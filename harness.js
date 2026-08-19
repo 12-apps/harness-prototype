@@ -1116,6 +1116,15 @@ const Proto = (() => {
       out += `# ui: as linhas "# ui:" abaixo mapeiam a marcação do protótipo `
            + `para componentes de ${cfg.library} — use o componente, não recrie o CSS\n`;
     }
+    /* A React prototype has no map to read: it imports the components, and the
+       gate hands that list in. These are the real imports, checked against the
+       catalog, not a description of them. */
+    const used = (typeof window !== "undefined" && window.PROTO_IMPORTS) || null;
+    if (used && used.length){
+      out += `# ui: este protótipo usa os componentes abaixo — são os imports dele, `
+           + `não uma descrição da marcação\n`;
+      used.forEach(u => { out += `# ui: import { ${u.name} } from "${u.from}";\n`; });
+    }
     if (suite && suite.coverage){
       const c = suite.coverage;
       out += `# cobertura: ${c.exercised} de ${c.total} handlers disparados por algum passo\n`;
@@ -1643,6 +1652,9 @@ const Proto = (() => {
   const INTERACTIVE_ROLES = ["button","link","checkbox","switch","tab","menuitem",
     "menuitemcheckbox","option","combobox","slider","radio","textbox","searchbox","spinbutton"];
 
+  /* Roles that exist to be announced, not operated. */
+  const ANNOUNCING_ROLES = ["alert","status","log","progressbar","timer","marquee"];
+
   function hasAffordance(el){
     const tag = el.tagName.toLowerCase();
     if (["button","select","textarea","input"].indexOf(tag) > -1) return true;
@@ -1650,6 +1662,12 @@ const Proto = (() => {
     if (INTERACTIVE_ROLES.indexOf(el.getAttribute("role")) > -1) return true;
     if (el.hasAttribute("data-act") || el.hasAttribute("data-campo")) return true;
     if (el.hasAttribute("onclick")) return true;
+    /* A live region is focusable so a screen reader can be sent to it, not
+       because there is anything to operate: an Alert ships role="alert" with
+       tabindex="0", and reading that as an affordance demands a handler the
+       prototype has no business writing — and cannot remove, since the role
+       and the tabindex belong to the component. */
+    if (ANNOUNCING_ROLES.indexOf(el.getAttribute("role")) > -1) return false;
     const ti = el.getAttribute("tabindex");
     if (ti != null && Number(ti) >= 0) return true;
     if (el.isContentEditable) return true;

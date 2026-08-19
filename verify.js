@@ -66,6 +66,9 @@ const label = isApp ? appName : path.basename(file);
    once <Button> renders, MUI emits a real <button> and nothing downstream can
    tell it from one an agent typed. */
 const jsxEntry = isApp && fs.existsSync(path.join(file, "app.jsx"));
+/* the components the prototype imports; the build fills this and the page
+   gets it, so the .feature can list what an implementer actually needs */
+let usedComponents = [];
 
 if (isApp){
   const need = ["styles.css", "data.js", jsxEntry ? "app.jsx" : "app.js"];
@@ -78,7 +81,7 @@ if (isApp){
 
   if (jsxEntry){
     /* 1. the component rule, before a browser is even started */
-    const { lint, loadCatalog } = require("./scripts/lint-prototype.js");
+    const { lint, loadCatalog, designSystemImports } = require("./scripts/lint-prototype.js");
     const entry = path.join(file, "app.jsx");
     let problems;
     try { problems = lint(entry, loadCatalog(__dirname)); }
@@ -109,6 +112,7 @@ if (isApp){
       process.exit(1);
     }
     console.log(`built ${path.relative(__dirname, entry)} in ${Date.now() - t0}ms`);
+    usedComponents = designSystemImports(entry);
   }
   if (!fs.existsSync(pageFile)){
     console.error("✕ proto.html not found next to verify.js");
@@ -164,6 +168,7 @@ async function runInBrowser(pageUrl, chrome, pptr){
     await pg.setViewport({ width:1400, height:1000 });
     const errors = [];
     pg.on("pageerror", e => errors.push(String(e.message).split("\n")[0]));
+    await pg.evaluateOnNewDocument(list => { window.PROTO_IMPORTS = list; }, usedComponents);
     await pg.goto(pageUrl, { waitUntil:"load" });
     await pg.waitForFunction("window.Proto && typeof window.Proto.verifyAll === 'function'", { timeout:20000 });
     const loadError = await pg.evaluate(() => window.PROTO_LOAD_ERROR || null);
@@ -193,6 +198,8 @@ async function runInBrowser(pageUrl, chrome, pptr){
    this is the deliverable, because a folder emailed to someone arrives with
    a file missing sooner or later. */
 function bundle(appDir, appName){
+  /* A React prototype ships the built bundle, not app.jsx: a browser cannot
+     run JSX, and the build already carries React and the components with it. */
   /* inlined script must not carry a sequence that closes its own block —
      the engine builds one deliberately, to inject a marker into the
      verification iframe */
@@ -227,7 +234,7 @@ ${read(here("catalog/ui-catalog.js"))}
 ${read(app("data.js"))}
 </script>
 <script>
-${read(app("app.js"))}
+${read(jsxEntry ? path.join(appDir, ".build", "app.js") : app("app.js"))}
 </script>
 </body>
 </html>
@@ -250,6 +257,19 @@ function writeArtifacts(dir, arts){
   put(base + ".feature", arts.feature);
   put("api.md", arts.api);
   put(base + ".html", isApp ? bundle(file, appName) : arts.html);
+
+  /* The bundle is for looking at; the source is what gets implemented. A
+     2MB build with React inlined is no use to somebody reading the screen. */
+  if (isApp){
+    const srcDir = path.join(dir, "source");
+    fs.mkdirSync(srcDir, { recursive: true });
+    ["styles.css", "data.js", jsxEntry ? "app.jsx" : "app.js"].forEach(f => {
+      const from = path.join(file, f);
+      if (!fs.existsSync(from)) return;
+      fs.copyFileSync(from, path.join(srcDir, f));
+      wrote.push("source/" + f);
+    });
+  }
   console.log("→ " + dir + ": " + (wrote.length ? wrote.join(", ") : "nothing to write"));
 }
 
@@ -307,6 +327,7 @@ const html = fs.readFileSync(pageFile, "utf8");
 const dom = new JSDOM(html, {
   runScripts: "dangerously",
   resources: "usable",
+  beforeParse(w){ w.PROTO_IMPORTS = usedComponents; },
   pretendToBeVisual: true,
   url: pageUrl
 });

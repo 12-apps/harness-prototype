@@ -34,11 +34,11 @@ cp -r apps/_template apps/<area>-<thing>
 apps/<area>-<thing>/
   styles.css   the prototype's styles
   data.js      fixtures and routes
-  app.js       context, scenarios and render
+  app.jsx      context, scenarios and render — React, real components
 ```
 
 Open it with `proto.html?app=<area>-<thing>`. The bench loads those three, in that
-order, so `app.js` can count on the fixtures already existing.
+order, so `app.jsx` can count on the fixtures already existing.
 
 The harness is never copied: one `harness.js` and one `harness.css` serve every
 prototype, and neither appears in the files you edit. The chrome also sits in a

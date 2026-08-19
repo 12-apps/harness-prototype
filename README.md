@@ -21,7 +21,7 @@ apps/
   product-editor/
     styles.css   the prototype's styles
     data.js      fixtures and routes
-    app.js       context, scenarios and render
+    app.jsx      context, scenarios and render — React, real components
 ```
 
 Open `proto.html?app=product-editor`. Ten prototypes still means one harness —
@@ -37,7 +37,7 @@ a folder now, and folders lose files in transit.
 2. Fill its three files:
    - `data.js` — fixtures and routes
    - `styles.css` — the prototype's styles
-   - `app.js` — context, scenarios and render
+   - `app.jsx` — context, scenarios and render (React; `app.js` for a vanilla one)
 3. Open `proto.html?app=<area>-<thing>`. The suite runs on its own and blocks the
    screen if it fails.
 4. Before shipping, run the gate. It has to exit `0`:
@@ -79,6 +79,7 @@ node verify.js apps/my-screen --export handoff/
 | `<name>.feature` | the scenarios as Gherkin, with the component and route hints |
 | `api.md` | every declared route, with a request and response **actually observed** while the scenarios ran — not an example someone wrote and never checked |
 | `<name>.html` | **one self-contained file** — bench, catalog and app inlined. Nothing travels with it, so nothing can be dropped on the way |
+| `source/` | the prototype's own files. The bundle is for looking at; this is what gets implemented |
 
 The `.feature` and `api.md` are a click away in the browser too, under **Gherkin**. The
 single-file bundle comes from the command line: a page cannot read the sidecars it was
@@ -125,7 +126,7 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 | `harness.js` | the engine. Loaded by every prototype, edited by none |
 | `harness.css` | the chrome, loaded inside a shadow root |
 | `proto.html` | the bench: a loader, `?app=<name>`. Never changes |
-| `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.js` |
+| `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.jsx` |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
 | `catalog/` | the 210 components of `@12-apps/ui`, generated from the installed package |
@@ -152,7 +153,7 @@ component name, which invented 24 components that do not exist (`charts`,
 `tokens`, `utils`, and a turborepo scaffolding `button` that alerts *"Hello from
 your app!"*) and mis-named 3 that do.
 
-The harness checks the names used in `primitives` against this catalog.
+The gate checks every component a prototype imports against this catalog: a name that is not in it, or the right name from the wrong path, fails the build.
 
 Note `catalog/ui-interactions.*` is curated by hand, not generated: it currently
 classifies 116 of the 210 components. Regenerating the catalog does not update it.

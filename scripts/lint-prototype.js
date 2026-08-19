@@ -123,7 +123,27 @@ function lint(file, catalog){
   return problems;
 }
 
-module.exports = { lint, loadCatalog };
+/* The components a prototype actually imports. The handoff used to carry a
+   hand-written selector→component map; with real imports that map is the
+   import list, and this is where it comes from. */
+function designSystemImports(file){
+  const babel = require("@babel/parser");
+  const src = fs.readFileSync(file, "utf8");
+  let ast;
+  try { ast = babel.parse(src, { sourceType:"module", plugins:["jsx"] }); }
+  catch { return []; }
+  const out = [];
+  (ast.program.body || []).forEach(n => {
+    if (n.type !== "ImportDeclaration") return;
+    if (!String(n.source.value).startsWith(PKG)) return;
+    n.specifiers.forEach(sp => {
+      if (sp.imported) out.push({ name: sp.imported.name, from: n.source.value });
+    });
+  });
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+module.exports = { lint, loadCatalog, designSystemImports };
 
 if (require.main === module){
   const file = process.argv[2];

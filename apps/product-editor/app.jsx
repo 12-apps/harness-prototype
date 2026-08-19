@@ -1,5 +1,253 @@
+import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
+import { Box } from "@12-apps/ui/mui/Box";
+import { Heading } from "@12-apps/ui/typography/Heading";
+import { Paragraph } from "@12-apps/ui/typography/Paragraph";
+import { Text } from "@12-apps/ui/typography/Text";
+import { Button } from "@12-apps/ui/form/Button";
+import { Input } from "@12-apps/ui/form/Input";
+import { Card } from "@12-apps/ui/layout/Card";
+import { Skeleton } from "@12-apps/ui/layout/Skeleton";
+import { Badge } from "@12-apps/ui/data-display/Badge";
+import { Alert } from "@12-apps/ui/data-display/Alert";
+import { Banner } from "@12-apps/ui/data-display/Banner";
+
+/* One React root per element the harness hands us, rendering into a container
+   of its own — never straight into the harness's element. The suite draws into
+   throwaway probes and clears them between passes; React would otherwise try to
+   remove nodes that are no longer its children and throw NotFoundError on
+   commit, asynchronously, where a try/catch around render cannot reach it.
+
+   replaceChildren is what keeps it to exactly one: the harness does not clear
+   the element before calling mount — it expects mount to own it — so appending
+   a container per call silently stacked 25 rendered screens in one probe, and
+   the audit then found an error mark belonging to a scenario that had finished
+   long before. `display:contents` keeps the container out of layout, so the
+   width rules still measure the real boxes. */
+const roots = new WeakMap();
+function rootFor(el){
+  const entry = roots.get(el);
+  if (entry && entry.host.parentNode === el) return entry.root;
+  const host = document.createElement("div");
+  host.style.display = "contents";
+  el.replaceChildren(host);
+  const root = createRoot(host);
+  roots.set(el, { host, root });
+  return root;
+}
+
+/* `state` on a screen tells the harness which of the four paths is showing,
+   and it is what the three mandatory state scenarios asserts against. */
+function stateOf(s, hasContent){
+  return (s.app.loading || s.waitingFor()) ? "carregando"
+       : s.app.error_                      ? "erro"
+       : !hasContent                       ? "vazio"
+       :                                     "conteudo";
+}
+
+function Loading({ bars, label }){
+  return (
+    <Box className="estado" data-estado="carregando" aria-busy="true">
+      <Box className="esqueleto">
+        {Array.from({ length: bars }, (_, i) => <Skeleton key={i} />)}
+      </Box>
+      <Paragraph>{label}</Paragraph>
+    </Box>
+  );
+}
+
+function ListScreen({ s }){
+  const items = s.app.products;
+  const st = stateOf(s, !(items && !items.length));
+  const columns = s.rung === "xlg" ? 3 : (s.widthPx >= 768 ? 2 : 1);
+
+  const body =
+    st === "carregando" ? <Loading bars={4} label="Carregando o cardápio…" /> :
+    st === "erro" ? (
+      <Box className="estado erro" data-estado="erro">
+        <Heading level="h2">Não deu para carregar o cardápio</Heading>
+        <Paragraph>{s.app.error_ || ""}</Paragraph>
+        <Button className="btn" data-act="recarregar-lista">Tentar de novo</Button>
+      </Box>
+    ) :
+    st === "vazio" ? (
+      <Box className="estado" data-estado="vazio">
+        {s.app.listError && <Alert className="aviso" data-erro="lista">{s.app.listError}</Alert>}
+        <Heading level="h2">Nenhum produto no cardápio</Heading>
+        <Paragraph>Cadastre o primeiro item para a loja abrir.</Paragraph>
+        <Button className="btn" data-act="novo-produto">Criar produto</Button>
+      </Box>
+    ) : (
+      <Box data-estado="conteudo" data-colunas={columns}
+           data-acao={s.widthPx >= 768 ? "topo" : "rodape"}>
+        <Box className="grade">
+          {(items || []).map(p => (
+            <Button key={p.id} className="linha" data-act="abrir-produto" data-id={p.id}>
+              <Text className="nome">
+                <Text component="b">{p.nameStr}</Text>
+                <Text className="cat">{p.category}</Text>
+              </Text>
+              <Text className="qtd">
+                {p.variants} {p.variants === 1 ? "variação" : "variações"}
+              </Text>
+            </Button>
+          ))}
+        </Box>
+        <Box className="acao-fixa">
+          <Button className="btn" data-act="novo-produto">Novo produto</Button>
+        </Box>
+      </Box>
+    );
+
+  return (
+    <Box className="app">
+      <Box className="app-hd" component="header">
+        <Heading level="h1">Cardápio</Heading>
+        <Paragraph>
+          {items ? items.length + (items.length === 1 ? " produto" : " produtos") : "—"}
+        </Paragraph>
+        <Button className="voltar" data-act="recarregar-lista">Recarregar</Button>
+      </Box>
+      <Box className="app-bd" data-async data-estado-atual={st}>{body}</Box>
+    </Box>
+  );
+}
+
+function ProductScreen({ s }){
+  const prod = s.app.product;
+  const vars = (prod && prod.variants) || [];
+  const canEdit = s.can("produto.editar");
+  const incomplete = vars.some(v => !v.price);
+  const st = stateOf(s, vars.length || s.app.payment);
+
+  const body =
+    st === "carregando" ? <Loading bars={3} label="Carregando o produto…" /> :
+    st === "erro" ? (
+      <Box className="estado erro" data-estado="erro">
+        <Heading level="h2">Não deu para carregar</Heading>
+        <Paragraph>{s.app.error_ || ""}</Paragraph>
+        <Button className="btn" data-act="tentar">Tentar de novo</Button>
+      </Box>
+    ) :
+    st === "vazio" ? (
+      <Box className="estado" data-estado="vazio">
+        {s.app.variantError && <Alert className="aviso" data-erro="variacao">{s.app.variantError}</Alert>}
+        <Heading level="h2">Nenhuma variação ainda</Heading>
+        <Paragraph>Crie tamanhos ou sabores sem duplicar o produto.</Paragraph>
+        {canEdit && <Button className="btn" data-act="add">Adicionar variação</Button>}
+      </Box>
+    ) : (
+      <Box data-estado="conteudo" data-colunas={s.widthPx >= 768 ? 2 : 1}
+           data-acao={s.widthPx >= 768 ? "topo" : "rodape"}>
+        {s.app.variantError && <Alert className="aviso" data-erro="variacao">{s.app.variantError}</Alert>}
+        {s.app.saved && <Badge className="tag">Produto salvo</Badge>}
+        {s.app.saveError && <Alert className="aviso" data-erro="salvar">{s.app.saveError}</Alert>}
+        {s.app.payment && (
+          <Badge className="tag" data-pg="ok">Pagamento aprovado · {s.app.payment.id}</Badge>
+        )}
+        {s.app.paymentError && <Alert className="aviso" data-pg="erro">{s.app.paymentError}</Alert>}
+
+        {!canEdit && (
+          <Alert className="aviso">
+            Você pode consultar este produto, mas quem edita preço é o gerente ou o dono.
+          </Alert>
+        )}
+
+        <Box className="grade">
+          {vars.map((v, i) => (
+            <Card key={v.id || i} className="var">
+              <Text component="b">{v.nameStr}</Text>
+              {canEdit ? (
+                <Input
+                  value={v.price}
+                  placeholder="0,00"
+                  slotProps={{ htmlInput: {
+                    className: "preco", "data-campo": "preco", "data-i": i,
+                    inputMode: "decimal", "aria-label": "Preço de " + v.nameStr
+                  } }}
+                />
+              ) : (
+                <Text>{v.price ? "R$ " + v.price : "sem preço"}</Text>
+              )}
+            </Card>
+          ))}
+
+          {s.app.blocked && (
+            <Banner className="trava">
+              <Heading level="h2">Limite de variações do plano</Heading>
+              <Paragraph>
+                Este plano vai até {String(s.app.limite || 0)}. Suba de plano para criar mais.
+              </Paragraph>
+            </Banner>
+          )}
+
+          {s.app.margin && s.can("relatorio.margem") && (
+            <Card className="card" data-card="margem">
+              <Heading level="h2">Margem por variação</Heading>
+              <Paragraph>Custo da ficha técnica contra o preço de venda de cada tamanho.</Paragraph>
+            </Card>
+          )}
+
+          {s.flag("cozinha") && (
+            <Card className="card">
+              <Heading level="h2">Cozinha</Heading>
+              <Paragraph>Cada variação pode ter tempo de preparo diferente.</Paragraph>
+            </Card>
+          )}
+
+          {s.flag("estoque") && (
+            <Card className="card">
+              <Heading level="h2">SKU e estoque</Heading>
+              <Paragraph>Cada variação baixa do estoque separadamente.</Paragraph>
+            </Card>
+          )}
+
+          {canEdit && vars.length > 0 && (
+            <Button className="btn ghost" data-act="add">Adicionar variação</Button>
+          )}
+          <Button className="btn ghost" data-act="pagar">Confirmar pagamento</Button>
+        </Box>
+      </Box>
+    );
+
+  return (
+    <Box className="app">
+      <Box className="app-hd" component="header">
+        <Button className="voltar" data-act="voltar">← Cardápio</Button>
+        <Heading level="h1">{prod ? prod.nameStr : "Produto"}</Heading>
+        <Paragraph>
+          {vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}
+        </Paragraph>
+      </Box>
+
+      <Box className="app-bd" data-async data-estado-atual={st}>{body}</Box>
+
+      {canEdit && st === "conteudo" && (
+        <Box className="actions acao-fixa">
+          <Button className="btn" data-act="salvar" disabled={incomplete || !vars.length}>
+            Salvar
+          </Button>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function Screen({ s }){
+  /* the page comes from the state; when in doubt, whatever has a list is
+     the list */
+  const pg = s.app.page || (s.app.products ? "lista" : "produto");
+  return pg === "lista" ? <ListScreen s={s} /> : <ProductScreen s={s} />;
+}
+
 /* Context, scenarios and render — the specification itself.
-   Loaded after data.js, so PROTO_DATA and PROTO_ROUTES already exist. */
+   Loaded after data.js, so PROTO_DATA and PROTO_ROUTES already exist.
+
+   React, and every element comes from the design system: there is no raw
+   HTML in this file and the gate refuses to run one that has any. The DOM
+   contract the scenarios assert on — the data-* hooks and the class names —
+   is carried through on the components, which is why the same 68 checks
+   still hold after the port. */
 
 Proto.init({
   title: "editor de produto",
@@ -10,40 +258,6 @@ Proto.init({
   routes: window.PROTO_ROUTES,
   latency: [250, 750],   /* a random range, on screen only; verification runs with no delay */
 
-  /* demands that every piece of markup with text or interaction is claimed
-     by a component from the map below */
-  strictMode: true,
-
-  /* The mapping between the prototype's markup and what the library already
-     has. Prototyping by hand is fast; the map keeps the home-made version
-     from becoming a new component in production. It goes into the .feature
-     as "# ui:". */
-  primitives: {
-    ".btn":               "Button",
-    ".card":              "Card",
-    ".var":               "Card",
-    ".empty":             "EmptyState",
-    ".aviso":             "Alert",
-    ".trava":             "Banner",
-    ".tag":               "Badge",
-    ".app-hd":            "AppHeader",
-    ".actions":           "ContentToolbar",
-    "[data-async]":       "AsyncStateContainer",
-    "[data-estado=vazio]":      "EmptyState",
-    "[data-estado=erro]":       "ErrorState",
-    "[data-estado=carregando]": "LoadingState",
-    "[data-card=margem]": "StatCard",
-    /* text and fields are components too — without this, strict mode reports
-       raw markup, which is exactly the point */
-    "h1, h2":             "Heading",
-    ".linha":             "Button",
-    ".linha b, .linha .cat, .linha .qtd, .linha .nome, .var span": "Text",
-    ".voltar":            "Button",
-    "[data-act=recarregar-lista]": "Button",
-    ".app-hd p, .card p, .estado p, .trava p": "Paragraph",
-    ".var b":             "Text",
-    "input.preco":        "Input"
-  },
 
   feature: {
     name: "Variações de produto",
@@ -532,174 +746,16 @@ Proto.init({
     }
   ],
 
-  render(s){
-    /* the page comes from the state; when in doubt, whatever has a list is
-     the list */
-    const pg = s.app.page || (s.app.products ? "lista" : "produto");
-    return pg === "lista" ? listScreen(s) : productScreen(s);
+  /* flushSync, not render: the harness measures the DOM on the very next
+     line, and a concurrent commit would not be there yet. */
+  mount(el, state){
+    const draw = () => flushSync(() => rootFor(el).render(<Screen s={state} />));
+    try { draw(); }
+    catch { roots.delete(el); draw(); }
   },
 
   defaultPage: "produto"
 });
-
-function listScreen(s){
-  const items = s.app.products;
-  const st_ = (s.app.loading || s.waitingFor()) ? "carregando"
-               : s.app.error_       ? "erro"
-               : (items && !items.length) ? "vazio"
-               : "conteudo";
-
-  const payload =
-    st_ === "carregando" ? `
-      <div class="estado" data-estado="carregando" aria-busy="true">
-        <div class="esqueleto"><i></i><i></i><i></i><i></i></div>
-        <p>Carregando o cardápio…</p>
-      </div>` :
-    st_ === "erro" ? `
-      <div class="estado erro" data-estado="erro">
-        <h2>Não deu para carregar o cardápio</h2>
-        <p>${Proto.esc(s.app.error_ || "")}</p>
-        <button class="btn" data-act="recarregar-lista">Tentar de novo</button>
-      </div>` :
-    st_ === "vazio" ? `
-      <div class="estado" data-estado="vazio">
-        ${s.app.listError ? `<div class="aviso" data-erro="lista">${Proto.esc(s.app.listError)}</div>` : ``}
-        <h2>Nenhum produto no cardápio</h2>
-        <p>Cadastre o primeiro item para a loja abrir.</p>
-        <button class="btn" data-act="novo-produto">Criar produto</button>
-      </div>` : `
-      <div data-estado="conteudo" data-colunas="${s.rung === "xlg" ? 3 : (s.widthPx >= 768 ? 2 : 1)}"
-           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
-        <div class="grade">
-        ${(items || []).map(p => `
-          <button class="linha" data-act="abrir-produto" data-id="${Proto.esc(p.id)}">
-            <span class="nome">
-              <b>${Proto.esc(p.nameStr)}</b>
-              <span class="cat">${Proto.esc(p.category)}</span>
-            </span>
-            <span class="qtd">${p.variants} ${p.variants === 1 ? "variação" : "variações"}</span>
-          </button>`).join("")}
-        </div>
-        <div class="acao-fixa"><button class="btn" data-act="novo-produto">Novo produto</button></div>
-      </div>`;
-
-  return `
-    <div class="app">
-      <header class="app-hd">
-        <h1>Cardápio</h1>
-        <p>${items ? items.length + (items.length === 1 ? " produto" : " produtos") : "—"}</p>
-        <button class="voltar" data-act="recarregar-lista">Recarregar</button>
-      </header>
-      <div class="app-bd" data-async data-estado-atual="${st_}">${payload}</div>
-    </div>`;
-}
-
-function productScreen(s){
-    const prod = s.app.product;
-    const vars = (prod && prod.variants) || [];
-    const canEdit = s.can("produto.editar");
-    const incomplete = vars.some(v => !v.price);
-
-    /* AsyncStateContainer: the four paths live in one place, and each marks
-       data-estado — that is what the harness asserts on its own. */
-    const st_ = (s.app.loading || s.waitingFor()) ? "carregando"
-                 : s.app.error_       ? "erro"
-                 : (!vars.length && !s.app.payment) ? "vazio"
-                 : "conteudo";
-
-    const loading = `
-      <div class="estado" data-estado="carregando" aria-busy="true">
-        <div class="esqueleto"><i></i><i></i><i></i></div>
-        <p>Carregando o produto…</p>
-      </div>`;
-
-    const error_ = `
-      <div class="estado erro" data-estado="erro">
-        <h2>Não deu para carregar</h2>
-        <p>${Proto.esc(s.app.error_ || "")}</p>
-        <button class="btn" data-act="tentar">Tentar de novo</button>
-      </div>`;
-
-    const empty = `
-      <div class="estado" data-estado="vazio">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
-        <h2>Nenhuma variação ainda</h2>
-        <p>Crie tamanhos ou sabores sem duplicar o produto.</p>
-        ${canEdit ? `<button class="btn" data-act="add">Adicionar variação</button>` : ``}
-      </div>`;
-
-    const content = `
-      <div data-estado="conteudo" data-colunas="${s.widthPx >= 768 ? 2 : 1}"
-           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
-        ${s.app.saved ? `<span class="tag">Produto salvo</span>` : ``}
-        ${s.app.saveError ? `<div class="aviso" data-erro="salvar">${Proto.esc(s.app.saveError)}</div>` : ``}
-        ${s.app.payment ? `<span class="tag" data-pg="ok">Pagamento aprovado · ${Proto.esc(s.app.payment.id)}</span>` : ``}
-        ${s.app.paymentError ? `<div class="aviso" data-pg="erro">${Proto.esc(s.app.paymentError)}</div>` : ``}
-
-        ${!canEdit ? `<div class="aviso">
-          Você pode consultar este produto, mas quem edita preço é o gerente ou o dono.
-        </div>` : ``}
-
-        <div class="grade">
-        ${vars.map((v, i) => `
-          <div class="var">
-            <b>${Proto.esc(v.nameStr)}</b>
-            ${canEdit
-              ? `<input class="preco" data-campo="preco" data-i="${i}" inputmode="decimal"
-                        value="${Proto.esc(v.price)}" placeholder="0,00"
-                        aria-label="Preço de ${Proto.esc(v.nameStr)}">`
-              : `<span>${v.price ? "R$ " + Proto.esc(v.price) : "sem preço"}</span>`}
-          </div>`).join("")}
-
-        ${s.app.blocked ? `<div class="trava">
-          <h2>Limite de variações do plano</h2>
-          <p>Este plano vai até ${Proto.esc(String(s.app.limite || 0))}. Suba de plano para criar mais.</p>
-        </div>` : ``}
-
-        ${s.app.margin && s.can("relatorio.margem") ? `
-        <div class="card" data-card="margem">
-          <h2>Margem por variação</h2>
-          <p>Custo da ficha técnica contra o preço de venda de cada tamanho.</p>
-        </div>` : ``}
-
-        ${s.flag("cozinha") ? `
-        <div class="card">
-          <h2>Cozinha</h2>
-          <p>Cada variação pode ter tempo de preparo diferente.</p>
-        </div>` : ``}
-
-        ${s.flag("estoque") ? `
-        <div class="card">
-          <h2>SKU e estoque</h2>
-          <p>Cada variação baixa do estoque separadamente.</p>
-        </div>` : ``}
-
-        ${canEdit && vars.length ? `<button class="btn ghost" data-act="add">Adicionar variação</button>` : ``}
-        <button class="btn ghost" data-act="pagar">Confirmar pagamento</button>
-        </div>
-      </div>`;
-
-    const payload = st_ === "carregando" ? loading
-                : st_ === "erro"       ? error_
-                : st_ === "vazio"      ? empty
-                : content;
-
-    return `
-      <div class="app">
-        <header class="app-hd">
-          <button class="voltar" data-act="voltar">← Cardápio</button>
-          <h1>${prod ? Proto.esc(prod.nameStr) : "Produto"}</h1>
-          <p>${vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}</p>
-        </header>
-
-        <div class="app-bd" data-async data-estado-atual="${st_}">${payload}</div>
-
-        ${canEdit && st_ === "conteudo" ? `<div class="actions acao-fixa">
-          <button class="btn" data-act="salvar" ${incomplete || !vars.length ? "disabled" : ""}>Salvar</button>
-        </div>` : ``}
-      </div>`;
-}
 
 /* navigating is a request: opening the product fetches the detail, going
        back refetches the list */
