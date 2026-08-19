@@ -215,6 +215,54 @@ import { Button } from "@12-apps/ui/form/Button";
 import { Heading } from "@12-apps/ui/typography/Heading";
 ```
 
+## Components that exist to be operated must be wired
+
+Using the component is not the end of it. `catalog/ui-interactions.md` classifies
+every component in the catalog by what the screen owes it:
+
+| level | meaning |
+|---|---|
+| `exige` | always operable — a `CollapsibleTrigger` renders a button, a `SubmitButton` submits |
+| `pode` | operable only if you give it a handler — a `Card`, an `Avatar` |
+| `nunca` | nothing to operate — a `CardContent`, a `ThemeProvider`, an icon |
+
+An `exige` component with nothing to do is a hole in the specification that reads
+as a finished screen, so the gate rejects it:
+
+```
+$ node verify.js apps/cardapio
+  apps/cardapio/app.jsx:71  <CollapsibleTrigger> is "exige" in catalog/ui-interactions.md — it always
+  renders something to operate, so a screen that shows one owes a step. Give it data-act="…" (or
+  data-campo="…" for a field) and a matching Proto.on, or use a component that is not operable.
+```
+
+The chain is checked in both directions, in the source:
+
+```jsx
+<Button data-act="save">Salvar</Button>          {/* the hook  */}
+Proto.on("click", '[data-act="save"]', …)        {/* answers it */}
+```
+
+- an `exige` component with no `data-act`, no `data-campo`, no `on…` prop and no
+  `href` → **unwired-component**;
+- a `data-act` / `data-campo` no `Proto.on` answers → **hook-without-handler**, a
+  control that looks live and is not;
+- a `Proto.on` for a hook no element carries → **handler-without-hook**, dead code
+  or an attribute renamed on one side only.
+
+MUI often puts the real element behind a slot, and the check reads that too:
+
+```jsx
+<Input slotProps={{ htmlInput: { "data-campo": "preco" } }} />
+```
+
+Two things the source cannot see, so they are not accused: a hook built at runtime
+(`data-act={id}`) and a hook arriving through a spread (`{...props}`). Both are
+allowed; a file that builds hooks at runtime just turns off the dead-handler
+direction, since "nowhere" would then be a guess. The runtime audit still covers
+those: it walks the rendered screen and reports anything operable that no step
+touches, plus every handler that no step fires (`handlers N/N` in the gate line).
+
 ## Rendering
 
 The harness measures the DOM immediately after drawing, and React commits

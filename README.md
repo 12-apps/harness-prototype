@@ -161,6 +161,12 @@ operable if given a handler, `nunca` = inert). Every level was read off the
 component's own declaration in the package source rather than guessed from its
 name — `CardContent` is a container, `CollapsibleTrigger` renders a button.
 
+It is enforced, not advisory: the gate rejects a prototype that renders an
+`exige` component with nothing to operate, a hook no `Proto.on` answers, or a
+handler for a hook no element carries — checked in the source, with a line
+number, before a browser starts. See "Components that exist to be operated must
+be wired" in `docs/project-instructions.md`.
+
 Regenerating the catalog does not update it. Two things keep the gap visible:
 the generator prints the names it wrote that still have no level, and
 `scripts/test-enforcement.js` fails the build on any component the

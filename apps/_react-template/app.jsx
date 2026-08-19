@@ -54,3 +54,11 @@ Proto.init({
     catch { roots.delete(el); draw(); }
   }
 });
+
+/* Every data-act on screen needs a handler answering it, and every handler
+   needs a step that fires it. The gate checks the first link in the source
+   and the second at runtime — a control that does nothing is not a smaller
+   version of the screen, it is a screen that lies about what it does. */
+Proto.on("click", '[data-act="recarregar"]', async (e, el, s) => {
+  await Proto.fetch("GET", "/api/items");
+});
