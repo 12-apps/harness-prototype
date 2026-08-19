@@ -295,6 +295,45 @@ direction, since "nowhere" would then be a guess. The runtime audit still covers
 those: it walks the rendered screen and reports anything operable that no step
 touches, plus every handler that no step fires (`handlers N/N` in the gate line).
 
+## Compounds are used with their parts
+
+Some components carry no box structure of their own — their parts do. `Card`
+supplies no padding; `CardContent` does. Fill a Card by hand and you get an
+unpadded box, so the padding goes back into `styles.css` and the component ends
+up as a border drawn around your own layout:
+
+```jsx
+<Card className="card">                       {/* ✕ uncomposed-compound   */}
+  <Heading level="h2">Margem</Heading>
+  <Paragraph>…</Paragraph>
+</Card>
+```
+```css
+.card{background:…;border:1px solid …;border-radius:…;padding:14px}
+```
+
+That was `apps/product-editor`, and all four of those declarations were already
+in the component. It now reads:
+
+```jsx
+<Card variant="outlined" className="card">
+  <CardContent>
+    <Heading level="h2">Margem</Heading>
+    <Paragraph>…</Paragraph>
+  </CardContent>
+</Card>
+```
+
+Six components are checked — `Card`, `Dialog`, `Accordion`, `Collapsible`,
+`Drawer`, `Sidebar` — and the list in `catalog/ui-composition.js` is derived,
+not chosen: the parent must take children, supply no padding, and have a part
+that does. `Form` is not on it, because no part of a Form carries structure and
+a Form holding its own fields is exactly right. Nor is `AppHeader`, which pads
+itself.
+
+A part nested deeper counts — `<Card><Box><CardContent/></Box></Card>` is fine
+— and children the source cannot read (`<Card>{body}</Card>`) are not accused.
+
 ## Rendering
 
 The harness measures the DOM immediately after drawing, and React commits

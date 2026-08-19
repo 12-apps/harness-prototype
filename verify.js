@@ -92,10 +92,10 @@ if (isApp){
 
   if (jsxEntry){
     /* 1. the component rule, before a browser is even started */
-    const { lint, loadCatalog, loadWiring, designSystemImports } = require("./scripts/lint-prototype.js");
+    const { lint, loadCatalog, loadWiring, loadParts, designSystemImports } = require("./scripts/lint-prototype.js");
     const entry = path.join(file, "app.jsx");
     let problems;
-    try { problems = lint(entry, loadCatalog(__dirname), loadWiring(__dirname)); }
+    try { problems = lint(entry, loadCatalog(__dirname), loadWiring(__dirname), loadParts(__dirname)); }
     catch (e){ console.error("✕ could not check the component rule: " + e.message); process.exit(3); }
     problems.filter(p => p.warn).forEach(p => console.error(`  ! ${entry}:${p.line}  ${p.msg}`));
     problems = problems.filter(p => !p.warn);

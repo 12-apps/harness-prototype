@@ -38,6 +38,7 @@ and nothing downstream can distinguish it from one an agent typed.
 | `unwired-component` | an `exige` component with no `data-act`, no `data-campo`, no `on…` prop and no `href` — an affordance that does nothing |
 | `hook-without-handler` | a `data-act` / `data-campo` no `Proto.on` answers |
 | `handler-without-hook` | a `Proto.on` for a hook no element carries |
+| `uncomposed-compound` | a `Card`, `Dialog`, `Accordion`, `Collapsible`, `Drawer` or `Sidebar` filled by hand instead of with the parts that give it its box structure |
 
 The last three come from `catalog/ui-interactions.js`, which classifies every
 component as `exige` (always operable), `pode` (operable if given a handler) or
@@ -46,6 +47,15 @@ left to the runtime audit, which decides from the rendered DOM, and `nunca` has
 no step to demand. The levels say what the screen owes a component, never
 whether to use it — `nunca` is the largest level because it holds the
 structure, `CardContent` and `SidebarHeader` and the rest.
+
+`uncomposed-compound` comes from `catalog/ui-composition.js`, and that list is
+derived rather than chosen: a component is on it only when it takes children,
+supplies no padding itself, and has a part that does. Skip the part and you get
+an unpadded box, so the padding gets written back into `styles.css` and the
+component becomes a border drawn around the prototype's own layout. Sixteen of
+the twenty-two same-name component families fail that test and are not checked
+— `Form` holding its own fields is right, `AppHeader` pads itself, `Command`
+and `Chart` render their own parts.
 
 Components you define yourself are fine — composing design-system parts into a
 screen is the job. Two things the source cannot see are deliberately not

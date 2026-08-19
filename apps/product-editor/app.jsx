@@ -8,6 +8,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Card } from "@12-apps/ui/layout/Card";
+import { CardContent } from "@12-apps/ui/layout/Card";
 import { Skeleton } from "@12-apps/ui/layout/Skeleton";
 import { Badge } from "@12-apps/ui/data-display/Badge";
 import { Alert } from "@12-apps/ui/data-display/Alert";
@@ -156,20 +157,22 @@ function ProductScreen({ s }){
 
         <Box className="grade">
           {vars.map((v, i) => (
-            <Card key={v.id || i} className="var">
-              <Text weight="bold">{v.nameStr}</Text>
-              {canEdit ? (
-                <Input
-                  value={v.price}
-                  placeholder="0,00"
-                  slotProps={{ htmlInput: {
-                    className: "preco", "data-campo": "preco", "data-i": i,
-                    inputMode: "decimal", "aria-label": "Preço de " + v.nameStr
-                  } }}
-                />
-              ) : (
-                <Text>{v.price ? "R$ " + v.price : "sem preço"}</Text>
-              )}
+            <Card key={v.id || i} variant="outlined">
+              <CardContent className="var">
+                <Text weight="bold">{v.nameStr}</Text>
+                {canEdit ? (
+                  <Input
+                    value={v.price}
+                    placeholder="0,00"
+                    slotProps={{ htmlInput: {
+                      className: "preco", "data-campo": "preco", "data-i": i,
+                      inputMode: "decimal", "aria-label": "Preço de " + v.nameStr
+                    } }}
+                  />
+                ) : (
+                  <Text>{v.price ? "R$ " + v.price : "sem preço"}</Text>
+                )}
+              </CardContent>
             </Card>
           ))}
 
@@ -183,23 +186,29 @@ function ProductScreen({ s }){
           )}
 
           {s.app.margin && s.can("relatorio.margem") && (
-            <Card className="card" data-card="margem">
-              <Heading level="h2">Margem por variação</Heading>
-              <Paragraph>Custo da ficha técnica contra o preço de venda de cada tamanho.</Paragraph>
+            <Card variant="outlined" className="card" data-card="margem">
+              <CardContent>
+                <Heading level="h2">Margem por variação</Heading>
+                <Paragraph>Custo da ficha técnica contra o preço de venda de cada tamanho.</Paragraph>
+              </CardContent>
             </Card>
           )}
 
           {s.flag("cozinha") && (
-            <Card className="card">
-              <Heading level="h2">Cozinha</Heading>
-              <Paragraph>Cada variação pode ter tempo de preparo diferente.</Paragraph>
+            <Card variant="outlined" className="card">
+              <CardContent>
+                <Heading level="h2">Cozinha</Heading>
+                <Paragraph>Cada variação pode ter tempo de preparo diferente.</Paragraph>
+              </CardContent>
             </Card>
           )}
 
           {s.flag("estoque") && (
-            <Card className="card">
-              <Heading level="h2">SKU e estoque</Heading>
-              <Paragraph>Cada variação baixa do estoque separadamente.</Paragraph>
+            <Card variant="outlined" className="card">
+              <CardContent>
+                <Heading level="h2">SKU e estoque</Heading>
+                <Paragraph>Cada variação baixa do estoque separadamente.</Paragraph>
+              </CardContent>
             </Card>
           )}
 

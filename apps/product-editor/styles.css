@@ -19,11 +19,10 @@
 .app-hd p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
 .app-bd{flex:1;padding:16px;display:grid;gap:10px;align-content:start}
 
-.card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px}
 .card h2{margin:0 0 6px;font-size:13px;font-weight:650}
 .card p{margin:0;font-size:13px;color:var(--ink-3)}
 
-.var{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.var{display:flex;align-items:center;gap:10px}
 .var b{font-size:13px;font-weight:600}
 .var input.preco{
   margin-left:auto;width:104px;text-align:right;min-height:44px;

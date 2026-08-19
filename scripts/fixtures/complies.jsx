@@ -5,6 +5,9 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Heading } from "@12-apps/ui/typography/Heading";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
+import { Card } from "@12-apps/ui/layout/Card";
+import { CardContent } from "@12-apps/ui/layout/Card";
+import { Form } from "@12-apps/ui/form/Form";
 
 function Row({ label }){
   return (
@@ -22,9 +25,21 @@ export default function Screen(){
     <Box>
       <Heading>Itens</Heading>
       <Row label="abrir" />
+      {/* a compound composed with its parts, including one nested a level down */}
+      <Card><CardContent><Heading>direto</Heading></CardContent></Card>
+      <Card><Box><CardContent><Heading>aninhado</Heading></CardContent></Box></Card>
+      {/* children the source cannot see are not accused */}
+      <Card>{slot()}</Card>
+      {/* and Form is NOT a checked compound: no part of it carries structure,
+          so a Form holding its fields directly is exactly right */}
+      <Form data-act="save"><Input slotProps={{ htmlInput: { "data-campo": "nome" } }} /></Form>
     </Box>
   );
 }
 
+function slot(){ return null; }
+
 Proto.on("click", '[data-act="open"]', () => {});
 Proto.on("input", '[data-campo="busca"]', () => {});
+Proto.on("click", '[data-act="save"]', () => {});
+Proto.on("input", '[data-campo="nome"]', () => {});

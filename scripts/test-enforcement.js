@@ -8,11 +8,12 @@
    ============================================================ */
 const fs = require("fs");
 const path = require("path");
-const { lint, loadCatalog, loadWiring } = require("./lint-prototype.js");
+const { lint, loadCatalog, loadWiring, loadParts } = require("./lint-prototype.js");
 
 const repo = path.join(__dirname, "..");
 const catalog = loadCatalog(repo);
 const wiring  = loadWiring(repo);
+const parts   = loadParts(repo);
 const fixture = f => path.join(__dirname, "fixtures", f);
 
 let failed = 0;
@@ -21,7 +22,7 @@ const check = (label, cond, detail) => {
   if (!cond) failed++;
 };
 
-const bad = lint(fixture("violates.jsx"), catalog, wiring);
+const bad = lint(fixture("violates.jsx"), catalog, wiring, parts);
 const kinds = bad.map(p => p.kind);
 const has = k => kinds.includes(k);
 
@@ -51,11 +52,31 @@ check("rejects markup built as a string",   bad.some(p => p.kind === "html-in-st
 /* …without firing on the harness's own step syntax, which looks identical. */
 check("leaves a Gherkin placeholder alone", !bad.some(p => /colunas/.test(p.msg)), "reported <colunas> as markup");
 /* A local component is composition, not a violation — but it is not silent. */
-check("notes a locally defined component",  lint(fixture("complies.jsx"), catalog, wiring).some(p => p.kind === "local-component" && p.warn), "not noted");
+check("notes a locally defined component",  lint(fixture("complies.jsx"), catalog, wiring, parts).some(p => p.kind === "local-component" && p.warn), "not noted");
 
-const good = lint(fixture("complies.jsx"), catalog, wiring).filter(p => !p.warn);
+/* A compound whose parts carry its box structure, used without them. The
+   fixture aliases the import (`Card as Kard`) so this also covers resolving
+   the catalog name through the local one. */
+check("rejects a compound filled by hand", has("uncomposed-compound") && bad.some(p => /<Kard>/.test(p.msg)), "not reported");
+
+const good = lint(fixture("complies.jsx"), catalog, wiring, parts).filter(p => !p.warn);
 check("passes a compliant prototype", good.length === 0,
       good.map(p => p.kind + ": " + p.msg).join(" | "));
+
+/* The compliant fixture is what stops this rule turning into noise: it holds
+   a Card composed directly, one composed a level down, one whose children the
+   source cannot read, and a Form holding its own fields. Only the first three
+   are about Card; the Form is there because Form is NOT a checked compound —
+   no part of it carries structure — and demanding parts for it would be the
+   kind of finding that teaches agents to ignore the gate. */
+const compounds = {};
+new Function("window", fs.readFileSync(path.join(repo, "catalog", "ui-composition.js"), "utf8"))(compounds);
+const checked = Object.keys(compounds.PROTO_UI_PARTS);
+check("does not demand parts for Form or AppHeader",
+      !checked.includes("Form") && !checked.includes("AppHeader"), checked.join(", "));
+check("every checked compound has parts in the catalog",
+      checked.every(c => c in catalog && compounds.PROTO_UI_PARTS[c].every(p => p in catalog)),
+      "a compound or a part is not a catalog component");
 
 /* ------------------------------------------------------------
    The classification has to cover the catalog it describes.
