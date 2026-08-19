@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /* ============================================================
-   PALADIRA · verification gate
+   PROTO · verification gate
    ============================================================
    Runs the prototype's suite OUTSIDE the browser and returns an exit
    code. It exists so that whoever edits the file — human or agent —
    does not ship a screen that is already broken.
 
-     node paladira-verify.js paladira-product-editor.html
-     node paladira-verify.js file.html --strict
+     node verify.js product-editor.html
+     node verify.js file.html --strict
 
    Exit codes:
      0  passed
@@ -27,7 +27,7 @@ const file = args.find(a => !a.startsWith("--"));
 const strict = args.includes("--strict");
 
 if (!file){
-  console.error("usage: node paladira-verify.js <file.html> [--strict]");
+  console.error("usage: node verify.js <file.html> [--strict]");
   process.exit(3);
 }
 if (!fs.existsSync(file)){
@@ -49,7 +49,7 @@ if (!fs.existsSync(file)){
    ------------------------------------------------------------------ */
 function findChromium(){
   const candidates = [
-    process.env.PALADIRA_CHROME,
+    process.env.PROTO_CHROME,
     "/home/claude/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome",
     "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
     "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"
@@ -83,11 +83,11 @@ async function runInBrowser(file, chrome, pptr){
     const errors = [];
     pg.on("pageerror", e => errors.push(String(e.message).split("\n")[0]));
     await pg.goto("file://" + path.resolve(file), { waitUntil:"load" });
-    await pg.waitForFunction("window.Paladira && typeof window.Paladira.verifyAll === 'function'", { timeout:20000 });
+    await pg.waitForFunction("window.Proto && typeof window.Proto.verifyAll === 'function'", { timeout:20000 });
     const r = await pg.evaluate(async () => {
-      const s = await window.Paladira.verifyAll();
+      const s = await window.Proto.verifyAll();
       return { ok:s.ok, bad:s.bad, warnings:s.warnings || [], infos:s.infos || [],
-               coverage:s.coverage || null, report: s.bad ? window.Paladira.report() : "" };
+               coverage:s.coverage || null, report: s.bad ? window.Proto.report() : "" };
     });
     r.errors = errors;
     return r;
@@ -142,7 +142,7 @@ const html = fs.readFileSync(file, "utf8");
 const dom = new JSDOM(html, {
   runScripts: "dangerously",
   pretendToBeVisual: true,
-  url: "https://paladira.local/" + path.basename(file)
+  url: "https://proto.local/" + path.basename(file)
 });
 const w = dom.window;
 
@@ -159,13 +159,13 @@ const errors = [];
 w.addEventListener("error", e => errors.push(e.message));
 
 w.addEventListener("load", () => {
-  /* the Paladira.on handlers are registered after init, so the suite is
+  /* the Proto.on handlers are registered after init, so the suite is
      only valid once the app script has finished — same reason as the
      setTimeout there */
   setTimeout(async () => {
-    const P = w.Paladira;
+    const P = w.Proto;
     if (!P || typeof P.verifyAll !== "function"){
-      console.error("✕ " + file + " does not expose the Paladira harness — is it a harness prototype?");
+      console.error("✕ " + file + " does not expose the Proto harness — is it a harness prototype?");
       process.exit(3);
     }
 

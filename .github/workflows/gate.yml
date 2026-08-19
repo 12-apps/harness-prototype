@@ -50,12 +50,12 @@ jobs:
 
       - name: verify the harness and the examples
         env:
-          PALADIRA_CHROME: ${{ steps.chrome.outputs.path }}
+          PROTO_CHROME: ${{ steps.chrome.outputs.path }}
         run: |
           failed=0
-          for f in paladira-harness.html examples/*.html; do
+          for f in proto.html examples/*.html; do
             [ -e "$f" ] || continue
             echo "── $f"
-            node paladira-verify.js "$f" || failed=1
+            node verify.js "$f" || failed=1
           done
           exit $failed

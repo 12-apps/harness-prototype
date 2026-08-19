@@ -8,7 +8,7 @@ and the harness audit decides from what the screen offers (role, tabindex,
 onclick, cursor:pointer, data-act), not from the component's name.
 
 The three level names stay Portuguese, matching the values in
-`paladira-ui-interactions.js`: `exige` = always operable, `pode` = operable if
+`ui-interactions.js`: `exige` = always operable, `pode` = operable if
 given a handler, `nunca` = inert.
 
 | nível | significado | n |

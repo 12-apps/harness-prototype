@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Paladira · protótipo</title>
+<title>Proto · protótipo</title>
 
 <!-- ============================================================
-     PALADIRA — REUSABLE HARNESS  v3
+     PROTO — REUSABLE HARNESS  v3
      ============================================================
 
      HOW TO USE
-     1. Copy this file. Rename it to paladira-<area>-<thing>.html
+     1. Copy this file. Rename it to <area>-<thing>.html
      2. Edit ONLY the zones marked with  ▼ APP ▼ … ▲ APP ▲
      3. Never edit the HARNESS zone.
 
@@ -37,12 +37,12 @@
      for Restaurante / Só bebidas / Loja without tripling the scenario.
 
      API
-       Paladira.init({ title, feature, context, scenarios, render })
-       Paladira.on(event, selector, fn)      delegated events
-       Paladira.set(patch)                   change state + re-render
-       Paladira.goto(id, step, example)      jump to a point
-       Paladira.verifyAll()                  run every scenario
-       Paladira.gherkin()                    return the .feature
+       Proto.init({ title, feature, context, scenarios, render })
+       Proto.on(event, selector, fn)      delegated events
+       Proto.set(patch)                   change state + re-render
+       Proto.goto(id, step, example)      jump to a point
+       Proto.verifyAll()                  run every scenario
+       Proto.gherkin()                    return the .feature
        s.app         the prototype's state
        s.ex          the active example row (in an Outline)
        s.flag(id)    is the feature on?
@@ -642,7 +642,7 @@ body{
 <body>
 <div class="h-shell">
   <header class="h-top">
-    <span class="h-brand"><span class="h-dot"></span>Paladira <em id="h-title">protótipo</em></span>
+    <span class="h-brand"><span class="h-dot"></span>Proto <em id="h-title">protótipo</em></span>
 
     <select class="h-sel" id="h-vp" aria-label="Viewport"></select>
     <select class="h-sel" id="h-zoomsel" aria-label="Escala">
@@ -740,9 +740,9 @@ body{
 /* ============================================================
    HARNESS — do not edit
    ============================================================ */
-const Paladira = (() => {
+const Proto = (() => {
   /* build stamp: lets you tell from the screen whether the open file is
-     the newest one — hover over the Paladira name */
+     the newest one — hover over the Proto name */
   const VERSION = "v3.7 · 2026-08-17 · primeira pintura imediata";
   /* ---------- breakpoint ladder ----------
      Naming the widths changes what you ask of the prototype: "works on
@@ -959,7 +959,7 @@ const Paladira = (() => {
      screen to reinvent. */
   function scanPrim(root){
     const map = cfg.primitives || {};
-    const cat = cfg.catalog || (typeof window !== "undefined" && window.PALADIRA_UI) || null;
+    const cat = cfg.catalog || (typeof window !== "undefined" && window.PROTO_UI) || null;
     const out = [];
     Object.keys(map).forEach(sel => {
       let n = 0;
@@ -1026,7 +1026,7 @@ const Paladira = (() => {
   /* `applyState` describes the transition; the button on screen runs its
      own. The two can drift apart with nobody noticing. A step with `click`
      closes that gap: it renders the state, looks for the element and calls
-     the SAME handlers registered with Paladira.on. If the element does not
+     the SAME handlers registered with Proto.on. If the element does not
      exist the step fails — the specification now demands the button
      exists. */
   let sandbox = null;
@@ -1051,7 +1051,7 @@ const Paladira = (() => {
   /* Not every interaction is a click. A field gets filled, a select gets
      chosen, a switch gets toggled — and each fires different events. A step
      declares what the person does and the harness runs it against the real
-     DOM, calling the handlers registered with Paladira.on. */
+     DOM, calling the handlers registered with Proto.on. */
   /* How do we know THIS button should have called the server? Three
      independent signals, none of which relies on anyone declaring intent:
 
@@ -1260,8 +1260,8 @@ const Paladira = (() => {
   }
 
   function installNetwork(){
-    if (window.__paladiraRede) return;
-    window.__paladiraRede = true;
+    if (window.__protoNetwork) return;
+    window.__protoNetwork = true;
     const originalFetch = window.fetch ? window.fetch.bind(window) : null;
 
     window.fetch = function(url, opts){
@@ -1466,7 +1466,7 @@ const Paladira = (() => {
   /* Context and layout preferences survive a reload. On about:srcdoc
      localStorage throws (null origin), so everything here is try/catch:
      with no storage the harness simply stops remembering. */
-  function prefsKey(){ return "paladira:" + (cfg.title || "proto"); }
+  function prefsKey(){ return "proto:" + (cfg.title || "proto"); }
 
   function readPrefs(){
     try { return JSON.parse(localStorage.getItem(prefsKey()) || "null"); }
@@ -2845,7 +2845,7 @@ const Paladira = (() => {
       warnings.push(`${sel} parece operável na tela mas nenhum handler responde — afordância sem ação`);
     });
 
-    /* Every Paladira.on is an onClick/onChange. Three different states, three
+    /* Every Proto.on is an onClick/onChange. Three different states, three
        different problems:
          matches nothing        → dead code
          matches, never fired   → uncovered behaviour
@@ -2883,7 +2883,7 @@ const Paladira = (() => {
       try {
         if (verifyIframe) verifyIframe.remove();
         const v = vp();
-        const mark = "<scr" + "ipt>window.__PALADIRA_CHILD=1;</scr" + "ipt>";
+        const mark = "<scr" + "ipt>window.__PROTO_CHILD=1;</scr" + "ipt>";
         const copy = "<!DOCTYPE html>" +
           document.documentElement.outerHTML.replace("<head>", "<head>" + mark);
 
@@ -2912,7 +2912,7 @@ const Paladira = (() => {
              srcdoc frame, so the window reference is what identifies it. */
           if (ev.source !== ifr.contentWindow) return;
           const m = ev.data;
-          if (!m || m.paladira !== 1) return;
+          if (!m || m.proto !== 1) return;
           alive = true;
           if (m.kindName === "progress"){ externalProgress(m.doneCount, m.total); return; }
           if (m.kindName === "result"){
@@ -3018,7 +3018,7 @@ const Paladira = (() => {
       state.ctx = contextOf(s);
       by[s.id] = {};
       doneCount++; idxAtual++; progressFn();
-      if (window.__paladiraProgresso) window.__paladiraProgresso(doneCount, total);
+      if (window.__protoProgress) window.__protoProgress(doneCount, total);
       await new Promise(r => setTimeout(r, 0));
       const rows = isOutline(s) ? s.examples.tableRows.map((_, i) => i) : [0];
 
@@ -3154,7 +3154,7 @@ const Paladira = (() => {
       return `${d.id}=${Array.isArray(v) ? (v.join(",") || "nenhuma") : v}`;
     }).join(" · ");
 
-    let t = `PALADIRA · a verificação falhou\n`;
+    let t = `PROTO · a verificação falhou\n`;
     t += `protótipo: ${cfg.title}\n`;
     t += `contexto: ${ctx}\n`;
     t += `placar: ${suite.bad} falha${suite.bad === 1 ? "" : "s"} · ${suite.ok} ok`;
@@ -3738,7 +3738,7 @@ const Paladira = (() => {
     $("h-title").textContent = cfg.title || "protótipo";
     const mark = document.querySelector(".h-brand");
     if (mark) mark.title = "harness " + VERSION;
-    document.title = "Paladira · " + (cfg.title || "protótipo");
+    document.title = "Proto · " + (cfg.title || "protótipo");
 
     cfg.context.forEach(d => {
       state.ctx[d.id] = d.kind === "flags"
@@ -4157,15 +4157,15 @@ const Paladira = (() => {
     else goto(state.scenario, -1, 0);
     fit();
 
-    if (window.__PALADIRA_CHILD){
+    if (window.__PROTO_CHILD){
       /* verifier mode: no sidebar, no link, no preferences — it just runs the
          suite in its own world and returns the report */
       const send = (kindName, extra) => {
-        try { parent.postMessage(Object.assign({ paladira:1, kindName }, extra), "*"); } catch {}
+        try { parent.postMessage(Object.assign({ proto:1, kindName }, extra), "*"); } catch {}
       };
       externalProgress = () => {};
       const sendProgress = (doneCount, total) => send("progress", { doneCount, total });
-      window.__paladiraProgresso = sendProgress;
+      window.__protoProgress = sendProgress;
       setTimeout(async () => {
         const r = await verifyAll();
         send("result", { suite: {
@@ -4178,7 +4178,7 @@ const Paladira = (() => {
 
     /* Runs on its own when the file opens: the file is reopened on every
        edit, so every change goes through the suite without anyone having to
-       remember. In a setTimeout because the Paladira.on calls come AFTER
+       remember. In a setTimeout because the Proto.on calls come AFTER
        init in the app script — verifying before that would report "no
        handler responds" for everything, which is a fault of the clock, not
        of the prototype. */
@@ -4195,8 +4195,8 @@ const Paladira = (() => {
     get verificationMode(){ return verificationMode; }, reset, fit, esc, state, VIEWPORTS };
 })();
 
-/* in the console: Paladira.state, Paladira.goto("id", 2), Paladira.verifyAll() */
-window.Paladira = Paladira;
+/* in the console: Proto.state, Proto.goto("id", 2), Proto.verifyAll() */
+window.Proto = Proto;
 </script>
 
 <!-- catálogo de @12-apps/ui — gerado do package.json.
@@ -4206,7 +4206,7 @@ window.Paladira = Paladira;
    128 components. Paste it into the prototype or load it from the
    project knowledge. The harness validates the names used in
    `primitives` against this catalog. */
-window.PALADIRA_UI = {
+window.PROTO_UI = {
   "button": "@12-apps/ui/button",
   "charts": "@12-apps/ui/charts",
   "social-login-button": "@12-apps/ui/social-login-button",
@@ -4345,7 +4345,7 @@ window.PALADIRA_UI = {
      deixar o fetch sair.
      ============================================================ -->
 <script>
-window.PALADIRA_DATA = {
+window.PROTO_DATA = {
   products: {
     "1": {
       id:"1", nameStr:"Pizza margherita", category:"Pizzas",
@@ -4363,7 +4363,7 @@ window.PALADIRA_DATA = {
   listFailsOnce: false
 };
 
-window.PALADIRA_ROUTES = [
+window.PROTO_ROUTES = [
   { httpMethod:"POST", pathStr:"/api/produtos",
     responds: ({ payload, data_ }) => {
       const id = String(Object.keys(data_.products).length + 1);
@@ -4432,13 +4432,13 @@ window.PALADIRA_ROUTES = [
      · Escreva do lado de quem usa, não do componente.
      ============================================================ -->
 <script>
-Paladira.init({
+Proto.init({
   title: "editor de produto",
 
   library: "@12-apps/ui",
 
-  data_: window.PALADIRA_DATA,
-  routes: window.PALADIRA_ROUTES,
+  data_: window.PROTO_DATA,
+  routes: window.PROTO_ROUTES,
   latency: [250, 750],   /* a random range, on screen only; verification runs with no delay */
 
   /* demands that every piece of markup with text or interaction is claimed
@@ -4989,12 +4989,12 @@ function listScreen(s){
     st_ === "erro" ? `
       <div class="estado erro" data-estado="erro">
         <h2>Não deu para carregar o cardápio</h2>
-        <p>${Paladira.esc(s.app.error_ || "")}</p>
+        <p>${Proto.esc(s.app.error_ || "")}</p>
         <button class="btn" data-act="recarregar-lista">Tentar de novo</button>
       </div>` :
     st_ === "vazio" ? `
       <div class="estado" data-estado="vazio">
-        ${s.app.listError ? `<div class="aviso" data-erro="lista">${Paladira.esc(s.app.listError)}</div>` : ``}
+        ${s.app.listError ? `<div class="aviso" data-erro="lista">${Proto.esc(s.app.listError)}</div>` : ``}
         <h2>Nenhum produto no cardápio</h2>
         <p>Cadastre o primeiro item para a loja abrir.</p>
         <button class="btn" data-act="novo-produto">Criar produto</button>
@@ -5003,10 +5003,10 @@ function listScreen(s){
            data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
         <div class="grade">
         ${(items || []).map(p => `
-          <button class="linha" data-act="abrir-produto" data-id="${Paladira.esc(p.id)}">
+          <button class="linha" data-act="abrir-produto" data-id="${Proto.esc(p.id)}">
             <span class="nome">
-              <b>${Paladira.esc(p.nameStr)}</b>
-              <span class="cat">${Paladira.esc(p.category)}</span>
+              <b>${Proto.esc(p.nameStr)}</b>
+              <span class="cat">${Proto.esc(p.category)}</span>
             </span>
             <span class="qtd">${p.variants} ${p.variants === 1 ? "variação" : "variações"}</span>
           </button>`).join("")}
@@ -5047,13 +5047,13 @@ function productScreen(s){
     const error_ = `
       <div class="estado erro" data-estado="erro">
         <h2>Não deu para carregar</h2>
-        <p>${Paladira.esc(s.app.error_ || "")}</p>
+        <p>${Proto.esc(s.app.error_ || "")}</p>
         <button class="btn" data-act="tentar">Tentar de novo</button>
       </div>`;
 
     const empty = `
       <div class="estado" data-estado="vazio">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.variantError)}</div>` : ``}
+        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
         <h2>Nenhuma variação ainda</h2>
         <p>Crie tamanhos ou sabores sem duplicar o produto.</p>
         ${canEdit ? `<button class="btn" data-act="add">Adicionar variação</button>` : ``}
@@ -5062,11 +5062,11 @@ function productScreen(s){
     const content = `
       <div data-estado="conteudo" data-colunas="${s.widthPx >= 768 ? 2 : 1}"
            data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.variantError)}</div>` : ``}
+        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
         ${s.app.saved ? `<span class="tag">Produto salvo</span>` : ``}
-        ${s.app.saveError ? `<div class="aviso" data-erro="salvar">${Paladira.esc(s.app.saveError)}</div>` : ``}
-        ${s.app.payment ? `<span class="tag" data-pg="ok">Pagamento aprovado · ${Paladira.esc(s.app.payment.id)}</span>` : ``}
-        ${s.app.paymentError ? `<div class="aviso" data-pg="erro">${Paladira.esc(s.app.paymentError)}</div>` : ``}
+        ${s.app.saveError ? `<div class="aviso" data-erro="salvar">${Proto.esc(s.app.saveError)}</div>` : ``}
+        ${s.app.payment ? `<span class="tag" data-pg="ok">Pagamento aprovado · ${Proto.esc(s.app.payment.id)}</span>` : ``}
+        ${s.app.paymentError ? `<div class="aviso" data-pg="erro">${Proto.esc(s.app.paymentError)}</div>` : ``}
 
         ${!canEdit ? `<div class="aviso">
           Você pode consultar este produto, mas quem edita preço é o gerente ou o dono.
@@ -5075,17 +5075,17 @@ function productScreen(s){
         <div class="grade">
         ${vars.map((v, i) => `
           <div class="var">
-            <b>${Paladira.esc(v.nameStr)}</b>
+            <b>${Proto.esc(v.nameStr)}</b>
             ${canEdit
               ? `<input class="preco" data-campo="preco" data-i="${i}" inputmode="decimal"
-                        value="${Paladira.esc(v.price)}" placeholder="0,00"
-                        aria-label="Preço de ${Paladira.esc(v.nameStr)}">`
-              : `<span>${v.price ? "R$ " + Paladira.esc(v.price) : "sem preço"}</span>`}
+                        value="${Proto.esc(v.price)}" placeholder="0,00"
+                        aria-label="Preço de ${Proto.esc(v.nameStr)}">`
+              : `<span>${v.price ? "R$ " + Proto.esc(v.price) : "sem preço"}</span>`}
           </div>`).join("")}
 
         ${s.app.blocked ? `<div class="trava">
           <h2>Limite de variações do plano</h2>
-          <p>Este plano vai até ${Paladira.esc(String(s.app.limite || 0))}. Suba de plano para criar mais.</p>
+          <p>Este plano vai até ${Proto.esc(String(s.app.limite || 0))}. Suba de plano para criar mais.</p>
         </div>` : ``}
 
         ${s.app.margin && s.can("relatorio.margem") ? `
@@ -5120,7 +5120,7 @@ function productScreen(s){
       <div class="app">
         <header class="app-hd">
           <button class="voltar" data-act="voltar">← Cardápio</button>
-          <h1>${prod ? Paladira.esc(prod.nameStr) : "Produto"}</h1>
+          <h1>${prod ? Proto.esc(prod.nameStr) : "Produto"}</h1>
           <p>${vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}</p>
         </header>
 
@@ -5134,76 +5134,76 @@ function productScreen(s){
 
 /* navigating is a request: opening the product fetches the detail, going
        back refetches the list */
-Paladira.on("click", '[data-act="abrir-produto"]', async (e, el) => {
+Proto.on("click", '[data-act="abrir-produto"]', async (e, el) => {
   try {
-    const p = await Paladira.api.get(`/api/produtos/${el.dataset.id}`);
-    Paladira.set({ page:"produto", product:p, error_:null, saved:false });
-  } catch (err){ Paladira.set({ page:"produto", error_:err.message }); }
+    const p = await Proto.api.get(`/api/produtos/${el.dataset.id}`);
+    Proto.set({ page:"produto", product:p, error_:null, saved:false });
+  } catch (err){ Proto.set({ page:"produto", error_:err.message }); }
 });
 
-Paladira.on("click", '[data-act="novo-produto"]', async () => {
+Proto.on("click", '[data-act="novo-produto"]', async () => {
   try {
-    const newer = await Paladira.api.post("/api/produtos", { nameStr:"Novo produto", category:"Sem categoria" });
-    Paladira.set({ page:"produto", product:newer, listError:null });
-  } catch (err){ Paladira.set({ listError: err.message }); }
+    const newer = await Proto.api.post("/api/produtos", { nameStr:"Novo produto", category:"Sem categoria" });
+    Proto.set({ page:"produto", product:newer, listError:null });
+  } catch (err){ Proto.set({ listError: err.message }); }
 });
 
-Paladira.on("click", '[data-act="voltar"]', async () => {
-  try { Paladira.set({ page:"lista", products: await Paladira.api.get("/api/produtos"), error_:null }); }
-  catch (err){ Paladira.set({ page:"lista", error_:err.message }); }
+Proto.on("click", '[data-act="voltar"]', async () => {
+  try { Proto.set({ page:"lista", products: await Proto.api.get("/api/produtos"), error_:null }); }
+  catch (err){ Proto.set({ page:"lista", error_:err.message }); }
 });
 
-Paladira.on("click", '[data-act="recarregar-lista"]', async () => {
-  try { Paladira.set({ products: await Paladira.api.get("/api/produtos"), error_:null }); }
-  catch (err){ Paladira.set({ error_:err.message }); }
+Proto.on("click", '[data-act="recarregar-lista"]', async () => {
+  try { Proto.set({ products: await Proto.api.get("/api/produtos"), error_:null }); }
+  catch (err){ Proto.set({ error_:err.message }); }
 });
 
 /* asks the API and only then updates the screen — no inventing the record */
-Paladira.on("click", '[data-act="add"]', async (e, el, s) => {
+Proto.on("click", '[data-act="add"]', async (e, el, s) => {
   const prod = s.app.product;
   const vars = (prod && prod.variants) || [];
   const names = ["Pequena","Média","Grande","Família"];
   try {
-    const fresh = await Paladira.api.post(`/api/produtos/${prod.id}/variacoes`,
+    const fresh = await Proto.api.post(`/api/produtos/${prod.id}/variacoes`,
       { nameStr:names[vars.length] || "Nova", price:"18,00" });
-    Paladira.set({ product:{ ...prod, variants:vars.concat(fresh) }, saved:false, variantError:null });
+    Proto.set({ product:{ ...prod, variants:vars.concat(fresh) }, saved:false, variantError:null });
   } catch (err){
     /* an item failure does not bring the page down: the AsyncStateContainer
        stays in the state it was in and the warning sits next to the list */
-    Paladira.set({ variantError: err.message });
+    Proto.set({ variantError: err.message });
   }
 });
 
-Paladira.on("input", '[data-campo="preco"]', (e, el, s) => {
+Proto.on("input", '[data-campo="preco"]', (e, el, s) => {
   const prod = s.app.product;
   const vars = ((prod && prod.variants) || []).slice();
   const i = Number(el.dataset.i);
   if (!vars[i]) return;
   vars[i] = { ...vars[i], price: el.value };
-  Paladira.set({ product:{ ...prod, variants:vars }, saved:false });
+  Proto.set({ product:{ ...prod, variants:vars }, saved:false });
 });
 
-Paladira.on("click", '[data-act="pagar"]', async (e, el, s) => {
+Proto.on("click", '[data-act="pagar"]', async (e, el, s) => {
   try {
-    const pg = await Paladira.api.post("/api/pagamentos", { val:4200 });
-    Paladira.set({ payment:pg, paymentError:null });
+    const pg = await Proto.api.post("/api/pagamentos", { val:4200 });
+    Proto.set({ payment:pg, paymentError:null });
   } catch (err){
-    Paladira.set({ paymentError:err.message, statusPagamento:err.status });
+    Proto.set({ paymentError:err.message, statusPagamento:err.status });
   }
 });
 
-Paladira.on("click", '[data-act="tentar"]', async () => {
-  try { Paladira.set({ product: await Paladira.api.get("/api/produtos/1"), error_:null }); }
-  catch (e){ Paladira.set({ error_:e.message }); }
+Proto.on("click", '[data-act="tentar"]', async () => {
+  try { Proto.set({ product: await Proto.api.get("/api/produtos/1"), error_:null }); }
+  catch (e){ Proto.set({ error_:e.message }); }
 });
 
-Paladira.on("click", '[data-act="salvar"]', async (e, el, s) => {
+Proto.on("click", '[data-act="salvar"]', async (e, el, s) => {
   const prod = s.app.product;
   try {
-    const saved = await Paladira.api.put(`/api/produtos/${prod.id}`, { variants: prod.variants });
-    Paladira.set({ product:saved, saved:true, saveError:null });
+    const saved = await Proto.api.put(`/api/produtos/${prod.id}`, { variants: prod.variants });
+    Proto.set({ product:saved, saved:true, saveError:null });
   } catch (err){
-    Paladira.set({ saveError: err.message, saved:false });
+    Proto.set({ saveError: err.message, saved:false });
   }
 });
 </script>

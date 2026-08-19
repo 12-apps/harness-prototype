@@ -1,7 +1,7 @@
 /* Wiring level per @12-apps/ui component.
    exige = always operable · pode = operable if given a handler · nunca = inert.
    The harness decides from the affordance on screen; this map is a reference. */
-window.PALADIRA_UI_WIRING = {
+window.PROTO_UI_WIRING = {
  "Button": "exige",
  "HeaderButton": "exige",
  "UploadButton": "exige",
@@ -131,7 +131,7 @@ window.PALADIRA_UI_WIRING = {
  "utils": "nunca",
  "useMediaQuery": "nunca"
 };
-window.PALADIRA_UI_ACAO = {
+window.PROTO_UI_ACTION = {
  "Input": "preenche",
  "Textarea": "preenche",
  "PhoneInput": "preenche",

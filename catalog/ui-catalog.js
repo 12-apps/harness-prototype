@@ -2,7 +2,7 @@
    128 components. Paste it into the prototype or load it from the
    project knowledge. The harness validates the names used in
    `primitives` against this catalog. */
-window.PALADIRA_UI = {
+window.PROTO_UI = {
   "button": "@12-apps/ui/button",
   "charts": "@12-apps/ui/charts",
   "social-login-button": "@12-apps/ui/social-login-button",

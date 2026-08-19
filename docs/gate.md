@@ -4,8 +4,8 @@
 
 ```bash
 npm install jsdom                              # once per session
-node paladira-verify.js paladira-<thing>.html
-node paladira-verify.js paladira-<thing>.html --strict
+node verify.js <thing>.html
+node verify.js <thing>.html --strict
 ```
 
 | exit | means | what to do |
@@ -20,17 +20,17 @@ node paladira-verify.js paladira-<thing>.html --strict
 The output says which one ran:
 
 ```
-✓ paladira-product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
+✓ product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
 
-**With `[browser]`** — it found a Chromium and ran the suite inside it. Only then do the rules that depend on measuring boxes apply: per-rung arrangement, overflow, touch target, text size, line length. It looks in this order: `PALADIRA_CHROME`, the Puppeteer cache, `/opt/pw-browsers`, `/usr/bin/chromium`. **It also needs puppeteer installed** to drive the browser — finding the Chromium is not enough on its own.
+**With `[browser]`** — it found a Chromium and ran the suite inside it. Only then do the rules that depend on measuring boxes apply: per-rung arrangement, overflow, touch target, text size, line length. It looks in this order: `PROTO_CHROME`, the Puppeteer cache, `/opt/pw-browsers`, `/usr/bin/chromium`. **It also needs puppeteer installed** to drive the browser — finding the Chromium is not enough on its own.
 
 **Without the marker** — it fell back to jsdom, which resolves the DOM but does no layout: `@container` never matches. The measurement rules declare themselves unverifiable instead of approving in the dark. Everything else (journeys, routes, states, permissions, disappearing content) still applies.
 
 To force a specific browser:
 
 ```bash
-PALADIRA_CHROME=/path/to/chrome node paladira-verify.js file.html
+PROTO_CHROME=/path/to/chrome node verify.js file.html
 ```
 
 ## In CI
