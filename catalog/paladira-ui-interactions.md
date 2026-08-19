@@ -1,11 +1,15 @@
-# @12-apps/ui — fiação exigida por componente
+# @12-apps/ui — wiring required per component
 
-Gerado do catálogo (128 componentes), com verificação de cobertura total.
+Generated from the catalog (128 components), with full coverage checked.
 
-Um componente não é passivo por natureza, e sim por uso: Avatar abre menu,
-Card inteiro vira alvo de clique, Badge se descarta. Por isso são três níveis,
-e a auditoria do harness decide pelo que a tela oferece (role, tabindex,
-onclick, cursor:pointer, data-act), não pelo nome do componente.
+A component is not passive by nature, but by use: an Avatar opens a menu, a
+whole Card becomes a click target, a Badge gets dismissed. Hence three levels,
+and the harness audit decides from what the screen offers (role, tabindex,
+onclick, cursor:pointer, data-act), not from the component's name.
+
+The three level names stay Portuguese, matching the values in
+`paladira-ui-interactions.js`: `exige` = always operable, `pode` = operable if
+given a handler, `nunca` = inert.
 
 | nível | significado | n |
 |---|---|---|

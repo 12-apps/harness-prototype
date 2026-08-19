@@ -1,88 +1,90 @@
-# Paladira — Contexto
+# Paladira — Context
 
-*(Referência para o conhecimento do projeto. As regras ficam nas instruções; aqui fica o porquê.)*
+*(Reference for the project knowledge. The rules live in the instructions; the why lives here.)*
 
 ---
 
-## 1. O produto
+## 1. The product
 
-Paladira é uma plataforma multi-loja para alimentação e varejo no Brasil. Uma loja roda a operação inteira por ela, e a superfície se divide em três:
+Paladira is a multi-shop platform for food and retail in Brazil. A shop runs its entire operation through it, and the surface splits into three:
 
-**Storefront** — cardápio por categoria e subcategoria, destaques, ficha do produto com variações e extras pagos, favoritos, carrinho, mesa ou balcão, comanda, chamar garçom, checkout, histórico.
+**Storefront** — menu by category and subcategory, highlights, product sheet with variations and paid extras, favourites, cart, mesa or balcão, comanda, call a garçom, checkout, history.
 
-**Admin** — catálogo e editor de produto, categorias, estoque e ingredientes, fichas técnicas, cozinha e suas estações, mesas e setores, entregas e couriers, pedidos, pagamentos, equipe e papéis, relatórios, plano, marketplaces, marca.
+**Admin** — catalog and product editor, categories, stock and ingredients, fichas técnicas, kitchen and its stations, mesas and sectors, deliveries and couriers, orders, payments, team and roles, reports, plan, marketplaces, branding.
 
-**Operação** — o painel da cozinha, a tela do garçom, o quadro de entregas. Voltadas para quem está trabalhando, ao vivo, por turno.
+**Operation** — the kitchen panel, the garçom's screen, the delivery board. Aimed at people who are working, live, by shift.
 
-As lojas variam muito e a UI precisa segurar todas: restaurante com mesas e cozinha, bar que só vende bebida, loja sem cozinha nenhuma. É para isso que existem as dimensões de contexto.
+Shops vary a lot and the UI has to hold all of them: a restaurant with mesas and a kitchen, a bar that only sells drinks, a shop with no kitchen at all. That is what the context dimensions exist for.
 
-## 2. Vocabulário
+## 2. Vocabulary
 
-| termo | é |
+The domain terms stay Portuguese, in the product and in these docs.
+
+| term | is |
 |---|---|
-| loja / tenant | uma loja |
-| mesa | mesa do salão |
-| comanda | conta compartilhada da mesa, pede antes e paga depois |
-| balcão | retirada, sem mesa |
-| pedido | o que vai para a cozinha |
-| cardápio | o menu público |
-| ficha técnica | receita do produto |
-| ingrediente | matéria-prima (RAW) ou sub-receita (PREP) |
-| variação | tamanho, sabor |
-| extras pagos | adicionais |
-| destaques | prateleira em evidência |
-| cozinha / estação | onde se prepara (Grelha, Fritura…) |
-| estoque | por local |
-| entrega / corrida | entrega e a corrida do courier |
-| garçom | garçom |
-| turno | turno de trabalho |
+| loja / tenant | a shop |
+| mesa | a table in the dining room |
+| comanda | the table's shared bill: order first, pay later |
+| balcão | takeaway, no table |
+| pedido | what goes to the kitchen |
+| cardápio | the public menu |
+| ficha técnica | the product's recipe |
+| ingrediente | raw material (RAW) or sub-recipe (PREP) |
+| variação | size, flavour |
+| extras pagos | paid add-ons |
+| destaques | the featured shelf |
+| cozinha / estação | where things are prepared (Grelha, Fritura…) |
+| estoque | stock, per location |
+| entrega / corrida | the delivery and the courier's run |
+| garçom | waiter |
+| turno | work shift |
 
-Há um MCP do Paladira ligado ao projeto com a API real. Quando precisar da forma verdadeira de uma entidade — campos de produto, estados de uma corrida, o que volta numa comanda — leia de lá em vez de inventar. Protótipo que bate com o modelo real vale muito mais.
+There is a Paladira MCP connected to the project with the real API. When you need the true shape of an entity — product fields, the states of a run, what comes back in a comanda — read it from there instead of inventing it. A prototype that matches the real model is worth far more.
 
-## 3. A ideia central
+## 3. The central idea
 
-**O protótipo é a especificação.** Não é uma imagem do que vai ser construído: é o contrato, executável, com os cenários em Gherkin de verdade e cada `Então` conferido contra o DOM. Quem for implementar recebe o `.feature` com as pistas de componente, rota e módulo, e os imports do `@12-apps/ui` já resolvidos.
+**The prototype is the specification.** It is not a picture of what will be built: it is the contract, executable, with real Gherkin scenarios and every `Então` checked against the DOM. Whoever implements it receives the `.feature` with the component, route and module hints, and the `@12-apps/ui` imports already resolved.
 
-Daí decorre quase tudo: se o protótipo é a especificação, ele não pode mentir. Não pode dizer "salvo" sem gravar, não pode ter botão que não faz nada, não pode ter tela que ninguém sabe como se alcança, não pode dizer que é responsivo porque coube.
+Almost everything follows from that: if the prototype is the specification, it cannot lie. It cannot say "salvo" without storing, it cannot have a button that does nothing, it cannot have a screen nobody knows how to reach, and it cannot claim to be responsive because it fit.
 
-## 4. O que a verificação cobra, e por quê
+## 4. What verification demands, and why
 
-| regra | existe porque |
+| rule | exists because |
 |---|---|
-| jornada com 2+ ações, `Então` depois de agir | `Dado … Então` sem ação é print com legenda |
-| tipos `@feliz` / `@conflito` / `@recuperacao` / `@retorno` | suíte só de caminho feliz é meia especificação |
-| três estados por página, como etapa da jornada | carregando, vazio e erro são caminhos que o usuário encontra |
-| toda rota nas duas pontas, toda chamada vinda de um passo | tratamento de erro descoberto em produção sai caro |
-| rota de escrita tem de alterar as fixtures | 200 sem gravar é fachada; recarregar desmente |
-| rótulo que promete gravar tem de gravar | *Salvar* que não salva é a mentira mais cara da UI |
-| afordância precisa de handler; handler precisa de passo | botão morto e comportamento sem cobertura |
-| `estrito` cobra marcação reivindicada por componente | evita recriar em produção o que a biblioteca já tem |
-| arranjo diferente por degrau, alvo 44px, texto 12px, linha 75ch | "coube" não é o mesmo que "serve" |
+| a journey with 2+ actions, a `Então` after acting | `Dado … Então` with no action is a screenshot with a caption |
+| the `@feliz` / `@conflito` / `@recuperacao` / `@retorno` types | a happy-path-only suite is half a specification |
+| three states per page, as a step of the journey | loading, empty and error are paths the user meets |
+| every route from both ends, every call born from a step | error handling discovered in production is expensive |
+| a write route has to change the fixtures | 200 without storing is a facade; a reload contradicts it |
+| a label that promises to store has to store | a *Salvar* that does not save is the costliest lie in the UI |
+| an affordance needs a handler; a handler needs a step | dead buttons and uncovered behaviour |
+| `strictMode` demands markup claimed by a component | avoids rebuilding in production what the library already has |
+| a different arrangement per rung, 44px target, 12px text, 75ch line | "it fit" is not the same as "it works" |
 
-Os escapes (`local`, `semRede`, `naCarga`, `jornada:false`, `estados:false`, `rotasCobertas:false`) existem porque exceções reais existem. Cada um é uma declaração explícita, e alguns são conferidos: `local: true` num controle chamado *Salvar* continua sendo acusado.
+The escapes (`local`, `noNetwork`, `onLoad`, `journey:false`, `states:false`, `coveredRoutes:false`) exist because real exceptions exist. Each one is an explicit declaration, and some are checked: `local: true` on a control called *Salvar* still gets called out.
 
-## 5. Decisões de UX já fechadas
+## 5. UX decisions already settled
 
-Não relitigar sem motivo.
+Do not relitigate without a reason.
 
-**Seletor de categorias.** Subcategoria é o item selecionável; categoria pai é cabeçalho por padrão, com opção de virar selecionável em três estados. Tudo expandido ao abrir, sem contagem de produtos, sem chips no gatilho. Busca insensível a acento com destaque do termo e hierarquia preservada. Selecionados fixos no topo. Rascunho + Aplicar; Esc descarta. Rodapé com contagem viva e Limpar que desabilita sozinho. Teclado completo. Abaixo de 480px vira bottom sheet com linhas de 42px.
+**Category selector.** The subcategory is the selectable item; the parent category is a header by default, with the option of becoming selectable in three states. Everything expanded on open, no product counts, no chips on the trigger. Accent-insensitive search with the term highlighted and the hierarchy preserved. Selected items pinned to the top. Draft + Apply; Esc discards. A footer with a live count and a Clear that disables itself. Full keyboard support. Below 480px it becomes a bottom sheet with 42px rows.
 
-**Provedor de pagamento.** OAuth é o estado padrão, não uma escolha oferecida de cara; chaves manuais são escape discreto dentro do painel, e os dois nunca aparecem juntos. Barra de ação grudada no fim do painel que está sendo preenchido. Remover conexão é modal com consequência escrita e saída "só pausar". `ativado` e `recebendo` são estados distintos.
+**Payment provider.** OAuth is the default state, not a choice offered up front; manual keys are a discreet escape inside the panel, and the two never appear together. The action bar sticks to the end of the panel being filled in. Removing a connection is a modal with the consequence written out and a "just pause" exit. `ativado` and `recebendo` are distinct states.
 
-**Geral.** Ação primária depois do formulário que ela confirma. Destrutivo com consequência explícita e escape. Estado concluído não se desfaz sozinho por causa de um toggle não relacionado.
+**General.** The primary action comes after the form it confirms. Destructive actions carry an explicit consequence and an escape. A completed state does not undo itself because of an unrelated toggle.
 
-## 6. Armadilhas que já custaram tempo
+## 6. Traps that have already cost time
 
-- **Scrim permanente.** Backdrop renderizado fora da condição "painel aberto" cobre a tela e come todo clique. A causa é invisível.
-- **Falta de `<!DOCTYPE html>`.** Quirks mode quebra container query parecendo bug de CSS.
-- **Query de DOM antes da primeira pintura.** Null deref — foi o bug mais frequente aqui.
-- **Função perdida em substituição grande.** Depois de trocar blocos, confira a lista de funções.
-- **`@media` dentro do quadro.** Responde à janela, não ao quadro; o seletor de largura perde o sentido. Use `@container`.
-- **Medir elemento fora do documento.** `getComputedStyle` devolve vazio — e vazio se parece com "não muda em degrau nenhum".
-- **Otimização que pula efeito.** Cache que devolve estado pronto sem refazer o passo faz o pedido não acontecer: some do monitor, some o carregando.
+- **A permanent scrim.** A backdrop rendered outside the "panel open" condition covers the screen and eats every click. The cause is invisible.
+- **A missing `<!DOCTYPE html>`.** Quirks mode breaks container queries while looking like a CSS bug.
+- **Querying the DOM before the first paint.** Null deref — the most frequent bug here.
+- **A function lost in a large replacement.** After swapping blocks, check the list of functions.
+- **`@media` inside the frame.** It responds to the window, not the frame; the width selector stops meaning anything. Use `@container`.
+- **Measuring an element outside the document.** `getComputedStyle` returns empty — and empty looks just like "does not change on any rung".
+- **An optimisation that skips an effect.** A cache that hands back ready state without redoing the step means the request never happens: it vanishes from the monitor, and so does the loading state.
 
-## 7. Como trabalhamos
+## 7. How we work
 
-Sessões longas e iterativas, cinco a quinze rodadas no mesmo arquivo. Retorno curto e direto; espera-se inferir o escopo e executar.
+Long, iterative sessions, five to fifteen rounds on the same file. Short, direct feedback; you are expected to infer the scope and execute.
 
-Conversas já se perderam no meio do caminho — por isso o harness e estas decisões vivem no conhecimento do projeto, não no histórico. O harness é arquivo, não descrição: descrição drifta, arquivo não.
+Conversations have been lost midway before — which is why the harness and these decisions live in the project knowledge, not in the history. The harness is a file, not a description: descriptions drift, files do not.
