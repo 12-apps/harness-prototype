@@ -194,7 +194,7 @@ const HTML_TAGS = new Set(("a abbr address area article aside audio b base bdi b
 const A_TAG = /<\/?([a-z][a-z0-9]*)(?=[\s/>])/g;
 const opensATag = str => {
   A_TAG.lastIndex = 0;
-  for (let m; (m = A_TAG.exec(str)); ) if (HTML_TAGS.has(m[1])) return m[0].replace("<", "").replace("/", "");
+  for (let m; (m = A_TAG.exec(str)); ) if (HTML_TAGS.has(m[1])) return m[1];
   return null;
 };
 
