@@ -1,10 +1,18 @@
 /* Wiring level per @12-apps/ui component — all 210 in the catalog.
-   exige = always operable · pode = operable if given a handler · nunca = inert.
+   exige = always operable · pode = operable if given a handler ·
+   nunca = not the thing to operate (which is not the same as unusable).
 
    Curated by hand, not generated: each level was read off the component's own
    declaration in the package source, not guessed from its name. Regenerating
    catalog/ui-catalog.js does NOT update this file — new components land here
    unclassified and must be judged the same way.
+
+   All three answer ONE question: does the screen owe this component a step?
+   None of them answers "should I use this component" — every name in this
+   file is a component to reach for, and `nunca` is the level with the most
+   of them. CardContent, DialogActions and SidebarHeader are the structure a
+   Card, a Dialog and a Sidebar are built from; skipping them is how a
+   prototype ends up re-implementing a component's padding in its own CSS.
 
    `exige` is ENFORCED, not advisory: scripts/lint-prototype.js reads this map
    and fails the gate when a prototype renders an `exige` component with no
@@ -14,8 +22,14 @@
 
    `pode` and `nunca` are not checked statically. `pode` depends on what the
    screen actually offers, which the runtime audit decides from the rendered
-   DOM (role, tabindex, onclick, cursor:pointer, data-act); `nunca` has
-   nothing to demand. */
+   DOM (role, tabindex, onclick, cursor:pointer, data-act).
+
+   `nunca` is not a claim that the component CANNOT be operated. Several of
+   them can: Box and Stack are MUI re-exports, and Heading spreads ...props,
+   so <Heading onClick={…}> works. It is the narrower claim that this is not
+   the thing to operate — a clickable Box is a Card, a Button or a
+   ListItemButton, and reaching for one of those is the point of having
+   them. */
 window.PROTO_UI_WIRING = {
  "Button": "exige",
  "HeaderButton": "exige",
@@ -120,7 +134,7 @@ window.PROTO_UI_WIRING = {
  "Transition": "nunca",
  "AspectRatio": "nunca",
  "TimingDiagram": "nunca",
- "Label": "nunca",
+ "Label": "pode",
  "FormControl": "nunca",
  "FormControlLabel": "nunca",
  "InputLabel": "nunca",
@@ -334,7 +348,7 @@ window.PROTO_UI_ACTION = {
  "Text": "passivo",
  "Blockquote": "passivo",
  "Code": "passivo",
- "Label": "passivo",
+ "Label": "clica",
  "Box": "passivo",
  "Stack": "passivo",
  "Grid2": "passivo",

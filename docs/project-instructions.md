@@ -243,8 +243,20 @@ every component in the catalog by what the screen owes it:
 | level | meaning |
 |---|---|
 | `exige` | always operable — a `CollapsibleTrigger` renders a button, a `SubmitButton` submits |
-| `pode` | operable only if you give it a handler — a `Card`, an `Avatar` |
-| `nunca` | nothing to operate — a `CardContent`, a `ThemeProvider`, an icon |
+| `pode` | operable only if you give it a handler — a `Card`, an `Avatar`, a `Label` |
+| `nunca` | not the thing to operate — a `CardContent`, a `ThemeProvider`, an icon |
+
+These answer one question — *does the screen owe this component a step?* — and
+none of them answers *should I use this component*. Every name in the catalog is
+one to reach for, and `nunca` is the largest level precisely because that is
+where the structure lives: `CardContent`, `DialogActions` and `SidebarHeader`
+are what a Card, a Dialog and a Sidebar are built from. Reach for the parts. A
+`<Card>` with hand-written children is how a prototype ends up re-implementing
+the component's own padding in `styles.css`.
+
+`nunca` also does not mean the component *cannot* take a handler — `Box` and
+`Stack` are MUI re-exports, `Heading` spreads `...props`. It means it is not the
+thing to operate: a clickable Box is a `Card`, a `Button` or a `ListItemButton`.
 
 An `exige` component with nothing to do is a hole in the specification that reads
 as a finished screen, so the gate rejects it:

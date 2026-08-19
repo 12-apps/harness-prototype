@@ -37,9 +37,11 @@ function loadCatalog(repo){
 }
 
 /* The wiring level per component: `exige` = always operable, `pode` =
-   operable if given a handler, `nunca` = inert. Only `exige` is enforced
-   here — `pode` depends on what the screen offers, which is the runtime
-   audit's job, and `nunca` has nothing to demand. */
+   operable if given a handler, `nunca` = not the thing to operate. Only
+   `exige` is enforced here — `pode` depends on what the screen offers, which
+   is the runtime audit's job, and `nunca` has no step to demand. The levels
+   say what the screen owes a component, never whether to use it: `nunca` is
+   the largest of the three because that is where the structure lives. */
 function loadWiring(repo){
   const src = fs.readFileSync(path.join(repo, "catalog", "ui-interactions.js"), "utf8");
   const m = src.match(/window\.PROTO_UI_WIRING = ([\s\S]*?);\n/);
