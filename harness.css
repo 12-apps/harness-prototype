@@ -1,0 +1,502 @@
+/* ============================================================
+   PROTO — harness chrome.  Do not edit from a prototype.
+   ============================================================
+   The bench around the stage: top bar, scenario sidebar, stage,
+   network monitor, data panel and the blocking failure screen.
+   The prototype's own styles live in its ▼ APP ▼ 1 of 2 zone.
+   ============================================================ */
+
+/* ============================================================
+   HARNESS — do not edit
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+
+:root, :host{
+  --h-bg:#0b0d10; --h-panel:#14171d; --h-panel-2:#1c2029;
+  --h-line:#232833; --h-line-2:#2c323e;
+  --h-fg:#e8eaef; --h-fg-dim:#a6acbb; --h-fg-mute:#6b7482;
+  --h-accent:#7c8cff; --h-accent-dim:#2a3160;
+  --h-ok:#4ade80; --h-bad:#f87171;
+  --h-given:#7dd3fc; --h-when:#fbbf24; --h-then:#4ade80;
+  --h-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+  --h-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+
+:host{
+  display:block;
+  background:var(--h-bg);color:var(--h-fg);
+  font:13px/1.45 var(--h-sans);-webkit-font-smoothing:antialiased;
+}
+/* Inherited properties cross a shadow boundary — they come in through the
+   host, so a prototype's `* { font-family: … !important }` would still reach
+   the chrome. Re-declaring them here stops that: nothing in the document can
+   match .h-shell, because it lives inside the shadow tree. */
+.h-shell{
+  display:flex;flex-direction:column;height:100vh;position:relative;
+  background:var(--h-bg);color:var(--h-fg);
+  font:13px/1.45 var(--h-sans);
+  letter-spacing:normal;word-spacing:normal;text-transform:none;text-align:left;
+  white-space:normal;visibility:visible;cursor:auto;direction:ltr;
+}
+
+/* ---------- barra superior ---------- */
+.h-top{
+  display:flex;align-items:center;gap:9px;
+  height:52px;flex:0 0 auto;padding:0 14px;
+  background:var(--h-panel);border-bottom:1px solid var(--h-line);
+}
+.h-brand{display:flex;align-items:center;gap:8px;font-weight:650;font-size:13px;white-space:nowrap}
+.h-brand .h-dot{width:9px;height:9px;border-radius:3px;background:var(--h-accent);box-shadow:0 0 0 3px var(--h-accent-dim)}
+.h-brand em{font-style:normal;font-weight:450;color:var(--h-fg-mute)}
+
+.h-sel{
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);color:var(--h-fg);
+  border-radius:8px;padding:6px 9px;font:inherit;font-size:12px;cursor:pointer;
+}
+.h-sel:focus-visible,.h-btn:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
+
+/* link field: reads the current state, accepts a pasted one */
+.h-linkin{
+  flex:1 1 190px;min-width:130px;max-width:400px;
+  background:#0e1116;border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  border-radius:8px;padding:6px 9px;font:11.5px/1.4 var(--h-mono);
+}
+.h-linkin:focus{color:var(--h-fg);border-color:var(--h-accent);outline:none}
+.h-linkin.bad{border-color:var(--h-bad);color:#ffc4c4}
+
+.h-pills{display:flex;gap:6px}
+.h-pill{
+  padding:4px 10px;border-radius:999px;font-size:11px;white-space:nowrap;
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  font-variant-numeric:tabular-nums;
+}
+.h-pill b{color:var(--h-fg);font-weight:600}
+.h-pill.ok  b{color:var(--h-ok)}
+.h-pill.bad b{color:var(--h-bad)}
+.h-pill.warn b{color:var(--h-when)}
+.h-pill.warn{border-color:#4a3d20}
+.h-pill.verificando{border-color:var(--h-accent);color:var(--h-fg-dim)}
+.h-pill.verificando b{color:var(--h-accent)}
+.h-spin{
+  display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:-1px;
+  border:1.5px solid var(--h-accent-dim);border-top-color:var(--h-accent);
+  border-radius:50%;animation:h-gira .7s linear infinite;
+}
+@keyframes h-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){ .h-spin{animation-duration:2.4s} }
+.h-btn[aria-busy="true"]{opacity:.7;cursor:progress}
+
+.h-pill.bad{cursor:pointer;border-color:#4a2b2f}
+.h-pill.bad:hover{background:#241a1d}
+
+.h-right{margin-left:auto;display:flex;gap:7px}
+.h-btn{
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  border-radius:8px;padding:6px 11px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;
+}
+.h-btn:hover{background:#242935;color:var(--h-fg)}
+.h-btn[aria-pressed="true"]{background:var(--h-accent);border-color:var(--h-accent);color:#fff}
+
+/* ---------- corpo ---------- */
+.h-body{flex:1;display:flex;min-height:0}
+
+.h-side{
+  width:var(--h-side-w,288px);flex:0 0 var(--h-side-w,288px);
+  background:var(--h-panel);border-right:1px solid var(--h-line);
+  padding:14px 12px;overflow:auto;
+}
+.h-side[hidden]{display:none}
+.h-side-title{
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--h-fg-mute);font-weight:650;margin:0 0 7px;
+}
+
+.h-feature{padding:0 2px 12px;margin-bottom:12px;border-bottom:1px solid var(--h-line)}
+.h-feature h2{margin:0;font-size:12.5px;font-weight:650;letter-spacing:-.005em}
+.h-feature p{margin:4px 0 0;font-size:11.5px;color:var(--h-fg-mute);line-height:1.4}
+
+/* ---------- shop context ---------- */
+.h-ctx{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--h-line)}
+.h-dim-hd{
+  display:flex;align-items:baseline;gap:6px;margin:0 0 6px;
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--h-fg-mute);font-weight:650;
+}
+.h-dim-hd span{letter-spacing:0;text-transform:none;font-size:10.5px;font-weight:500;opacity:.75}
+
+.h-dimsel{
+  width:100%;
+  background:#181c23;border:1px solid var(--h-line-2);color:var(--h-fg);
+  border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;cursor:pointer;
+}
+.h-dimsel:hover{background:#1e232b}
+.h-dimsel:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
+
+.h-dim{margin-bottom:10px;position:relative}
+.h-dim:last-child{margin-bottom:0}
+
+/* multiselect: trigger + panel, instead of a row of chips */
+.h-multi-trig{
+  display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  background:#181c23;border:1px solid var(--h-line-2);color:var(--h-fg);
+  border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;cursor:pointer;
+}
+.h-multi-trig:hover{background:#1e232b}
+.h-multi-trig[aria-expanded="true"]{border-color:var(--h-accent)}
+.h-multi-trig .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-multi-trig .lbl.vazio{color:var(--h-fg-mute)}
+.h-multi-trig .cnt{
+  flex:0 0 auto;font-size:10.5px;color:var(--h-fg-mute);
+  background:#0e1116;border:1px solid var(--h-line-2);border-radius:999px;padding:1px 7px;
+}
+.h-multi-trig .car{flex:0 0 auto;font-size:8px;color:var(--h-fg-mute);transition:transform .12s ease}
+.h-multi-trig[aria-expanded="true"] .car{transform:rotate(90deg);color:var(--h-accent)}
+
+.h-multi-panel{
+  position:absolute;top:100%;left:0;right:0;z-index:25;margin-top:4px;
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);border-radius:9px;
+  padding:4px;box-shadow:0 14px 34px rgba(0,0,0,.55);
+}
+.h-multi-opt{
+  display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  background:transparent;border:0;border-radius:6px;padding:7px 8px;
+  color:var(--h-fg-dim);font:inherit;font-size:12px;cursor:pointer;
+}
+.h-multi-opt:hover{background:rgba(255,255,255,.05);color:var(--h-fg)}
+.h-multi-opt[aria-pressed="true"]{color:#fff}
+.h-multi-opt .mark{
+  width:13px;height:13px;flex:0 0 13px;border-radius:4px;
+  border:1px solid var(--h-line-2);display:grid;place-items:center;
+  font-size:9px;line-height:1;color:transparent;
+}
+.h-multi-opt[aria-pressed="true"] .mark{background:var(--h-accent);border-color:var(--h-accent);color:#fff}
+.h-multi-opt .tg{margin-left:auto;font-size:10px;color:var(--h-fg-mute);font-family:var(--h-mono)}
+
+/* scale: a segmented track. One line by construction, and the filled
+   stretch keeps showing what the active level includes — something a
+   select would hide. With many levels, use ui:"select". */
+.h-seg{
+  display:flex;width:100%;
+  background:#181c23;border:1px solid var(--h-line-2);
+  border-radius:8px;overflow:hidden;
+}
+.h-seg button{
+  flex:1 1 0;min-width:0;
+  padding:7px 5px;border:0;border-right:1px solid var(--h-line);
+  background:transparent;color:var(--h-fg-mute);
+  font:inherit;font-size:11.5px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:background .12s ease,color .12s ease;
+}
+.h-seg button:last-child{border-right:0}
+.h-seg button:hover{background:rgba(255,255,255,.04);color:var(--h-fg-dim)}
+.h-seg button.incluido{background:#1b2030;color:var(--h-fg-dim)}
+.h-seg button[aria-pressed="true"]{background:var(--h-accent);color:#fff;font-weight:600}
+.h-seg button:focus-visible{outline:2px solid var(--h-accent);outline-offset:-2px}
+/* multiselect variant: each cell toggles on its own, so it marks with
+   a ✓ instead of relying on the fill alone (which is not a level here) */
+.h-seg.multi button[aria-pressed="true"]{background:var(--h-accent-dim);color:#fff;border-color:var(--h-accent)}
+.h-seg.multi .tick{
+  display:inline-block;width:9px;margin-right:5px;
+  font-size:9px;color:var(--h-accent);
+}
+.h-seg.multi button[aria-pressed="true"] .tick{color:#fff}
+
+.h-chips{display:flex;flex-wrap:wrap;gap:5px}
+.h-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#181c23;border:1px solid var(--h-line-2);color:var(--h-fg-mute);
+  border-radius:999px;padding:5px 11px;
+  font:inherit;font-size:11.5px;cursor:pointer;
+  transition:background .12s ease,border-color .12s ease,color .12s ease;
+}
+.h-chip:hover{background:#1e232b;color:var(--h-fg-dim)}
+.h-chip .mark{
+  width:12px;height:12px;flex:0 0 12px;border-radius:4px;
+  border:1px solid var(--h-line-2);display:grid;place-items:center;
+  font-size:8px;line-height:1;color:transparent;
+}
+.h-chip.radio .mark{border-radius:999px}
+.h-chip[aria-pressed="true"]{background:var(--h-accent-dim);border-color:var(--h-accent);color:#fff}
+.h-chip[aria-pressed="true"] .mark{background:var(--h-accent);border-color:var(--h-accent);color:#fff}
+/* on a scale, the levels below the active one also apply */
+.h-chip.incluido{border-color:#3a4470;color:var(--h-fg-dim);background:#191d2b}
+.h-chip:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
+
+/* ---------- scenario ---------- */
+.h-count{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.h-count .h-side-title{margin-bottom:7px}
+.h-mini{
+  background:transparent;border:1px solid var(--h-line-2);color:var(--h-fg-mute);
+  border-radius:6px;padding:2px 8px;font:inherit;font-size:10.5px;cursor:pointer;
+}
+.h-mini:hover{background:var(--h-panel-2);color:var(--h-fg)}
+.h-mini[aria-pressed="true"]{border-color:var(--h-accent);color:var(--h-accent)}
+.h-filtros{display:flex;gap:6px;align-items:center;margin:0 0 9px}
+.h-busca{
+  flex:1;min-width:0;background:#0e1116;border:1px solid var(--h-line-2);
+  color:var(--h-fg);border-radius:8px;padding:6px 9px;font:inherit;font-size:11.5px;
+}
+.h-busca::placeholder{color:var(--h-fg-mute)}
+.h-busca:focus{outline:none;border-color:var(--h-accent)}
+.h-mini.falha{border-color:#4a2b2f;color:var(--h-bad)}
+.h-mini.falha[aria-pressed="true"]{background:#2a1a1d;border-color:var(--h-bad)}
+
+.h-grupo{
+  display:flex;align-items:center;gap:7px;width:100%;text-align:left;
+  background:transparent;border:0;border-radius:6px;
+  padding:7px 6px;margin:8px 0 5px;cursor:pointer;
+  color:var(--h-fg-mute);font:inherit;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;font-weight:650;
+}
+.h-grupo:hover{background:var(--h-panel-2);color:var(--h-fg-dim)}
+.h-grupo .chev{font-size:7px;transition:transform .12s ease;transform:rotate(90deg)}
+.h-grupo.fechado .chev{transform:none}
+.h-grupo .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.h-grupo .ct{
+  letter-spacing:0;text-transform:none;font-weight:500;font-size:10.5px;
+  background:#0e1116;border:1px solid var(--h-line-2);border-radius:999px;padding:1px 7px;
+}
+.h-grupo.sub{
+  margin:2px 0 5px;padding-left:14px;opacity:.85;
+  font-size:9.5px;letter-spacing:.09em;
+}
+.h-grupo.sub .ct{font-size:10px;padding:0 6px}
+.h-grupo .fl{
+  letter-spacing:0;text-transform:none;font-weight:600;font-size:10.5px;
+  color:var(--h-bad);background:#2a1a1d;border:1px solid #4a2b2f;border-radius:999px;padding:1px 7px;
+}
+
+.h-vazio{margin:0 0 8px;font-size:11.5px;color:var(--h-fg-mute)}
+
+.h-scn{
+  background:#181c23;border:1px solid var(--h-line);border-radius:10px;
+  margin:0 0 7px;overflow:hidden;
+}
+.h-scn.oculto{border-style:dashed;background:#15181e}
+.h-scn.oculto .h-scn-hd{cursor:default;opacity:.75}
+.h-scn.oculto .chev{color:var(--h-bad);transform:none}
+.h-motivo{border-top:1px solid var(--h-line);padding:8px 11px 10px}
+.h-motivo p{margin:0 0 4px;font-size:11px;line-height:1.45;color:var(--h-fg-dim)}
+.h-motivo p b{color:var(--h-accent);font-family:var(--h-mono);font-weight:600}
+.h-motivo .ag{color:var(--h-fg-mute)}
+.h-mini.fix{margin-top:5px;border-color:var(--h-accent);color:var(--h-accent)}
+.h-mini.fix:hover{background:var(--h-accent-dim);color:#fff}
+.h-scn.open{background:#1a1f27;border-color:var(--h-line-2)}
+.h-scn.on{box-shadow:inset 3px 0 0 var(--h-accent)}
+
+.h-scn-hd{
+  display:grid;grid-template-columns:14px 1fr;gap:2px 8px;
+  width:100%;text-align:left;background:transparent;border:0;
+  color:var(--h-fg-dim);padding:10px 11px;font:inherit;cursor:pointer;
+}
+.h-scn-hd:hover{background:rgba(255,255,255,.025)}
+.h-scn-hd .chev{grid-row:1;grid-column:1;color:var(--h-fg-mute);font-size:8px;line-height:1.9;transition:transform .12s ease}
+.h-scn.open .h-scn-hd .chev{color:var(--h-accent);transform:rotate(90deg)}
+.h-scn-hd .title{grid-row:1;grid-column:2;font-size:12px;font-weight:600;line-height:1.3;color:var(--h-fg-dim)}
+.h-scn.on .h-scn-hd .title{color:var(--h-fg)}
+.h-scn-hd .sub{grid-row:2;grid-column:2;display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--h-fg-mute)}
+.h-scn-hd .sub .sep{opacity:.45}
+.h-tags{color:var(--h-accent);font-weight:500}
+.h-scn-hd .fail{color:var(--h-bad);font-weight:600}
+.h-scn-hd .esq{color:var(--h-when);font-weight:600}
+
+.h-impl{
+  border-top:1px solid var(--h-line);
+  padding:7px 11px;
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 7px;
+  font:10.5px/1.5 var(--h-mono);color:var(--h-fg-mute);
+}
+.h-impl .k{opacity:.6}
+.h-impl b{color:var(--h-fg-dim);font-weight:600}
+.h-impl .nota{flex:0 0 100%;font-family:var(--h-sans);font-size:10.5px;opacity:.85}
+.h-impl .ui{flex:0 0 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px;margin-top:2px}
+.h-impl .ui b{color:var(--h-then)}
+.h-impl .ui b.desconhecido{color:var(--h-bad);text-decoration:underline dotted}
+.h-impl .ui i{font-style:normal;opacity:.6;margin-left:-3px}
+
+.h-steps{border-top:1px solid var(--h-line);background:rgba(0,0,0,.16);padding:5px 0}
+.h-step{
+  display:grid;grid-template-columns:46px 1fr 8px;gap:8px;align-items:baseline;
+  width:100%;text-align:left;background:transparent;border:0;
+  border-left:2px solid transparent;padding:5px 11px 5px 9px;
+  color:var(--h-fg-mute);font:inherit;font-size:11.5px;line-height:1.4;cursor:pointer;
+}
+.h-step:hover{background:rgba(255,255,255,.03);color:var(--h-fg-dim)}
+.h-step.done{color:var(--h-fg-dim)}
+.h-step.on{background:var(--h-accent-dim);border-left-color:var(--h-accent);color:#fff}
+.h-step .kw{font-weight:700;font-size:10px;letter-spacing:.03em;text-transform:uppercase}
+.h-step.k-dado .kw{color:var(--h-given)}
+.h-step.k-quando .kw{color:var(--h-when)}
+.h-step.k-então .kw{color:var(--h-then)}
+.h-step.k-e .kw,.h-step.k-mas .kw{color:var(--h-fg-mute)}
+.h-step .ph{color:var(--h-when);font-weight:600}
+.h-step.on .ph{color:#ffe0a3}
+.h-spin.sm{width:7px;height:7px;border-width:1.2px;margin:0}
+.h-step .dot{font-size:8px;line-height:1.9}
+.h-step .dot.ok{color:var(--h-ok)}
+.h-step .dot.bad{color:var(--h-bad)}
+
+/* ---------- Outline examples ---------- */
+.h-ex{border-top:1px solid var(--h-line);padding:7px 9px 8px}
+.h-ex-hd{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--h-fg-mute);font-weight:650;margin:0 0 5px}
+.h-ex-row{
+  display:flex;gap:0;width:100%;text-align:left;
+  background:transparent;border:1px solid transparent;border-radius:6px;
+  padding:4px 6px;margin-bottom:2px;
+  color:var(--h-fg-mute);font:11px/1.4 var(--h-mono);cursor:pointer;
+}
+.h-ex-row:hover{background:rgba(255,255,255,.035);color:var(--h-fg-dim)}
+.h-ex-row.on{background:var(--h-accent-dim);border-color:var(--h-accent);color:#fff}
+.h-ex-row.head{cursor:default;color:var(--h-fg-mute);opacity:.7;font-weight:600}
+.h-ex-row.head:hover{background:transparent}
+.h-ex-row .cel{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px}
+.h-ex-row .cel:last-child{padding-right:0}
+.h-ex-row.larg .cel:first-of-type{color:var(--h-when);font-weight:600}
+.h-ex-row .st{flex:0 0 10px;font-size:8px;line-height:1.6}
+.h-ex-row .st.ok{color:var(--h-ok)}
+.h-ex-row .st.bad{color:var(--h-bad)}
+
+/* ---------- palco ---------- */
+/* resize grip: thin, but with a grab area larger than the visible
+   stroke — a 4px target is frustrating with a mouse */
+.h-resize{
+  flex:0 0 5px;cursor:col-resize;position:relative;
+  background:var(--h-line);transition:background .12s ease;
+}
+.h-resize::after{content:"";position:absolute;inset:0 -4px;}
+.h-resize:hover,.h-resize.ativo{background:var(--h-accent)}
+.h-resize[hidden]{display:none}
+
+.h-stage{
+  flex:1;min-width:0;position:relative;overflow:auto;display:flex;padding:24px;
+  background:radial-gradient(circle at 1px 1px,#20252e 1px,transparent 0) 0 0/22px 22px,var(--h-bg);
+}
+/* transform:scale does not change layout size — without this box the
+   stage clips its edges instead of scrolling. margin:auto centres it and
+   still scrolls. */
+.h-frame-box{margin:auto;flex:0 0 auto;position:relative}
+.h-frame{
+  position:relative;background:#fff;border-radius:18px;overflow:hidden;
+  box-shadow:0 0 0 1px #313846,0 24px 60px rgba(0,0,0,.55);
+  transform-origin:0 0;container-type:inline-size;container-name:frame;
+}
+
+.h-err{
+  height:100%;overflow:auto;padding:20px;margin:0;
+  background:#1b1013;color:#ffb4b4;font:12px/1.5 var(--h-mono);white-space:pre-wrap;
+}
+.h-err b{display:block;color:#fff;font:600 13px/1.4 var(--h-sans);margin-bottom:8px}
+
+/* needs a real width and container-type, otherwise the @container rules
+   do not apply and verification would test a layout nobody sees */
+
+/* failure screen: covers everything. If verification does not pass there
+   is no point looking at the prototype — the pasteable report is what
+   helps. */
+.h-falha{
+  position:fixed;inset:0;z-index:60;background:#0b0d10;
+  display:flex;align-items:center;justify-content:center;padding:28px;
+}
+.h-falha[hidden]{display:none}
+.h-falha-cx{width:min(860px,100%);display:flex;flex-direction:column;max-height:100%}
+.h-falha-cx h3{margin:0 0 4px;font-size:15px;font-weight:700;color:var(--h-bad)}
+.h-falha-cx p{margin:0 0 12px;font-size:12.5px;color:var(--h-fg-mute)}
+.h-falha-cx textarea{
+  flex:1;min-height:260px;width:100%;resize:none;
+  background:#12161c;border:1px solid #3a2429;border-radius:10px;
+  color:#e8d7d7;font:12px/1.65 var(--h-mono);padding:16px;
+}
+.h-falha-cx textarea:focus-visible{outline:2px solid var(--h-bad);outline-offset:1px}
+.h-falha-acoes{display:flex;gap:8px;margin-top:12px}
+
+/* network monitor: lives on the stage, next to the screen that made the
+   requests. Closed it is a pill; open it lists what this screen asked
+   for, and each row expands into what was sent and what came back. */
+.h-mon{position:absolute;left:16px;bottom:16px;z-index:20;max-width:min(460px,calc(100% - 32px))}
+.h-mon[hidden]{display:none}
+.h-mon-trig{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--h-panel);border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  border-radius:999px;padding:6px 13px;font:inherit;font-size:11.5px;cursor:pointer;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+}
+.h-mon-trig:hover{color:var(--h-fg);border-color:var(--h-accent)}
+.h-mon-trig .pt{width:7px;height:7px;border-radius:99px;background:var(--h-ok);flex:0 0 7px}
+.h-mon-trig.temErro .pt{background:var(--h-bad)}
+.h-mon-corpo{
+  margin-top:8px;background:var(--h-panel);border:1px solid var(--h-line-2);
+  border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.55);overflow:hidden;
+}
+.h-mon-corpo[hidden]{display:none}
+.h-mon-list{max-height:210px;overflow:auto;padding:5px}
+.h-mon-item{
+  display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;
+  background:transparent;border:0;border-radius:6px;padding:5px 7px;
+  color:var(--h-fg-mute);font:11px/1.5 var(--h-mono);cursor:pointer;
+}
+.h-mon-item:hover{background:rgba(255,255,255,.05);color:var(--h-fg-dim)}
+.h-mon-item.on{background:var(--h-accent-dim);color:#fff}
+.h-mon-item .m{color:var(--h-when);min-width:42px}
+.h-mon-item .c{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-mon-item .s.ok{color:var(--h-ok)}
+.h-mon-item .s.bad{color:var(--h-bad)}
+.h-mon-item .t{opacity:.6}
+.h-mon-det{
+  margin:0;border-top:1px solid var(--h-line);background:#0e1116;
+  padding:11px;max-height:220px;overflow:auto;
+  font:11px/1.6 var(--h-mono);color:#cfd6e4;white-space:pre-wrap;
+}
+.h-mon-det[hidden]{display:none}
+.h-mon-vazio{padding:10px;font-size:11.5px;color:var(--h-fg-mute)}
+
+.h-spec{position:absolute;inset:0;z-index:30;background:rgba(11,13,16,.94);display:flex;flex-direction:column;padding:20px}
+.h-spec[hidden]{display:none}
+.h-spec-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.h-spec-hd h3{margin:0;font-size:13px;font-weight:650}
+.h-spec-hd p{margin:0;font-size:11.5px;color:var(--h-fg-mute)}
+.h-spec-hd .h-right{margin-left:auto}
+.h-dados-cols{flex:1;display:flex;gap:14px;min-height:0}
+.h-dados-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.h-dados-col textarea{flex:1}
+.h-log{
+  flex:1;overflow:auto;background:#0e1116;border:1px solid var(--h-line-2);
+  border-radius:10px;padding:10px;font:11.5px/1.6 var(--h-mono);
+}
+.h-log .rota{color:var(--h-fg-dim);padding:2px 0}
+.h-log .rota b{color:var(--h-accent);font-weight:600}
+.h-log hr{border:0;border-top:1px solid var(--h-line);margin:9px 0}
+.h-log .req{
+  display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;
+  background:transparent;border:0;border-radius:6px;padding:3px 6px;
+  color:var(--h-fg-mute);font:inherit;cursor:pointer;
+}
+.h-log .req:hover{background:rgba(255,255,255,.05);color:var(--h-fg-dim)}
+.h-log .req.on{background:var(--h-accent-dim);color:#fff}
+.h-log .req .t{opacity:.6}
+.h-log .req .v{color:var(--h-fg-mute);opacity:.7;font-size:10px}
+.h-log #h-dados-filtro{margin:0 0 7px}
+.h-log .req .m{color:var(--h-when);min-width:46px}
+.h-log .req .c{flex:1;color:var(--h-fg-dim);overflow:hidden;text-overflow:ellipsis}
+.h-log .req .s.ok{color:var(--h-ok)}
+.h-log .req .s.bad{color:var(--h-bad)}
+.h-log .vazio{color:var(--h-fg-mute)}
+.h-spec textarea{
+  flex:1;width:100%;resize:none;background:#0e1116;
+  border:1px solid var(--h-line-2);border-radius:10px;color:#d8dee9;
+  font:12px/1.6 var(--h-mono);padding:16px;
+}
+.h-spec textarea:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
+
+/* handoff row under the spec: the three files an implementer needs */
+.h-spec-dl{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:8px 12px;border-top:1px solid var(--h-line-2);
+}
+.h-spec-dl span{font-size:11.5px;color:var(--h-fg-mute);margin-right:2px}
+
+.h-spec-dl code{
+  font:11px/1.4 var(--h-mono);color:var(--h-fg-mute);
+  padding:3px 7px;background:var(--h-panel-2);border:1px solid var(--h-line-2);border-radius:6px;
+}
+.h-spec-dl .h-btn[disabled]{opacity:.45;cursor:not-allowed}

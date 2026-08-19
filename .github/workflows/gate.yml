@@ -1,0 +1,71 @@
+name: gate
+
+# The gate exits non-zero when a prototype fails its own specification.
+# Running it in CI is what stops a broken prototype from becoming the
+# source of truth for whoever implements it.
+#
+# The GitHub runner ships a Chromium, so the rules that need to measure
+# boxes also apply here: per-step layout, overflow, touch target, text
+# size and line length. Locally, without a browser, those declare
+# themselves unverifiable — the output is marked `[navegador]` when they
+# did apply.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The gate only reads the repository: it clones, installs its dependencies
+# and runs the suite. Without this the GITHUB_TOKEN gets the repository's
+# default permissions, which are broader than any step here needs.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The gate only enters the browser when it finds a Chromium AND the
+      # puppeteer to drive it; without puppeteer it falls back to jsdom
+      # silently, and the measurement rules stop applying without the
+      # output complaining.
+      - name: install the gate's dependencies
+        run: npm install --no-save jsdom puppeteer
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'   # the runner ships the Chrome found below
+
+      - name: locate the runner's Chromium
+        id: chrome
+        run: |
+          for c in "$CHROME_BIN" /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -n "$c" ] && [ -x "$c" ]; then echo "path=$c" >> "$GITHUB_OUTPUT"; exit 0; fi
+          done
+          echo "path=" >> "$GITHUB_OUTPUT"
+
+      # A prototype is a folder under apps/. The bench itself is not one, so
+      # there is nothing to verify in it; _template is the empty starter and
+      # would only ever report "0 ok", which is a green that counts nothing.
+      - name: verify every prototype
+        env:
+          PROTO_CHROME: ${{ steps.chrome.outputs.path }}
+        run: |
+          failed=0
+          found=0
+          for d in apps/*/; do
+            name=$(basename "$d")
+            case "$name" in _*) echo "── $name (starter template, nothing to verify)"; continue;; esac
+            found=$((found + 1))
+            echo "── $name"
+            node verify.js "$d" || failed=1
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no prototype found under apps/"
+            exit 1
+          fi
+          exit $failed

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proto</title>
+
+<!-- ============================================================
+     PROTO — the bench.  This file never changes.
+     ============================================================
+
+     It is a loader, not a prototype. Open it with the name of an app:
+
+         proto.html?app=product-editor
+
+     and it pulls in that app's three files, in this order:
+
+         apps/<name>/styles.css   the prototype's styles
+         apps/<name>/data.js      fixtures and routes
+         apps/<name>/app.js       context, scenarios and render
+
+     A prototype is those three files. Nothing of the harness is in
+     them, and nothing of them is in here — so an agent writing a
+     prototype never opens this file, and never opens the engine.
+
+     To start one: copy apps/_template/ to apps/<your-name>/ and open
+     proto.html?app=<your-name>. The rules the gate enforces are in
+     docs/project-instructions.md.
+     ============================================================ -->
+
+<link rel="stylesheet" href="harness.css">
+</head>
+
+<body>
+<script src="harness.js"></script>
+<script src="catalog/ui-catalog.js"></script>
+</body>
+</html>
