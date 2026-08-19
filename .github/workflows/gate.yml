@@ -35,8 +35,18 @@ jobs:
       # puppeteer to drive it; without puppeteer it falls back to jsdom
       # silently, and the measurement rules stop applying without the
       # output complaining.
+      # pnpm, not npm: @12-apps/ui's preinstall runs `only-allow pnpm`, and the
+      # devDependencies are what the React path needs — the UI package itself,
+      # react, react-dom and esbuild. puppeteer is added on top because the
+      # gate only reaches browser mode when it has something to drive Chrome.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: install the gate's dependencies
-        run: npm install --no-save jsdom puppeteer
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm add -D puppeteer --reporter silent
         env:
           PUPPETEER_SKIP_DOWNLOAD: '1'   # the runner ships the Chrome found below
 
@@ -51,6 +61,20 @@ jobs:
       # A prototype is a folder under apps/. The bench itself is not one, so
       # there is nothing to verify in it; _template is the empty starter and
       # would only ever report "0 ok", which is a green that counts nothing.
+      # The component rule is why a prototype cannot ship raw HTML, so it gets
+      # a test of its own: loosen the linter and this goes red rather than CI
+      # staying green on a rule that no longer bites.
+      - name: the component rule still bites
+        run: node scripts/test-enforcement.js
+
+      # The React path is not covered by the loop below, because the only React
+      # app is a starter and starters are skipped. Run it explicitly so the
+      # linter, the esbuild step and the flushSync mount are exercised here.
+      - name: build and run the React starter
+        env:
+          PROTO_CHROME: ${{ steps.chrome.outputs.path }}
+        run: node verify.js apps/_react-template
+
       - name: verify every prototype
         env:
           PROTO_CHROME: ${{ steps.chrome.outputs.path }}

@@ -3865,7 +3865,10 @@ window.Proto = Proto;
     document.body.appendChild(el);
   });
 
+  /* A React prototype is compiled to .build/app.js; a vanilla one is app.js
+     as written. Try the built one first and fall back, so both kinds load
+     through the same bench and neither needs to declare which it is. */
   load(base + "data.js")
-    .then(() => load(base + "app.js"))
+    .then(() => load(base + ".build/app.js").catch(() => load(base + "app.js")))
     .catch(missing);
 })();
