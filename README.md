@@ -128,20 +128,34 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 | `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.js` |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
-| `catalog/` | the 128 components of `@12-apps/ui` and what each one demands in wiring |
+| `catalog/` | the 210 components of `@12-apps/ui`, generated from the installed package |
 | `scripts/generate-catalog.js` | regenerates the catalog from the installed package |
 | `apps/product-editor/` | a filled-in prototype to read, with the product instructions and context it came from |
 
 ## Component catalog
 
-`catalog/` is generated, not hand-written. When `@12-apps/ui` changes version:
+`catalog/` is generated, never hand-written, and it is generated from the
+**installed package** — not from its file names:
 
 ```bash
-npm install @12-apps/ui
-node scripts/generate-catalog.js
+node scripts/generate-catalog.js               # pnpm-installs @12-apps/ui, then reads it
+node scripts/generate-catalog.js --no-install   # use what is already there
+node scripts/generate-catalog.js --version 5.3.0
 ```
 
-The harness checks the names used in `primitives` against the catalog, and does not invent an import path for a name that does not exist.
+pnpm, not npm: the package's own `preinstall` runs `only-allow pnpm`.
+
+It reads the names each built entry actually exports, so a name in the catalog is
+a name you can import from the path beside it — verified by bundling all 210 at
+once. The generator it replaced took the last segment of each export path as the
+component name, which invented 24 components that do not exist (`charts`,
+`tokens`, `utils`, and a turborepo scaffolding `button` that alerts *"Hello from
+your app!"*) and mis-named 3 that do.
+
+The harness checks the names used in `primitives` against this catalog.
+
+Note `catalog/ui-interactions.*` is curated by hand, not generated: it currently
+classifies 116 of the 210 components. Regenerating the catalog does not update it.
 
 ## License
 

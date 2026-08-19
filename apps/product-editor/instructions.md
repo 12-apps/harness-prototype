@@ -41,7 +41,7 @@ runs where both agree.
 
 ## Components
 
-Use `@12-apps/ui`. The 128 components are catalogued in
+Use `@12-apps/ui`. The 210 components are catalogued in
 [`../catalog/ui-catalog.md`](../catalog/ui-catalog.md), with what each demands in
 wiring in [`../catalog/ui-interactions.md`](../catalog/ui-interactions.md). Never
 write a hex value when a token exists.

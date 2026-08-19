@@ -185,7 +185,7 @@ Prefer `@container` over `@media`: the frame is the container.
 
 ## Components
 
-When the product has a component library, map to it. For `@12-apps/ui` the 128 components are listed in `ui-catalog.md`, with what needs wiring in `ui-interactions.md` (60 require it, 37 may, 31 never). The `primitives` map links a selector to a component **by name**; the import path comes from the catalog, and a name outside it is called out instead of generating an invented import. `strictMode: true` demands that every piece of markup with text or interaction is claimed. Never write a hex value when a token exists.
+When the product has a component library, map to it. For `@12-apps/ui` the 210 components are listed in `ui-catalog.md`, generated from what the package actually exports, with the import path for each. `ui-interactions.md` classifies what needs wiring, but it is curated by hand and covers 116 of them. The `primitives` map links a selector to a component **by name**; the import path comes from the catalog, and a name outside it is called out instead of generating an invented import. `strictMode: true` demands that every piece of markup with text or interaction is claimed. Never write a hex value when a token exists.
 
 ## Before shipping — mandatory
 
