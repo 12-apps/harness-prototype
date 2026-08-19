@@ -6,50 +6,53 @@
 <title>Paladira · protótipo</title>
 
 <!-- ============================================================
-     PALADIRA — HARNESS REUTILIZÁVEL  v3
+     PALADIRA — REUSABLE HARNESS  v3
      ============================================================
 
-     COMO USAR
-     1. Copie este arquivo. Renomeie para paladira-<área>-<coisa>.html
+     HOW TO USE
+     1. Copy this file. Rename it to paladira-<area>-<thing>.html
      2. Edit ONLY the zones marked with  ▼ APP ▼ … ▲ APP ▲
-     3. Nunca edite a zona HARNESS.
+     3. Never edit the HARNESS zone.
 
-     O PROTÓTIPO É A ESPECIFICAÇÃO
-     Os cenários são Gherkin de verdade (# language: pt), com passos
-     clicáveis: clicar no passo N reproduz 1..N a partir do Dado.
-     Os "Então" carregam verificação contra o DOM. Verificar roda tudo.
-     Gherkin exporta o .feature. O campo de link leva e traz estados.
+     THE PROTOTYPE IS THE SPECIFICATION
+     Scenarios are real Gherkin (# language: pt), with clickable steps:
+     clicking step N replays 1..N from the Dado. The "Então" steps carry
+     a check against the DOM. Verifying runs all of it. Gherkin exports
+     the .feature. The link field carries states in and out.
 
-     CONTEXTO DA LOJA — três tipos de dimensão
-       kind:"escala"  plano (free → ultra). @pro vale de Pro para cima.
-       kind:"opcao"   papel do usuário. @garcom vale só no garçom.
-       kind:"flags"   funcionalidades ligáveis. @cozinha exige ligada.
-     Qualquer opção pode conceder permissões (permite:[…], "*" = todas),
-     e um cenário exige permissão com @pode:produto.editar.
-     Cenário fora do contexto sai da lista E do .feature.
+     The scenario text stays Portuguese — it is the specification's
+     content. Everything around it is English.
 
-     ESQUEMA DO CENÁRIO
-     Um cenário com `exemplos` vira Esquema: os passos usam <coluna> e
-     cada linha da tabela é selecionável. Serve para o mesmo fluxo em
-     Restaurante / Só bebidas / Loja sem triplicar o cenário.
+     SHOP CONTEXT — three kinds of dimension
+       kind:"escala"  plan (free → ultra). @pro applies from Pro upwards.
+       kind:"opcao"   the user's role. @garcom applies to the waiter only.
+       kind:"flags"   switchable features. @cozinha requires it on.
+     Any option can grant permissions (allows:[…], "*" = all), and a
+     scenario demands one with @pode:produto.editar.
+     A scenario outside the context leaves the list AND the .feature.
+
+     SCENARIO OUTLINE
+     A scenario with `examples` becomes an Outline: the steps use
+     <column> and every table row is selectable. It covers the same flow
+     for Restaurante / Só bebidas / Loja without tripling the scenario.
 
      API
-       Paladira.init({ title, feature, contexto, scenarios, render })
-       Paladira.on(evento, seletor, fn)     eventos delegados
-       Paladira.set(patch)                  muda estado + re-render
-       Paladira.goto(id, passo, exemplo)    pula para um ponto
-       Paladira.verifyAll()                 roda todos os cenários
-       Paladira.gherkin()                   devolve o .feature
-       s.app        estado do protótipo
-       s.ex         linha de exemplo ativa (no Esquema)
-       s.flag(id)   funcionalidade ligada?
-       s.opcao(dim) opção ativa de uma dimensão
-       s.pode(p)    permissão concedida pelo contexto atual?
+       Paladira.init({ title, feature, context, scenarios, render })
+       Paladira.on(event, selector, fn)      delegated events
+       Paladira.set(patch)                   change state + re-render
+       Paladira.goto(id, step, example)      jump to a point
+       Paladira.verifyAll()                  run every scenario
+       Paladira.gherkin()                    return the .feature
+       s.app         the prototype's state
+       s.ex          the active example row (in an Outline)
+       s.flag(id)    is the feature on?
+       s.option(dim) the active option of a dimension
+       s.can(p)      permission granted by the current context?
      ============================================================ -->
 
 <style>
 /* ============================================================
-   HARNESS — não editar
+   HARNESS — do not edit
    ============================================================ */
 *,*::before,*::after{box-sizing:border-box}
 
@@ -87,7 +90,7 @@ body{
 }
 .h-sel:focus-visible,.h-btn:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
 
-/* campo de link: lê o estado atual, aceita um colado */
+/* link field: reads the current state, accepts a pasted one */
 .h-linkin{
   flex:1 1 190px;min-width:130px;max-width:400px;
   background:#0e1116;border:1px solid var(--h-line-2);color:var(--h-fg-dim);
@@ -147,7 +150,7 @@ body{
 .h-feature h2{margin:0;font-size:12.5px;font-weight:650;letter-spacing:-.005em}
 .h-feature p{margin:4px 0 0;font-size:11.5px;color:var(--h-fg-mute);line-height:1.4}
 
-/* ---------- contexto da loja ---------- */
+/* ---------- shop context ---------- */
 .h-ctx{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--h-line)}
 .h-dim-hd{
   display:flex;align-items:baseline;gap:6px;margin:0 0 6px;
@@ -167,7 +170,7 @@ body{
 .h-dim{margin-bottom:10px;position:relative}
 .h-dim:last-child{margin-bottom:0}
 
-/* multisseleção: gatilho + painel, no lugar de uma fileira de chips */
+/* multiselect: trigger + panel, instead of a row of chips */
 .h-multi-trig{
   display:flex;align-items:center;gap:8px;width:100%;text-align:left;
   background:#181c23;border:1px solid var(--h-line-2);color:var(--h-fg);
@@ -204,9 +207,9 @@ body{
 .h-multi-opt[aria-pressed="true"] .mark{background:var(--h-accent);border-color:var(--h-accent);color:#fff}
 .h-multi-opt .tg{margin-left:auto;font-size:10px;color:var(--h-fg-mute);font-family:var(--h-mono)}
 
-/* escala: trilho segmentado. Uma linha só por construção, e o trecho
-   preenchido continua mostrando o que o nível ativo inclui — coisa que
-   um select esconderia. Com muitos níveis, use ui:"select". */
+/* scale: a segmented track. One line by construction, and the filled
+   stretch keeps showing what the active level includes — something a
+   select would hide. With many levels, use ui:"select". */
 .h-seg{
   display:flex;width:100%;
   background:#181c23;border:1px solid var(--h-line-2);
@@ -225,8 +228,8 @@ body{
 .h-seg button.incluido{background:#1b2030;color:var(--h-fg-dim)}
 .h-seg button[aria-pressed="true"]{background:var(--h-accent);color:#fff;font-weight:600}
 .h-seg button:focus-visible{outline:2px solid var(--h-accent);outline-offset:-2px}
-/* variante de multisseleção: cada célula liga sozinha, então marca com
-   ✓ em vez de depender só do preenchimento (que ali não é um nível) */
+/* multiselect variant: each cell toggles on its own, so it marks with
+   a ✓ instead of relying on the fill alone (which is not a level here) */
 .h-seg.multi button[aria-pressed="true"]{background:var(--h-accent-dim);color:#fff;border-color:var(--h-accent)}
 .h-seg.multi .tick{
   display:inline-block;width:9px;margin-right:5px;
@@ -251,11 +254,11 @@ body{
 .h-chip.radio .mark{border-radius:999px}
 .h-chip[aria-pressed="true"]{background:var(--h-accent-dim);border-color:var(--h-accent);color:#fff}
 .h-chip[aria-pressed="true"] .mark{background:var(--h-accent);border-color:var(--h-accent);color:#fff}
-/* na escala, os níveis abaixo do ativo também valem */
+/* on a scale, the levels below the active one also apply */
 .h-chip.incluido{border-color:#3a4470;color:var(--h-fg-dim);background:#191d2b}
 .h-chip:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
 
-/* ---------- cenário ---------- */
+/* ---------- scenario ---------- */
 .h-count{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .h-count .h-side-title{margin-bottom:7px}
 .h-mini{
@@ -369,7 +372,7 @@ body{
 .h-step .dot.ok{color:var(--h-ok)}
 .h-step .dot.bad{color:var(--h-bad)}
 
-/* ---------- exemplos do Esquema ---------- */
+/* ---------- Outline examples ---------- */
 .h-ex{border-top:1px solid var(--h-line);padding:7px 9px 8px}
 .h-ex-hd{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--h-fg-mute);font-weight:650;margin:0 0 5px}
 .h-ex-row{
@@ -390,8 +393,8 @@ body{
 .h-ex-row .st.bad{color:var(--h-bad)}
 
 /* ---------- palco ---------- */
-/* alça de redimensionamento: fina, mas com área de pegada maior que o
-   traço visível — 4px de alvo é frustrante no mouse */
+/* resize grip: thin, but with a grab area larger than the visible
+   stroke — a 4px target is frustrating with a mouse */
 .h-resize{
   flex:0 0 5px;cursor:col-resize;position:relative;
   background:var(--h-line);transition:background .12s ease;
@@ -404,8 +407,9 @@ body{
   flex:1;min-width:0;position:relative;overflow:auto;display:flex;padding:24px;
   background:radial-gradient(circle at 1px 1px,#20252e 1px,transparent 0) 0 0/22px 22px,var(--h-bg);
 }
-/* transform:scale não muda o tamanho de layout — sem esta caixa o palco
-   corta as bordas em vez de rolar. margin:auto centraliza e ainda rola. */
+/* transform:scale does not change layout size — without this box the
+   stage clips its edges instead of scrolling. margin:auto centres it and
+   still scrolls. */
 .h-frame-box{margin:auto;flex:0 0 auto;position:relative}
 .h-frame{
   position:relative;background:#fff;border-radius:18px;overflow:hidden;
@@ -420,15 +424,16 @@ body{
 }
 .h-err b{display:block;color:#fff;font:600 13px/1.4 var(--h-sans);margin-bottom:8px}
 
-/* precisa de largura real e container-type, senão as regras @container
-   não valem e a verificação testaria um layout que ninguém vê */
+/* needs a real width and container-type, otherwise the @container rules
+   do not apply and verification would test a layout nobody sees */
 .h-probe{
   position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;
   container-type:inline-size;container-name:frame;
 }
 
-/* tela de falha: cobre tudo. Se a verificação não passa, não faz sentido
-   olhar o protótipo — o que serve é o relatório colável. */
+/* failure screen: covers everything. If verification does not pass there
+   is no point looking at the prototype — the pasteable report is what
+   helps. */
 .h-falha{
   position:fixed;inset:0;z-index:60;background:#0b0d10;
   display:flex;align-items:center;justify-content:center;padding:28px;
@@ -445,9 +450,9 @@ body{
 .h-falha-cx textarea:focus-visible{outline:2px solid var(--h-bad);outline-offset:1px}
 .h-falha-acoes{display:flex;gap:8px;margin-top:12px}
 
-/* monitor de rede: fica no palco, junto da tela que fez os pedidos.
-   Fechado é uma pílula; aberto lista o que esta tela pediu, e cada
-   linha abre o que foi enviado e o que voltou. */
+/* network monitor: lives on the stage, next to the screen that made the
+   requests. Closed it is a pill; open it lists what this screen asked
+   for, and each row expands into what was sent and what came back. */
 .h-mon{position:absolute;left:16px;bottom:16px;z-index:20;max-width:min(460px,calc(100% - 32px))}
 .h-mon[hidden]{display:none}
 .h-mon-trig{
@@ -542,7 +547,7 @@ body{
 .app{min-height:100%;display:flex;flex-direction:column;background:var(--bg-2);color:var(--ink);font:14px/1.45 var(--h-sans)}
 .app-hd{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px}
 .app-hd h1{margin:0;font-size:16px;font-weight:650;letter-spacing:-.01em}
-/* linha longa demais cansa: o olho perde a volta */
+/* an over-long line tires the reader: the eye loses the way back */
 .app-hd p,.card p,.estado p,.trava p{max-width:52ch}
 .app-hd p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
 .app-bd{flex:1;padding:16px;display:grid;gap:10px;align-content:start}
@@ -567,7 +572,7 @@ body{
 
 .btn{
   border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;
-  /* 44px de altura mínima: alvo de dedo, não de mouse */
+  /* 44px minimum height: a finger target, not a mouse target */
   min-height:44px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;
   font:inherit;font-size:13px;font-weight:550;cursor:pointer;
 }
@@ -609,10 +614,10 @@ body{
 .trava p{margin:0;font-size:12.5px;color:var(--ink-3)}
 
 .actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;justify-content:flex-end}
-/* scrim: só existe no DOM enquanto o painel está aberto — nunca permanente */
+/* scrim: only exists in the DOM while the panel is open — never permanent */
 .scrim{position:absolute;inset:0;background:rgba(17,19,24,.45);z-index:20}
 
-/* a lista muda de arranjo por degrau — não é só "caber" */
+/* the list changes arrangement per rung — it is not just "fitting" */
 .grade{display:grid;gap:10px;grid-template-columns:1fr}
 @container frame (min-width: 768px){
   .grade{grid-template-columns:1fr 1fr}
@@ -620,7 +625,7 @@ body{
 @container frame (min-width: 1440px){
   .grade{grid-template-columns:1fr 1fr 1fr}
 }
-/* em xxs/xs a ação principal desce para uma barra fixa no rodapé */
+/* on xxs/xs the primary action drops to a fixed footer bar */
 .acao-fixa{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
 @container frame (min-width: 768px){
   .acao-fixa{position:static;border-top:0;padding:0;display:flex;justify-content:flex-end}
@@ -733,17 +738,17 @@ body{
 
 <script>
 /* ============================================================
-   HARNESS — não editar
+   HARNESS — do not edit
    ============================================================ */
 const Paladira = (() => {
-  /* carimbo de build: serve para saber, olhando a tela, se o arquivo
-     aberto é o mais novo — passe o mouse no nome Paladira */
+  /* build stamp: lets you tell from the screen whether the open file is
+     the newest one — hover over the Paladira name */
   const VERSION = "v3.7 · 2026-08-17 · primeira pintura imediata";
-  /* ---------- escada de pontos de quebra ----------
-     Nomear as larguras muda o que se pede ao protótipo: "funciona no
-     celular" é vago; "em xxs a ação principal vai para o rodapé fixo" é
-     verificável. A escada é a régua — os aparelhos são só atalhos para
-     larguras de mercado. Troque em `larguras` na configuração. */
+  /* ---------- breakpoint ladder ----------
+     Naming the widths changes what you ask of the prototype: "works on
+     mobile" is vague; "on xxs the primary action moves to the fixed
+     footer" is verifiable. The ladder is the ruler — the devices are just
+     shortcuts to market widths. Change it in `widths` in the config. */
   const DEFAULT_LADDER = [
     { id:"xxs", label:"xxs · 320",  w:320,  h:640,  level:true },
     { id:"xs",  label:"xs · 380",   w:380,  h:780,  level:true },
@@ -764,7 +769,7 @@ const Paladira = (() => {
   let LADDER = DEFAULT_LADDER.slice();
   let VIEWPORTS = LADDER.concat(DEVICES);
 
-  /* em que degrau uma largura cai: o maior degrau que ela alcança */
+  /* which rung a width falls on: the largest rung it reaches */
   function rungOf(w){
     let current = LADDER[0];
     for (const d of LADDER) if (w >= d.w) current = d;
@@ -776,33 +781,33 @@ const Paladira = (() => {
 
   let cfg = { title:"protótipo", feature:null, context:[], scenarios:[], render:null, mount:null };
   let initial = null;
-  let results = {};      /* ao vivo: cenarioId -> { passo: bool } */
-  let suite   = null;    /* última verificação completa */
+  let results = {};      /* live: scenarioId -> { step: bool } */
+  let suite   = null;    /* the last complete verification */
   let muteHash = false;
   let search = "", searchFocused = false, onlyFailures = false;
   const closedGroups = new Set();
   let seededStates = false;
-  /* A verificação segura a fila por ~30s. Sem isto, clicar num cenário
-     no meio da rodada não faz nada — a navegação fica esperando a suíte
-     terminar e a barra parece morta. Navegar cancela a rodada: quem está
-     olhando a tela tem prioridade sobre quem está conferindo. */
+  /* Verification holds the queue for ~30s. Without this, clicking a
+     scenario mid-run does nothing — navigation waits for the suite to
+     finish and the bar looks dead. Navigating cancels the run: whoever is
+     looking at the screen wins over whoever is checking it. */
   let cancelVerification = false;
-  /* o contexto que a PESSOA escolheu. A verificação troca de contexto a
-     cada cenário; ao terminar (ou ser interrompida) tem de voltar para o
-     que está marcado agora, não para o instantâneo do começo — senão
-     cancelar desfaz a escolha que causou o cancelamento. */
+  /* the context the PERSON chose. Verification swaps context for every
+     scenario; when it finishes (or is interrupted) it has to return to
+     what is ticked now, not to the snapshot from the start — otherwise
+     cancelling undoes the very choice that caused the cancellation. */
   let userCtx = null;
   let interrupted = false;
 
-  /* Interromper a suíte para navegar é certo, mas deixá-la interrompida
-     para sempre custa caro: é o cache dela que faz a navegação seguinte
-     ser instantânea. Então ela volta sozinha quando a pessoa para de
-     mexer — sem roubar a vez enquanto ela está usando. */
-  /* Progresso guardado de uma rodada interrompida. Recomeçar do zero era
-     desperdício puro: como cada cenário é verificado no contexto que ele
-     mesmo exige, o que a pessoa faz na tela (navegar, trocar plano) não
-     invalida nada do que já foi verificado. Só recarregar o arquivo
-     invalida — e aí a página inteira recomeça de qualquer jeito. */
+  /* Interrupting the suite to navigate is right, but leaving it interrupted
+     forever is expensive: its cache is what makes the next navigation
+     instant. So it resumes on its own once the person stops interacting —
+     without stealing the turn while they are still using it. */
+  /* Saved progress from an interrupted run. Starting over was pure waste:
+     since every scenario is verified in the context it demands for itself,
+     what the person does on screen (navigating, switching plan) invalidates
+     nothing already verified. Only reloading the file invalidates it — and
+     then the whole page restarts anyway. */
   let partial = null;
   let resumeTimer = null;
   function scheduleResume(){
@@ -814,17 +819,17 @@ const Paladira = (() => {
     }, cfg.resumeWait || 1200);
   }
 
-  /* mostrarFalha vive dentro do init; este é o gancho para alcançá-lo */
+  /* showFailure lives inside init; this is the hook that reaches it */
   let showFailureSafely = () => {};
   let byKeyboard = false;
-  let manualChoice = false;   /* a pessoa mexeu no seletor de largura agora */
+  let manualChoice = false;   /* the person just touched the width selector */
   let awaiting = null;
-  /* a pessoa mexeu na tela depois do último passo reproduzido? */
+  /* did the person touch the screen after the last replayed step? */
   let appDirty = false;
   let didRender = false;
-  let showHidden = false;   /* barra lateral mostrando só o que está fora de escopo */
-  let openDim = null;    /* painel de multisseleção aberto — vive fora do
-                            rebuild da barra, senão fecharia a cada render */
+  let showHidden = false;   /* sidebar showing only what is out of scope */
+  let openDim = null;    /* the open multiselect panel — lives outside the
+                            sidebar rebuild, or it would close on every render */
 
   const state = {
     scenario:null, step:-1, example:0,
@@ -832,11 +837,11 @@ const Paladira = (() => {
     app:{}, ex:null,
     viewport:"xs", landscape:false, zoom:"fit", sidebar:288,
 
-    /* há pedido em voo agora? o AsyncStateContainer usa isto para mostrar
-       o carregando sem o protótipo precisar controlar flag na mão */
+    /* is a request in flight right now? AsyncStateContainer uses this to show
+       the loading state without the prototype hand-managing a flag */
     waitingFor(){ return network.inFlightScreen > 0; },
-    /* degrau em que a tela está sendo desenhada: deixa o protótipo mudar
-       de estrutura, não só de CSS, quando o arranjo pede */
+    /* the rung the screen is being drawn at: lets the prototype change
+       structure, not just CSS, when the arrangement calls for it */
     get rung(){ return rungOf(currentWidth().w).id; },
     get widthPx(){ return currentWidth().w; },
     option(dimId){ return this.ctx[dimId]; },
@@ -853,8 +858,8 @@ const Paladira = (() => {
   /* ---------- contexto: plano / papel / funcionalidades ---------- */
   function dim(id){ return cfg.context.find(d => d.id === id); }
 
-  /* opções ativas agora. Na escala, o nível ativo inclui os de baixo:
-     quem está no Ultra também tem o que o Pro tem. */
+  /* the options active right now. On a scale, the active level includes the
+     ones below it: whoever is on Ultra also has what Pro has. */
   function activeOptions(){
     const out = [];
     cfg.context.forEach(d => {
@@ -875,12 +880,12 @@ const Paladira = (() => {
     return out;
   }
 
-  /* Uma permissão precisa do aval de TODA dimensão que fala dela.
-     O plano habilita, o papel autoriza — união deixaria o plano Pro
-     dando margem para o garçom. Dimensão que nunca cita a permissão
-     não opina. Permissão que ninguém cita não existe: melhor um
-     cenário sumir visivelmente do que um @pode: com erro de digitação
-     passar despercebido. */
+  /* A permission needs the blessing of EVERY dimension that mentions it.
+     The plan enables, the role authorises — a union would let the Pro plan
+     hand margin to the waiter. A dimension that never mentions the
+     permission has no opinion. A permission nobody mentions does not
+     exist: better that a scenario visibly disappears than that a
+     mistyped @pode: slips through unnoticed. */
   function can(perm){
     let cited = false;
     for (const d of cfg.context){
@@ -893,14 +898,14 @@ const Paladira = (() => {
       if (!ok) return false;
     }
     if (!cited){
-      /* só o coringa pode cobrir uma permissão que nenhuma opção lista */
+      /* only the wildcard can cover a permission no option lists */
       return activeOptions().some(({ o }) => (o.allows || []).indexOf("*") > -1);
     }
     return true;
   }
 
-  /* uma tag só filtra se corresponder a algo do contexto.
-     @catálogo, @validação e afins seguem sendo só rótulo. */
+  /* a tag only filters if it matches something in the context.
+     @catálogo, @validação and the like remain labels only. */
   function tagSatisfied(tag){
     if (tag.indexOf("@pode:") === 0) return state.can(tag.slice(6));
 
@@ -913,15 +918,15 @@ const Paladira = (() => {
       if (d.kind === "escala") return d.options.findIndex(o => o.id === v) >= idx;
       return v === id;
     }
-    return true;   /* tag sem correspondência: rótulo, não filtro */
+    return true;   /* a tag with no match: a label, not a filter */
   }
 
   function isVisible(s){ return (s.tags || []).every(tagSatisfied); }
   function visible(){ return cfg.scenarios.filter(isVisible); }
-  /* ---------- pista de implementação ---------- */
-  /* Onde este cenário vira código. O que o cenário declara vence; o
-     resto herda da funcionalidade, para não repetir a mesma rota em
-     cinco cenários. Aceita chaves em pt ou en. */
+  /* ---------- implementation hint ---------- */
+  /* Where this scenario becomes code. What the scenario declares wins; the
+     rest is inherited from the feature, so the same route is not repeated
+     across five scenarios. Accepts keys in Portuguese or English. */
   function implOf(s){
     const base = (cfg.feature && cfg.feature.impl) || {};
     const own  = (s && s.impl) || {};
@@ -945,13 +950,13 @@ const Paladira = (() => {
     return bits.join(" · ");
   }
 
-  /* ---------- primitivas já existentes na biblioteca ---------- */
-  /* Prototipar à mão é rápido, e é para isso que serve o modo vanilla.
-     O risco é a versão caseira ser reconstruída em produção quando a
-     biblioteca já tem a peça. Então o harness varre o que foi
-     desenhado, cruza com o mapa de primitivas e leva o de-para para o
-     .feature: quem implementa recebe "isto aqui é Button", não uma
-     tela para reinventar. */
+  /* ---------- primitives that already exist in the library ---------- */
+  /* Prototyping by hand is fast, and that is what vanilla mode is for.
+     The risk is the home-made version being rebuilt in production when the
+     library already has the piece. So the harness scans what was drawn,
+     crosses it with the primitives map and carries the mapping into the
+     .feature: whoever implements it gets "this one is a Button", not a
+     screen to reinvent. */
   function scanPrim(root){
     const map = cfg.primitives || {};
     const cat = cfg.catalog || (typeof window !== "undefined" && window.PALADIRA_UI) || null;
@@ -962,16 +967,17 @@ const Paladira = (() => {
       if (!n) return;
       const v = map[sel];
       const nameStr = typeof v === "string" ? v : v.nameStr;
-      /* o caminho vem do catálogo — escrever import à mão para 128
-         componentes é como o nome errado entra na especificação */
+      /* the path comes from the catalog — hand-writing imports for 128
+         components is how a wrong name gets into the specification */
       const de = (typeof v === "object" && v.de) || (cat && cat[nameStr]) || null;
       out.push({ sel, nameStr, de, n, unknown: !!cat && !cat[nameStr] });
     });
     return out;
   }
 
-  /* dois seletores podem virar o mesmo componente (.card e .var são Card),
-     então agrupa por nome e soma — a lista é de componentes, não de classes */
+  /* two selectors can map to the same component (.card and .var are both
+     Card), so it groups by name and sums — the list is of components, not
+     of classes */
   function groupPrim(list){
     const by = {};
     list.forEach(p => {
@@ -990,13 +996,13 @@ const Paladira = (() => {
       .join(" · ");
   }
 
-  /* imports prontos para colar, só do que a tela usa */
+  /* imports ready to paste, only for what the screen uses */
   function primImports(list){
     return groupPrim(list).filter(p => p.de)
       .map(p => `import { ${p.nameStr} } from "${p.de}";`);
   }
 
-  /* varre um cenário no último passo, fora da tela */
+  /* scans a scenario at its last step, off screen */
   async function primOf(s){
     if (!cfg.primitives) return [];
     const probe = document.createElement("div");
@@ -1016,12 +1022,13 @@ const Paladira = (() => {
     return list;
   }
 
-  /* ---------- passos que clicam de verdade ---------- */
-  /* `apply` descreve a transição; o botão na tela executa a dela. Os dois
-     podem divergir sem ninguém notar. Um passo com `clique` fecha essa
-     brecha: renderiza o estado, procura o elemento e chama os MESMOS
-     handlers registrados com Paladira.on. Se o elemento não existir, o
-     passo falha — a especificação passa a exigir que o botão exista. */
+  /* ---------- steps that really click ---------- */
+  /* `applyState` describes the transition; the button on screen runs its
+     own. The two can drift apart with nobody noticing. A step with `click`
+     closes that gap: it renders the state, looks for the element and calls
+     the SAME handlers registered with Paladira.on. If the element does not
+     exist the step fails — the specification now demands the button
+     exists. */
   let sandbox = null;
   /* uma reprodução por vez. Sem isto, o replay disparado pela navegação e a
      verificação automática correm juntos e um limpa o sandbox do outro. */
