@@ -1834,7 +1834,7 @@ const Paladira = (() => {
       if (spec){
         const before = JSON.stringify(app);
         const repBefore = replaying;
-        if (lastLive) replaying = false;   /* latência + carregando */
+        if (lastLive) replaying = false;   /* latency + loading */
         const cAntes = network.counter;
         const r = await runAction(spec, app, ex);
         app = r.app;
@@ -1889,13 +1889,13 @@ const Paladira = (() => {
   }
 
   async function replay(){
-    /* nada a cancelar: a suíte roda no mundo dela, dentro do iframe */
-    if (verifying) cancelVerification = true;   /* só no modo fallback */
+    /* nothing to cancel: the suite runs in its own world, inside the iframe */
+    if (verifying) cancelVerification = true;   /* fallback mode only */
     return enqueue(async () => {
     const s = scn(state.scenario);
     if (!s) return;
-    network.tela.length = 0;    /* o monitor mostra o que ESTA tela pediu */
-    network.inFlightScreen = 0;      /* pedido pendurado da tela anterior não conta aqui */
+    network.tela.length = 0;    /* the monitor shows what THIS screen asked for */
+    network.inFlightScreen = 0;      /* a request left stalled by the previous screen does not count here */
     const r = await buildState(s, state.step, state.example, !verifying);
     state.app = r.app;
     state.ex  = r.ex;
@@ -1903,15 +1903,15 @@ const Paladira = (() => {
   }
 
   async function goto(scenarioId, step, example){
-    /* clicar no passo em que já se está não precisa refazer nada — a não
-       ser que a pessoa tenha mexido na tela depois, e aí o clique é
-       justamente para voltar ao estado do roteiro */
+    /* clicking the step you are already on needs no redo — unless the person
+       touched the screen afterwards, in which case the click is precisely
+       to get back to the script's state */
     const samePoint = state.scenario === scenarioId
       && state.step === (step == null ? -1 : step)
       && (example == null || state.example === example);
-    /* jaRenderizou é obrigatório: no init o estado JÁ aponta para o
-       primeiro cenário, então sem esta guarda o primeiro goto casaria
-       como "mesmo ponto" e a tela nunca seria desenhada. */
+    /* didRender is mandatory: at init the state ALREADY points at the first
+       scenario, so without this guard the first goto would match as "same
+       point" and the screen would never be drawn. */
     if (samePoint && didRender && !appDirty && !awaiting) return;
 
     state.scenario = scenarioId;
@@ -1919,10 +1919,10 @@ const Paladira = (() => {
     state.step = (step == null ? -1 : step);
     if (example != null) state.example = example;
 
-    /* Linha de exemplo que declara largura leva o palco junto — é o que
-       garante que se vê o que foi verificado. Mas se a pessoa acabou de
-       escolher um degrau à mão, a escolha dela manda: aí a troca de linha
-       já aconteceu no seletor. */
+    /* An example row that declares a width takes the stage with it — that is
+       what guarantees you see what was verified. But if the person just
+       picked a rung by hand, their choice wins: the row switch already
+       happened in the selector. */
     const targetWidth = sampleWidth(scnById(scenarioId) || {}, state.example);
     if (targetWidth && !manualChoice && state.viewport !== targetWidth.id
         && LADDER.some(d => d.id === targetWidth.id)){
@@ -1930,9 +1930,9 @@ const Paladira = (() => {
     }
     manualChoice = false;
 
-    /* ir para um cenário abre o bloco em que ele mora: senão a navegação
-       (por link, por seta ou por Ir até a falha) leva para um cartão que
-       está dobrado e a barra parece não ter reagido */
+    /* going to a scenario opens the block it lives in: otherwise navigation
+       (by link, by arrow or by Go to the failure) lands on a collapsed card
+       and the bar looks as if it did not react */
     const aim = scnById(scenarioId);
     if (aim){
       const pg = aim.page || cfg.defaultPage || "única";
@@ -1940,9 +1940,9 @@ const Paladira = (() => {
       if (stateOf(aim)) closedGroups.delete(pg + "::estados");
     }
 
-    /* A primeira visita a um cenário refaz a jornada inteira e pode levar
-       quase um segundo. Sem sinal nenhum, o clique parece perdido — então
-       o passo já aparece marcado como aguardando, antes do await. */
+    /* The first visit to a scenario redoes the whole journey and can take
+       nearly a second. With no signal at all the click feels lost — so the
+       step is marked as waiting up front, before the await. */
     awaiting = { id:scenarioId, stp:state.step };
     buildSidebar();
 
@@ -1950,8 +1950,8 @@ const Paladira = (() => {
     awaiting = null;
     appDirty = false;
     render();
-    /* a navegação pode ter trocado o degrau (linha de Exemplos com
-       largura): o quadro precisa acompanhar, senão a pílula mente */
+    /* navigation may have switched the rung (an Examples row with a width):
+       the frame has to follow, otherwise the pill lies */
     fit();
   }
 
@@ -1980,7 +1980,7 @@ const Paladira = (() => {
   }
 
   function applyHash(source){
-    /* aceita "#a/2", "a/2" ou uma URL inteira colada */
+    /* accepts "#a/2", "a/2" or a whole pasted URL */
     let raw = source == null ? location.hash : String(source);
     const cut = raw.indexOf("#");
     if (cut > -1) raw = raw.slice(cut + 1);
@@ -2036,15 +2036,15 @@ const Paladira = (() => {
   }
 
   function syncHash(){
-    /* durante o init o fit() já roda e escreveria o estado restaurado por
-       cima do link recebido — o link tem de ser lido antes de qualquer
-       escrita, senão ele nunca vence */
+    /* during init fit() already runs and would write the restored state over
+       the incoming link — the link has to be read before any write, or it
+       never wins */
     if (!started) return;
     savePrefs();
     const h = encodeHash();
     if (location.hash === h) return;
-    /* history.replaceState com URL estoura em file:// (origem null),
-       então mexemos no hash direto e ignoramos o evento que ele dispara */
+    /* history.replaceState with a URL throws on file:// (null origin), so we
+       touch the hash directly and ignore the event it fires */
     muteHash = true;
     location.hash = h;
     setTimeout(() => { muteHash = false; }, 0);
@@ -2053,22 +2053,22 @@ const Paladira = (() => {
   }
 
   function linkValue(){
-    /* em about:srcdoc o href não abre em lugar nenhum: vale só o trecho */
+    /* on about:srcdoc the href opens nowhere: only the fragment is useful */
     return /^(https?|file):$/.test(location.protocol) ? location.href : encodeHash();
   }
 
   /* ---------- auditoria ---------- */
-  /* O que dá para exigir mecanicamente, e por quê:
-     1. Todo elemento interativo renderizado deve ser clicado por algum
-        passo — senão existe caminho na tela que a especificação ignora.
-     2. Todo `Quando` precisa de um `Então` depois — ação sem asserção
-        não é verificada por ninguém.
-     3. Handler registrado que nunca casa com nada é código morto.
-     4. Passo que não muda estado nem tela não está descrevendo nada. */
-  /* Um componente não é passivo por natureza — é passivo por uso. Avatar
-     abre menu, Card inteiro vira alvo de clique, Badge se descarta. Então
-     a auditoria não pergunta "que componente é este", e sim "esta tela
-     está oferecendo algo para a pessoa operar". */
+  /* What can be demanded mechanically, and why:
+     1. Every rendered interactive element must be clicked by some step —
+        otherwise there is a path on screen the specification ignores.
+     2. Every `Quando` needs a `Então` after it — an action with no
+        assertion is verified by nobody.
+     3. A registered handler that never matches anything is dead code.
+     4. A step that changes neither state nor screen describes nothing. */
+  /* A component is not passive by nature — it is passive by use. An Avatar
+     opens a menu, a whole Card becomes a click target, a Badge gets
+     dismissed. So the audit does not ask "which component is this", but
+     "is this screen offering something for the person to operate". */
   const INTERACTIVE_ROLES = ["button","link","checkbox","switch","tab","menuitem",
     "menuitemcheckbox","option","combobox","slider","radio","textbox","searchbox","spinbutton"];
 
@@ -2084,7 +2084,7 @@ const Paladira = (() => {
     if (el.isContentEditable) return true;
     try {
       const cs = el.ownerDocument.defaultView.getComputedStyle(el);
-      if (cs && cs.cursor === "pointer") return true;   /* o div que finge ser botão */
+      if (cs && cs.cursor === "pointer") return true;   /* the div pretending to be a button */
     } catch {}
     return false;
   }
@@ -2106,11 +2106,11 @@ const Paladira = (() => {
     return "click";
   }
 
-  /* Modo estrito: no vanilla não dá para proibir HTML cru — o render é
-     string. Dá para exigir que toda marcação que MOSTRA texto ou RECEBE
-     interação esteja reivindicada por algum componente do mapa. Div e
-     span puramente estruturais (sem texto próprio) passam; o resto vira
-     dívida explícita, com sugestão de qual componente usar. */
+  /* Strict mode: in vanilla you cannot forbid raw HTML — the render is a
+     string. You can demand that every piece of markup that SHOWS text or
+     TAKES interaction is claimed by some component in the map. Purely
+     structural divs and spans (with no text of their own) pass; the rest
+     becomes explicit debt, with a suggestion of which component to use. */
   const SUGGESTION = {
     h1:"Heading", h2:"Heading", h3:"Heading", h4:"Heading", h5:"Heading", h6:"Heading",
     p:"Paragraph", span:"Text", small:"Text", strong:"Text", em:"Text", b:"Text", i:"Text",
@@ -2141,7 +2141,7 @@ const Paladira = (() => {
       const tag = el.tagName.toLowerCase();
       const shows = !!ownText(el);
       const opera  = hasAffordance(el);
-      if (!shows && !opera) return;          /* contêiner estrutural: passa */
+      if (!shows && !opera) return;          /* structural container: passes */
       const cls = el.className ? "." + String(el.className).split(" ")[0] : "";
       released.push({
         onde: tag + cls,
@@ -2153,15 +2153,15 @@ const Paladira = (() => {
     return released;
   }
 
-  /* ---------- assinatura de layout por degrau ----------
-     A parte 2 cobra o que o protótipo DECLARA. Esta cobra o que ele
-     entrega: desenha a mesma tela em cada degrau e compara o arranjo
-     calculado. Assinatura igual na escada inteira quer dizer que a tela
-     coube, não que respondeu.
+  /* ---------- layout signature per rung ----------
+     Part 2 demands what the prototype DECLARES. This one demands what it
+     delivers: it draws the same screen at every rung and compares the
+     computed arrangement. The same signature across the whole ladder means
+     the screen fit, not that it responded.
 
-     Precisa de motor de layout — container query não resolve sem alguém
-     medir a caixa. No portão (jsdom) a regra se declara não verificável
-     em vez de acusar falsamente. */
+     It needs a layout engine — a container query resolves to nothing
+     without someone measuring the box. In the gate (jsdom) the rule
+     declares itself unverifiable instead of accusing falsely. */
   const LAYOUT_PROPS = ["display","flexDirection","flexWrap","gridTemplateColumns",
                         "position","order","justifyContent","alignItems","fontSize","textAlign"];
 
@@ -2185,8 +2185,8 @@ const Paladira = (() => {
     return hasEngine;
   }
 
-  /* o probe tem de acompanhar a largura vigente, senão a container query
-     nunca muda e o Então mede sempre o mesmo arranjo */
+  /* the probe has to follow the current width, otherwise the container
+     query never changes and the Então always measures the same arrangement */
   function adjustProbe(probe){
     if (probe) probe.style.width = currentWidth().w + "px";
   }
@@ -2205,22 +2205,22 @@ const Paladira = (() => {
     return pieces.join("\u00a7");
   }
 
-  /* ---------- regras físicas por degrau ----------
-     "Coube" não é o mesmo que "serve". Estas medem o que o olho cobraria:
-     transbordo lateral, alvo pequeno demais para o dedo, texto miúdo,
-     linha longa demais para ler, e conteúdo que some no estreito sem
-     ninguém ter decidido isso. */
-  const MIN_TOUCH_TARGET = 44;     /* px — dedo médio */
+  /* ---------- physical rules per rung ----------
+     "It fit" is not the same as "it works". These measure what the eye
+     would object to: sideways overflow, a target too small for a finger,
+     tiny text, a line too long to read, and content that vanishes when
+     narrow without anyone having decided that. */
+  const MIN_TOUCH_TARGET = 44;     /* px — an average finger */
   const MIN_TEXT_SIZE = 12;    /* px */
   const MAX_LINE_LENGTH = 75;    /* caracteres */
 
   function measuresPhysical(root, rung, width_){
-    /* devolve pares [chave, detalhe]: a auditoria agrupa por chave e
-       lista os degraus, senão o mesmo defeito vira seis avisos iguais */
+    /* returns [key, detail] pairs: the audit groups by key and lists the
+       rungs, otherwise the same defect becomes six identical warnings */
     const foundItems = [];
     const narrow = rung.w <= 480;
 
-    /* transbordo lateral: rolagem horizontal é quase sempre acidente */
+    /* sideways overflow: horizontal scrolling is almost always an accident */
     const scrollTarget = root.scrollWidth || 0;
     if (scrollTarget > width_ + 2){
       foundItems.push([`transborda na horizontal`, `${scrollTarget - width_}px`]);
@@ -2244,7 +2244,7 @@ const Paladira = (() => {
       if (px && px < MIN_TEXT_SIZE){
         foundItems.push([`texto abaixo de ${MIN_TEXT_SIZE}px`, `${Math.round(px)}px`]);
       }
-      /* linha longa demais só incomoda no largo, onde há espaço de sobra */
+      /* an over-long line only bothers on wide screens, where space is plentiful */
       if (rung.w >= 1024 && el.tagName === "P"){
         const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
         const ch = r && px ? r.width / (px * 0.5) : 0;
@@ -2263,15 +2263,15 @@ const Paladira = (() => {
     return el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : "");
   }
 
-  /* o que a tela oferece: usado para achar conteúdo que some no estreito */
+  /* what the screen offers: used to find content that vanishes when narrow */
   function offerOf(root){
     const set = new Set();
     root.querySelectorAll("[data-act],[data-campo],[data-card]").forEach(el => {
       set.add("ação:" + (el.getAttribute("data-act") || el.getAttribute("data-campo")
                       || el.getAttribute("data-card")));
     });
-    /* conteúdo também conta: um bloco inteiro sumir no estreito é o caso
-       clássico de "não coube, então tirei" — e ninguém decidiu isso */
+    /* content counts too: a whole block vanishing when narrow is the classic
+       "it did not fit, so I removed it" — and nobody decided that */
     root.querySelectorAll("h1,h2,h3").forEach(el => {
       const t = (el.textContent || "").trim();
       if (t) set.add("bloco:" + t.slice(0, 40));
@@ -2301,14 +2301,14 @@ const Paladira = (() => {
     const warnings = [];
     const infos = [];
     const physicals = new Map();
-    const doneCount = new Set();          /* "tipo seletor" já exercitado */
-    const aims  = new Map();          /* "tipo seletor" -> cenários */
+    const doneCount = new Set();          /* a "type selector" already exercised */
+    const aims  = new Map();          /* "type selector" -> scenarios */
     const usedHandlers = new Set();
     const noHandler = new Set();
     const rawList = new Map();
-    /* NÃO limpar aqui: com o memo, os handlers disparam durante a fase de
-       verificação e a auditoria só reaproveita o estado. Zerar neste ponto
-       apagaria a evidência e todo handler pareceria sem cobertura. */
+    /* do NOT clear here: with the memo, handlers fire during the verification
+       phase and the audit merely reuses the state. Resetting at this point
+       would erase the evidence and every handler would look uncovered. */
 
     const probe = document.createElement("div");
     probe.className = "h-probe";
@@ -2321,14 +2321,14 @@ const Paladira = (() => {
       (s.steps || []).forEach(st => {
         const spec = specOf(st);
         if (spec){
-          /* [data-act=x][data-id=2] cobre o alvo [data-act=x]: clicar numa
-             linha da lista prova o padrão, não só aquela linha */
+          /* [data-act=x][data-id=2] covers the [data-act=x] target: clicking
+             one row of the list proves the pattern, not just that row */
           const m = /\[data-(act|campo)="([^"]+)"\]/.exec(spec.sel);
           doneCount.add(spec.kindName + " " + (m ? `[data-${m[1]}="${m[2]}"]` : spec.sel));
         }
       });
 
-      /* Quando sem Então: ação que ninguém verifica */
+      /* a Quando with no Então: an action nobody verifies */
       const steps = s.steps || [];
       steps.forEach((st, i) => {
         if (nature(st) !== "acao") return;
@@ -2339,9 +2339,10 @@ const Paladira = (() => {
 
       const rows = isOutline(s) ? s.examples.tableRows.map((_, i) => i) : [0];
 
-      /* Dado literal com estrutura de domínio é dado inventado na tela.
-         A regra: o cenário busca o que mostra. `semRede: true` isenta
-         telas que de fato não dependem de servidor. */
+      /* A literal Dado carrying domain structure is data invented on the
+         screen. The rule: the scenario fetches what it shows.
+         `noNetwork: true` exempts screens that genuinely do not depend on
+         a server. */
       if (!s.noNetwork && stateOf(s) !== "carregando"
           && s.given && s.given.state && typeof s.given.state !== "function"){
         const v = s.given.state;
@@ -2362,9 +2363,9 @@ const Paladira = (() => {
           warnings.push(`${s.name}: nenhum pedido à rede — de onde veio o dado da tela?`);
         }
 
-        /* varre TODA a jornada, não só o destino: numa jornada o botão de
-           tentar de novo aparece no meio do caminho e some depois — olhar
-           só o último passo o daria como código morto */
+        /* scans the WHOLE journey, not just the destination: in a journey the
+           retry button appears midway and disappears afterwards — looking
+           only at the last step would write it off as dead code */
         const screens = [];
         for (let k = -1; k < steps.length; k++){
           try {
@@ -2373,7 +2374,7 @@ const Paladira = (() => {
             if (cfg.mount)       cfg.mount(probe, shown);
             else if (cfg.render) probe.innerHTML = cfg.render(shown);
             screens.push(probe.innerHTML);
-          } catch { /* passo que quebra já é acusado em outro lugar */ }
+          } catch { /* a step that breaks is already called out elsewhere */ }
         }
 
         for (const html of screens){
@@ -2381,8 +2382,8 @@ const Paladira = (() => {
 
         probe.querySelectorAll("*").forEach(el => {
           if (!hasAffordance(el) || el.disabled) return;
-          /* o alvo é o botão, não os spans dentro dele: quem clica numa
-             linha clica na linha inteira */
+          /* the target is the button, not the spans inside it: clicking a row
+             clicks the whole row */
           const owner = el.closest("button,a[href],[role=button],input,select,textarea");
           if (owner && owner !== el) return;
           const act  = el.getAttribute("data-act") || el.getAttribute("data-campo");
@@ -2390,8 +2391,9 @@ const Paladira = (() => {
           const sel = act
             ? `[${attr}="${act}"]`
             : el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : "");
-          /* um passo que clica em [data-act=x][data-id=2] cobre o alvo
-             [data-act=x]: o que vale é o elemento casar com o seletor */
+          /* a step that clicks [data-act=x][data-id=2] covers the
+             [data-act=x] target: what counts is the element matching the
+             selector */
           let anyOf = false;
           handlers.forEach(h => {
             try { if (el.matches(h.selector)){ usedHandlers.add(h.selector); anyOf = true; } } catch {}
@@ -2423,11 +2425,11 @@ const Paladira = (() => {
       warnings.push(`${rest.join(" ")} aparece em ${[...scens].join(", ")} mas nenhum passo ${verb[kindName]} nele`);
     });
 
-    /* ---------- a tela muda por degrau? ---------- */
+    /* ---------- does the screen change per rung? ---------- */
     if (cfg.responsive !== false){
-      /* probe próprio: o da varredura de cenários já foi removido antes
-         daqui, e medir num elemento fora do documento devolve estilo
-         vazio — que se parecia com "não muda em nenhum degrau" */
+      /* its own probe: the scenario scan's was removed before this point,
+         and measuring an element outside the document returns empty style
+         — which looked just like "does not change on any rung" */
       const probeL = document.createElement("div");
       probeL.className = "h-probe";
       document.body.appendChild(probeL);
@@ -2440,16 +2442,17 @@ const Paladira = (() => {
       {
         const perPage = {};
         cfg.scenarios.forEach(x => {
-          if (stateOf(x)) return;                   /* estado não representa arranjo */
+          if (stateOf(x)) return;                   /* a state does not represent an arrangement */
           const pg = x.page || cfg.defaultPage || "única";
           (perPage[pg] = perPage[pg] || []).push(x);
         });
 
         for (const pg of Object.keys(perPage)){
-          /* Olha algumas jornadas da página, não só a primeira: uma que
-             termina no estado vazio não tem arranjo para comparar, e
-             julgar a página por ela acusaria falso. Basta uma jornada
-             mostrar arranjos diferentes para a página ter respondido. */
+          /* Looks at a few of the page's journeys, not just the first: one
+             that ends in the empty state has no arrangement to compare, and
+             judging the page by it would accuse falsely. One journey
+             showing different arrangements is enough for the page to have
+             responded. */
           const candidates = perPage[pg].slice(0, cfg.layoutJourneys || 3);
           let best = { distinct:1, inheritedList:[], nameStr:candidates[0] && candidates[0].name };
 
@@ -2466,8 +2469,9 @@ const Paladira = (() => {
               physicals.set(k, reg);
             }));
 
-            /* conteúdo que existe no largo e some no estreito sem ninguém
-               ter decidido isso: some do jeito errado, por falta de espaço */
+            /* content that exists when wide and vanishes when narrow with
+               nobody having decided it: it goes the wrong way, for lack of
+               room */
             const wide = sigs[sigs.length - 1].offer || new Set();
             const narrow = sigs[0].offer || new Set();
             wide.forEach(item => {
@@ -2488,7 +2492,7 @@ const Paladira = (() => {
             }
           }
 
-          if (noEngine){ /* sem motor não há arranjo para julgar */ }
+          if (noEngine){ /* with no engine there is no arrangement to judge */ }
           else if (best.distinct === 1){
             warnings.push(`a página "${pg}" desenha o MESMO arranjo em toda a escada `
               + `(${LADDER.map(d => d.id).join(", ")}) — coube, mas não respondeu`);
@@ -2512,17 +2516,18 @@ const Paladira = (() => {
       });
     }
 
-    /* ---------- variedade de jornadas ----------
-       Profundidade não basta: uma suíte com cinco caminhos felizes e
-       nenhum conflito é tão incompleta quanto um cenário de um passo.
-       O vocabulário abaixo obriga a pensar em TIPOS de jornada, e cada
-       tag é conferida contra o que a tela realmente faz — @conflito que
-       termina sem erro na tela é rótulo mentiroso.
+    /* ---------- variety of journeys ----------
+       Depth is not enough: a suite with five happy paths and no conflict is
+       as incomplete as a one-step scenario. The vocabulary below forces you
+       to think in TYPES of journey, and every tag is checked against what
+       the screen actually does — a @conflito that ends with no error on
+       screen is a lying label.
 
-         @feliz        o caminho que dá certo, de ponta a ponta
-         @conflito     o servidor recusa: e-mail já existe, limite, 422
-         @recuperacao  quebra no meio e a pessoa se recupera sozinha
-         @retorno      quem já usou volta: sai da tela e entra de novo   */
+         @feliz        the path that works, end to end
+         @conflito     the server refuses: email exists, limit, 422
+         @recuperacao  breaks midway and the person recovers on their own
+         @retorno      someone who already used it returns: leaves the
+                       screen and comes back in                          */
     if (cfg.journeys !== false){
       const TYPES = ["feliz", "conflito", "recuperacao", "retorno"];
       const kindFor = s => (s.tags || []).map(t => t.replace(/^@/, ""))
@@ -2547,7 +2552,7 @@ const Paladira = (() => {
             + `jornada @conflito, @recuperacao ou @retorno`);
         }
 
-        /* assinatura igual = cenário clonado com outro nome */
+        /* the same signature = a scenario cloned under another name */
         const signatures = {};
         ofGroup.forEach(s => {
           const sig = (s.steps || []).map(st => { const sp = specOf(st); return sp ? sp.kindName + " " + sp.sel : null; })
@@ -2559,7 +2564,7 @@ const Paladira = (() => {
           } else signatures[sig] = s.name;
         });
 
-        /* pelo menos uma jornada de ponta a ponta por página */
+        /* at least one end-to-end journey per page */
         const longest = Math.max(0, ...ofGroup.map(s =>
           (s.steps || []).filter(st => specOf(st) || st.waitFor).length));
         if (longest < (cfg.endToEndActions || 3)){
@@ -2568,7 +2573,7 @@ const Paladira = (() => {
         }
       }
 
-      /* as tags de tipo são conferidas contra a tela final */
+      /* the type tags are checked against the final screen */
       for (const s of cfg.scenarios){
         state.ctx = contextOf(s);
         const kindName = kindFor(s);
@@ -2589,7 +2594,7 @@ const Paladira = (() => {
             else if (cfg.render) probe.innerHTML = cfg.render(shown);
             if (errorMarks(probe)) middle = true;
             if (k === stps - 1) end = errorMarks(probe);
-          } catch { /* já acusado em outro lugar */ }
+          } catch { /* already called out elsewhere */ }
         }
 
         forcedWidth = null;
@@ -2608,7 +2613,7 @@ const Paladira = (() => {
       }
     }
 
-    /* palavra digitada versus o que o passo faz */
+    /* the typed keyword versus what the step does */
     cfg.scenarios.forEach(s => {
       (s.steps || []).forEach((st, i) => {
         const nat = nature(st);
@@ -2623,10 +2628,11 @@ const Paladira = (() => {
       });
     });
 
-    /* ---------- jornada, não asserção solta ----------
-       "Dado que o usuário não pagou / Então a tela fica vazia" não é
-       cenário: é um print com legenda. Cenário é o caminho — chegar na
-       tela, agir, e ver o que mudou. As regras abaixo cobram isso. */
+    /* ---------- a journey, not a loose assertion ----------
+       "Dado que o usuário não pagou / Então a tela fica vazia" is not a
+       scenario: it is a screenshot with a caption. A scenario is the path —
+       reach the screen, act, and see what changed. The rules below demand
+       that. */
     if (cfg.journeys !== false){
       const MIN_ACTIONS = cfg.minAcoes || 2;
 
