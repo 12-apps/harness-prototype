@@ -6,6 +6,7 @@
    test of its own. Without one, someone loosens the linter and CI stays
    green — which is the failure this repository keeps finding in itself.
    ============================================================ */
+const fs = require("fs");
 const path = require("path");
 const { lint, loadCatalog } = require("./lint-prototype.js");
 
@@ -34,6 +35,35 @@ check("rejects a component never imported", has("unknown-component"), "not repor
 const good = lint(fixture("complies.jsx"), catalog);
 check("passes a compliant prototype", good.length === 0,
       good.map(p => p.kind + ": " + p.msg).join(" | "));
+
+/* ------------------------------------------------------------
+   The classification has to cover the catalog it describes.
+   ------------------------------------------------------------
+   ui-interactions.* is curated by hand while ui-catalog.js is generated,
+   so the two drift in silence: the catalog grew to 210 components while
+   the classification still described 116, and nothing said so. This
+   checks both directions — a component with no level, and a level for a
+   component that no longer exists. Regenerate the catalog, add the
+   missing judgments, or this goes red.
+   ------------------------------------------------------------ */
+const wiring = {};
+new Function("window", fs.readFileSync(path.join(repo, "catalog", "ui-interactions.js"), "utf8"))(wiring);
+const names = Object.keys(catalog);
+const missing = level => names.filter(n => !(n in level));
+const orphan  = level => Object.keys(level).filter(n => !(n in catalog));
+const list = a => a.length + ": " + a.slice(0, 8).join(", ") + (a.length > 8 ? " …" : "");
+
+for (const [label, level] of [["wiring", wiring.PROTO_UI_WIRING], ["action", wiring.PROTO_UI_ACTION]]){
+  check(`every catalog component has a ${label} level`, missing(level).length === 0, list(missing(level)));
+  check(`no ${label} level for a component that is gone`, orphan(level).length === 0, list(orphan(level)));
+}
+
+/* `nunca` means there is nothing to operate, so it cannot carry a step
+   that operates something. `efemero` is allowed: a skeleton or a loading
+   state appears and goes away without ever being touched. */
+const inert = names.filter(n => wiring.PROTO_UI_WIRING[n] === "nunca"
+                             && !["passivo", "efemero"].includes(wiring.PROTO_UI_ACTION[n]));
+check("no component is inert and operable at once", inert.length === 0, list(inert));
 
 console.log(failed ? `\n✕ the component rule is not enforcing what it claims (${failed})`
                    : `\n✓ the component rule still bites (${bad.length} violations caught in the fixture)`);
