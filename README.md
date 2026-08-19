@@ -4,9 +4,22 @@ A single HTML file that serves as a bench for designing and **stress-testing** U
 
 ```bash
 npm install jsdom
-node verify.js proto.html
-# ✓ proto.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
+node verify.js examples/product-editor.html
+# ✓ product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
+
+## Two files, two jobs
+
+`proto.html` is the **bench**: the harness and nothing else. Its three zones are
+empty, so it reports `0 ok` — there is no prototype in it to check. Copy it to start.
+
+`examples/product-editor.html` is a **prototype**: the same harness with all three
+zones filled in, and the reference to read when you want to see what good scenarios,
+routes and states look like.
+
+Keeping them apart is deliberate. They used to be the same file, which left the bench
+carrying somebody else's demo and made it easy — for a person or an agent — to edit
+the wrong one.
 
 ## How it is used
 
@@ -17,6 +30,10 @@ node verify.js proto.html
    - `▼ APP ▼ (2 of 2)` — context, scenarios and render
 3. Open it in a browser. The suite runs on its own and blocks the screen if it fails.
 4. Before shipping, run the gate. It has to exit `0`.
+
+CI verifies every prototype it finds — the examples, and anything you copy to the repo
+root. It skips `proto.html` on purpose: an empty bench passes with `0 ok`, and that
+green would mean nothing.
 
 Nothing outside the zones gets touched — that is the harness, and it is the same in every prototype.
 
@@ -64,12 +81,12 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 
 | path | what it is |
 |---|---|
-| `proto.html` | the harness; copy it per prototype |
+| `proto.html` | the bench — harness only, empty zones; copy it per prototype |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
 | `catalog/` | the 128 components of `@12-apps/ui` and what each one demands in wiring |
 | `scripts/generate-catalog.js` | regenerates the catalog from the installed package |
-| `examples/` | a demo prototype, plus the product instructions and context it was built from |
+| `examples/` | a filled-in prototype to read, plus the product instructions and context it was built from |
 
 ## Component catalog
 

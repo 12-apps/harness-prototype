@@ -28,7 +28,7 @@
        kind:"opcao"   the user's role. @garcom applies to the waiter only.
        kind:"flags"   switchable features. @cozinha requires it on.
      Any option can grant permissions (allows:[…], "*" = all), and a
-     scenario demands one with @pode:produto.editar.
+     scenario demands one with @pode:<permission>.
      A scenario outside the context leaves the list AND the .feature.
 
      SCENARIO OUTLINE
@@ -469,7 +469,7 @@ body{
   border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.55);overflow:hidden;
 }
 .h-mon-corpo[hidden]{display:none}
-.h-mon-lista{max-height:210px;overflow:auto;padding:5px}
+.h-mon-list{max-height:210px;overflow:auto;padding:5px}
 .h-mon-item{
   display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;
   background:transparent;border:0;border-radius:6px;padding:5px 7px;
@@ -697,7 +697,7 @@ body{
           <span class="pt"></span><span id="h-mon-resumo">rede</span>
         </button>
         <div class="h-mon-corpo" id="h-mon-corpo" hidden>
-          <div class="h-mon-lista" id="h-mon-lista"></div>
+          <div class="h-mon-list" id="h-mon-list"></div>
           <pre class="h-mon-det" id="h-mon-det" hidden></pre>
         </div>
       </aside>
@@ -833,7 +833,7 @@ const Proto = (() => {
 
   const state = {
     scenario:null, step:-1, example:0,
-    ctx:{},        /* dimensaoId -> id ativo (string) ou lista (flags) */
+    ctx:{},        /* dimensionId -> active id (string), or a list (flags) */
     app:{}, ex:null,
     viewport:"xs", landscape:false, zoom:"fit", sidebar:288,
 
@@ -1513,9 +1513,13 @@ const Proto = (() => {
     return t || null;
   }
 
+  /* Which page the state is on. The prototype says so with `page`; the
+     harness has no other way to know, and guessing from the shape of the
+     state would only work for whichever prototype the guess was written
+     against. Journeys that cross screens need this set. */
   function pageOf(app){
     if (!app) return null;
-    return app.page || (app.products ? "lista" : (app.product ? "produto" : null));
+    return app.page || null;
   }
 
   /* Journey first, state checks after. Loading, empty and error are
@@ -1744,7 +1748,7 @@ const Proto = (() => {
 
     const stps = (s.steps || []).slice(0, upTo + 1);
     /* Live, what really has to happen is the LAST ACTION up to here — not
-       the last step. Stopping on a Então after "recarrega a lista" has to
+       the last step. Stopping on a Então after a "reload the list" step has to
        fire the reload; otherwise the screen shows up ready with no request
        at all, which is what made it look broken. */
     let idxAcao = -1;
@@ -3643,7 +3647,7 @@ const Proto = (() => {
     $("h-mon-corpo").hidden = !monitorOpen;
     if (!monitorOpen) return;
 
-    $("h-mon-lista").innerHTML = items.length
+    $("h-mon-list").innerHTML = items.length
       ? items.slice().reverse().map(r =>
           `<button class="h-mon-item${monitorSel === r.id ? " on" : ""}" data-req="${r.id}">`
           + `<span class="m">${esc(r.httpMethod)}</span>`
@@ -3939,7 +3943,7 @@ const Proto = (() => {
       if (openScen) paintData();
     }
     $("h-mon-trig").addEventListener("click", () => { monitorOpen = !monitorOpen; paintMonitor(); });
-    $("h-mon-lista").addEventListener("click", e => {
+    $("h-mon-list").addEventListener("click", e => {
       const b = e.target.closest("[data-req]");
       if (!b) return;
       const id = Number(b.dataset.req);

@@ -4,8 +4,8 @@
   "description": "Prototyping bench: the prototype is the specification, and the gate enforces it.",
   "bin": { "proto-verify": "./verify.js" },
   "scripts": {
-    "verify": "node verify.js proto.html",
-    "verify:examples": "node verify.js examples/product-editor.html",
+    "verify": "node verify.js",
+    "verify:example": "node verify.js examples/product-editor.html",
     "catalog": "node scripts/generate-catalog.js"
   },
   "devDependencies": { "jsdom": "^24.0.0" },

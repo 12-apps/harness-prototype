@@ -48,14 +48,28 @@ jobs:
           done
           echo "path=" >> "$GITHUB_OUTPUT"
 
-      - name: verify the harness and the examples
+      # proto.html is the empty bench, not a prototype: it has no scenarios,
+      # so the gate would pass it with "0 ok" and that green would mean
+      # nothing. Every other prototype — the examples, and anything copied
+      # to the repo root per the documented workflow — is verified.
+      - name: verify every prototype
         env:
           PROTO_CHROME: ${{ steps.chrome.outputs.path }}
         run: |
           failed=0
-          for f in proto.html examples/*.html; do
+          found=0
+          for f in *.html examples/*.html; do
             [ -e "$f" ] || continue
+            if [ "$f" = "proto.html" ]; then
+              echo "── $f (the bench itself, nothing to verify)"
+              continue
+            fi
+            found=$((found + 1))
             echo "── $f"
             node verify.js "$f" || failed=1
           done
+          if [ "$found" -eq 0 ]; then
+            echo "no prototype found to verify"
+            exit 1
+          fi
           exit $failed

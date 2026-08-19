@@ -28,7 +28,7 @@
        kind:"opcao"   the user's role. @garcom applies to the waiter only.
        kind:"flags"   switchable features. @cozinha requires it on.
      Any option can grant permissions (allows:[…], "*" = all), and a
-     scenario demands one with @pode:produto.editar.
+     scenario demands one with @pode:<permission>.
      A scenario outside the context leaves the list AND the .feature.
 
      SCENARIO OUTLINE
@@ -469,7 +469,7 @@ body{
   border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.55);overflow:hidden;
 }
 .h-mon-corpo[hidden]{display:none}
-.h-mon-lista{max-height:210px;overflow:auto;padding:5px}
+.h-mon-list{max-height:210px;overflow:auto;padding:5px}
 .h-mon-item{
   display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;
   background:transparent;border:0;border-radius:6px;padding:5px 7px;
@@ -531,110 +531,17 @@ body{
 
 <!-- ============================================================
      ▼ APP ▼  1 of 2 — the prototype's styles
-     Use @container (não @media). No modo React os tokens vêm de
-     "@12-apps/ui/tokens" — não repita hex à mão.
+     Use @container, not @media: the frame is the container, so a rule
+     keyed to the window would ignore the width ladder entirely.
+     With a component library, take the tokens from it — do not repeat
+     hex values by hand.
      ============================================================ -->
 <style>
-:root{
-  --brand:#5b5bd6; --brand-ink:#4a4ac4; --brand-soft:#eeeefc; --brand-line:#c9c9f2;
-  --ink:#111318; --ink-2:#3d4350; --ink-3:#6b7280; --ink-4:#9aa1ad;
-  --line:#e4e7ec; --line-2:#eef0f4; --bg:#fff; --bg-2:#f7f8fa;
-  --ok:#0f7a4d; --ok-soft:#e8f6ef; --ok-line:#bfe5d3;
-  --warn:#b45309; --warn-soft:#fdf1e3; --warn-line:#f3d9b5;
-  --bad:#c02626; --bad-soft:#fdeceb; --bad-line:#f5c6c2;
-  --r:10px;
-}
-.app{min-height:100%;display:flex;flex-direction:column;background:var(--bg-2);color:var(--ink);font:14px/1.45 var(--h-sans)}
-.app-hd{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px}
-.app-hd h1{margin:0;font-size:16px;font-weight:650;letter-spacing:-.01em}
-/* an over-long line tires the reader: the eye loses the way back */
-.app-hd p,.card p,.estado p,.trava p{max-width:52ch}
-.app-hd p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
-.app-bd{flex:1;padding:16px;display:grid;gap:10px;align-content:start}
+/* The prototype's styles go here. Nothing in this file is shared with the
+   harness chrome above, so you can start from an empty sheet.
 
-.card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px}
-.card h2{margin:0 0 6px;font-size:13px;font-weight:650}
-.card p{margin:0;font-size:13px;color:var(--ink-3)}
-
-.var{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
-.var b{font-size:13px;font-weight:600}
-.var input.preco{
-  margin-left:auto;width:104px;text-align:right;min-height:44px;
-  border:1px solid var(--line);border-radius:8px;padding:7px 9px;
-  font:inherit;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);
-}
-.var input.preco:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
-.var span{margin-left:auto;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-
-.empty{border:1px dashed var(--line-2);border-radius:var(--r);background:var(--bg);padding:28px 16px;text-align:center}
-.empty h2{margin:0 0 4px;font-size:14px;font-weight:650}
-.empty p{margin:0 0 14px;font-size:13px;color:var(--ink-3)}
-
-.btn{
-  border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;
-  /* 44px minimum height: a finger target, not a mouse target */
-  min-height:44px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;
-  font:inherit;font-size:13px;font-weight:550;cursor:pointer;
-}
-.btn:hover{background:var(--brand-ink)}
-.btn.ghost{background:transparent;color:var(--brand);border-color:var(--brand-line)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-
-.tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
-.aviso{display:flex;gap:8px;background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);border-radius:var(--r);padding:11px 13px;font-size:12.5px}
-.linha{
-  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
-  background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
-  padding:13px 14px;font:inherit;cursor:pointer;color:var(--ink);
-}
-.linha:hover{border-color:var(--brand-line);background:var(--brand-soft)}
-.linha .nome{display:grid;gap:2px}
-.linha b{font-size:13.5px;font-weight:600}
-.linha .cat{font-size:12px;color:var(--ink-3)}
-.linha .qtd{margin-left:auto;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-.voltar{
-  background:transparent;border:0;color:var(--brand);font:inherit;font-size:13px;
-  cursor:pointer;padding:0 4px;margin-bottom:2px;text-align:left;
-  min-height:44px;display:inline-flex;align-items:center;
-}
-.estado{
-  display:grid;place-items:center;gap:10px;padding:44px 20px;text-align:center;
-  background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
-}
-.estado h2{margin:0;font-size:14px;font-weight:650}
-.estado p{margin:0;font-size:13px;color:var(--ink-3)}
-.estado .esqueleto{width:100%;display:grid;gap:8px}
-.estado .esqueleto i{display:block;height:14px;border-radius:6px;background:var(--line-2)}
-.estado.erro{border-color:var(--bad-line);background:var(--bad-soft)}
-.estado.erro h2{color:var(--bad)}
-
-.trava{background:var(--bg);border:1px dashed var(--line-2);border-radius:var(--r);padding:16px;text-align:center}
-.trava h2{margin:0 0 4px;font-size:13.5px;font-weight:650}
-.trava p{margin:0;font-size:12.5px;color:var(--ink-3)}
-
-.actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;justify-content:flex-end}
-/* scrim: only exists in the DOM while the panel is open — never permanent */
-.scrim{position:absolute;inset:0;background:rgba(17,19,24,.45);z-index:20}
-
-/* the list changes arrangement per rung — it is not just "fitting" */
-.grade{display:grid;gap:10px;grid-template-columns:1fr}
-@container frame (min-width: 768px){
-  .grade{grid-template-columns:1fr 1fr}
-}
-@container frame (min-width: 1440px){
-  .grade{grid-template-columns:1fr 1fr 1fr}
-}
-/* on xxs/xs the primary action drops to a fixed footer bar */
-.acao-fixa{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
-@container frame (min-width: 768px){
-  .acao-fixa{position:static;border-top:0;padding:0;display:flex;justify-content:flex-end}
-}
-
-@container frame (max-width: 480px){
-  .app-bd{padding:12px}
-  .btn{padding:11px 14px}
-}
+   examples/product-editor.html is the same harness with a full prototype
+   in these three zones — copy from there when you want a worked reference. */
 </style>
 <!-- ▲ APP ▲ -->
 </head>
@@ -697,7 +604,7 @@ body{
           <span class="pt"></span><span id="h-mon-resumo">rede</span>
         </button>
         <div class="h-mon-corpo" id="h-mon-corpo" hidden>
-          <div class="h-mon-lista" id="h-mon-lista"></div>
+          <div class="h-mon-list" id="h-mon-list"></div>
           <pre class="h-mon-det" id="h-mon-det" hidden></pre>
         </div>
       </aside>
@@ -833,7 +740,7 @@ const Proto = (() => {
 
   const state = {
     scenario:null, step:-1, example:0,
-    ctx:{},        /* dimensaoId -> id ativo (string) ou lista (flags) */
+    ctx:{},        /* dimensionId -> active id (string), or a list (flags) */
     app:{}, ex:null,
     viewport:"xs", landscape:false, zoom:"fit", sidebar:288,
 
@@ -1513,9 +1420,13 @@ const Proto = (() => {
     return t || null;
   }
 
+  /* Which page the state is on. The prototype says so with `page`; the
+     harness has no other way to know, and guessing from the shape of the
+     state would only work for whichever prototype the guess was written
+     against. Journeys that cross screens need this set. */
   function pageOf(app){
     if (!app) return null;
-    return app.page || (app.products ? "lista" : (app.product ? "produto" : null));
+    return app.page || null;
   }
 
   /* Journey first, state checks after. Loading, empty and error are
@@ -1744,7 +1655,7 @@ const Proto = (() => {
 
     const stps = (s.steps || []).slice(0, upTo + 1);
     /* Live, what really has to happen is the LAST ACTION up to here — not
-       the last step. Stopping on a Então after "recarrega a lista" has to
+       the last step. Stopping on a Então after a "reload the list" step has to
        fire the reload; otherwise the screen shows up ready with no request
        at all, which is what made it look broken. */
     let idxAcao = -1;
@@ -3643,7 +3554,7 @@ const Proto = (() => {
     $("h-mon-corpo").hidden = !monitorOpen;
     if (!monitorOpen) return;
 
-    $("h-mon-lista").innerHTML = items.length
+    $("h-mon-list").innerHTML = items.length
       ? items.slice().reverse().map(r =>
           `<button class="h-mon-item${monitorSel === r.id ? " on" : ""}" data-req="${r.id}">`
           + `<span class="m">${esc(r.httpMethod)}</span>`
@@ -3939,7 +3850,7 @@ const Proto = (() => {
       if (openScen) paintData();
     }
     $("h-mon-trig").addEventListener("click", () => { monitorOpen = !monitorOpen; paintMonitor(); });
-    $("h-mon-lista").addEventListener("click", e => {
+    $("h-mon-list").addEventListener("click", e => {
       const b = e.target.closest("[data-req]");
       if (!b) return;
       const id = Number(b.dataset.req);
@@ -4340,872 +4251,76 @@ window.PROTO_UI = {
 
 <!-- ============================================================
      ▼ DATA ▼ — fixtures and routes
-     Todo dado da tela mora aqui. A UI nunca escreve um produto na mão:
-     ela pede. Trocar por um backend de verdade é apagar `rotas` e
-     deixar o fetch sair.
+     Every value the screen shows lives here. The screen never writes a
+     record by hand: it asks. Swapping in a real backend means deleting
+     the routes and letting fetch out.
+
+     A write route has to change the fixtures. Answering 200 without
+     storing is a facade — a reload contradicts it and the gate says so.
      ============================================================ -->
 <script>
-window.PROTO_DATA = {
-  products: {
-    "1": {
-      id:"1", nameStr:"Pizza margherita", category:"Pizzas",
-      variants:[
-        { id:"v1", nameStr:"Pequena", price:"18,00" },
-        { id:"v2", nameStr:"Média",   price:"24,00" },
-        { id:"v3", nameStr:"Grande",  price:"31,00" }
-      ]
-    },
-    "2": { id:"2", nameStr:"Calabresa", category:"Pizzas", variants:[] }
-  },
-  planLimits: { free:1, basic:3, pro:10, ultra:50 },
-  /* switches on "fails the first time, works the second" — lets Tentar de
-     novo reach an outcome instead of repeating the error forever */
-  listFailsOnce: false
-};
+/* Fixtures: the world the prototype starts from. They reset for every
+   scenario, so a scenario can never leak state into the next one. */
+window.PROTO_DATA = {};
 
-window.PROTO_ROUTES = [
-  { httpMethod:"POST", pathStr:"/api/produtos",
-    responds: ({ payload, data_ }) => {
-      const id = String(Object.keys(data_.products).length + 1);
-      const newer = { id, nameStr:(payload && payload.nameStr) || "Produto sem nome",
-                     category:(payload && payload.category) || "Sem categoria", variants:[] };
-      data_.products[id] = newer;
-      return newer;
-    } },
-
-  { httpMethod:"GET", pathStr:"/api/produtos",
-    responds: ({ data_ }) => {
-      if (data_.listFailsOnce){ data_.listFailsOnce = false; throw new Error("Serviço indisponível"); }
-      return Object.values(data_.products).map(p => ({
-        id:p.id, nameStr:p.nameStr, category:p.category, variants:p.variants.length
-      }));
-    } },
-
-  { httpMethod:"GET", pathStr:"/api/produtos/:id",
-    responds: ({ params, data_ }) => {
-      const p = data_.products[params.id];
-      if (!p) throw new Error("produto não encontrado");
-      return JSON.parse(JSON.stringify(p));
-    } },
-
-  { httpMethod:"POST", pathStr:"/api/produtos/:id/variacoes",
-    responds: ({ params, payload, data_ }) => {
-      const p = data_.products[params.id];
-      if (!p) throw new Error("produto não encontrado");
-      const fresh = { id:"v" + (p.variants.length + 1) + "-" + params.id,
-                     nameStr:(payload && payload.nameStr) || "Nova",
-                     price:(payload && payload.price) || "18,00" };
-      p.variants.push(fresh);        /* really stores it: a reload has to keep it */
-      return fresh;
-    } },
-
-  { httpMethod:"PUT", pathStr:"/api/produtos/:id",
-    responds: ({ params, payload, data_ }) => {
-      const p = data_.products[params.id];
-      if (!p) throw new Error("produto não encontrado");
-      Object.assign(p, payload || {}, { updatedAt:"2026-08-15T12:00:00Z" });
-      return JSON.parse(JSON.stringify(p));
-    } },
-
-  { httpMethod:"POST", pathStr:"/api/pagamentos",
-    responds: ({ payload, data_ }) => {
-      data_.payments = data_.payments || [];
-      const pg = { id:"pi_" + (data_.payments.length + 1),
-                   status:"aprovado", val:(payload && payload.val) || 0 };
-      data_.payments.push(pg);
-      return pg;
-    } },
-
-];
+/* Routes the screen may call. Shape:
+     { httpMethod:"GET", pathStr:"/api/things", onLoad:true,
+       responds: ({ params, payload, data_ }) => … }
+   onLoad marks a call that belongs to loading the screen rather than to a
+   step. Throw from `responds` to produce a failure the prototype has to
+   handle. */
+window.PROTO_ROUTES = [];
 </script>
 
 <!-- ============================================================
      ▼ APP ▼  2 of 2 — context, scenarios and render
      Replace everything from here to ▲ APP ▲ with the prototype.
 
-     Cenários:
-     · Dado   = o mundo antes da ação. Traz o `state`.
-     · Quando = ação da pessoa. Traz `apply(estado, exemplo)` puro.
-     · Então  = o que ela passa a ver. Traz `check(estado, dom)`.
-     · Sem passos = só um estado (tela de erro, lista vazia).
-     · Com `exemplos` = Esquema do Cenário: use <coluna> nos textos.
-     · Escreva do lado de quem usa, não do componente.
+     Steps:
+     · Given = the world before the action. Carries `state`.
+     · When  = what the person does. `click` / `fill` / `choose` /
+               `toggleCtl` / `waitFor`, or a pure `applyState`.
+     · Then  = what they now see. Carries `check(state, dom)`.
+     · With `examples` it becomes a Scenario Outline: use <column> in the
+       step text and the harness fills it per row.
+     · Write from the side of whoever uses the screen, not the component.
+
+     The gate demands a journey, not a loose assertion: at least two
+     actions on different targets, a Then after the last one, every page
+     reachable from another screen, and @carregando / @vazio / @erro per
+     page. docs/project-instructions.md has the full list.
      ============================================================ -->
 <script>
+/* An empty bench: it opens, and the suite reports nothing to check.
+   Fill the three zones and the gate starts having something to say.
+
+   For a worked reference — routes, scenarios, the three states per page
+   and a width ladder that actually changes arrangement — open
+   examples/product-editor.html, which is this same harness with a
+   complete prototype in these zones. */
 Proto.init({
-  title: "editor de produto",
+  title: "prototype",
 
-  library: "@12-apps/ui",
+  /* Axes that change what the screen offers. Each entry is
+     { id, label, kind:"escala"|"opcao"|"flags", value, options:[…] }. */
+  context: [],
 
-  data_: window.PROTO_DATA,
+  data_:  window.PROTO_DATA,
   routes: window.PROTO_ROUTES,
-  latency: [250, 750],   /* a random range, on screen only; verification runs with no delay */
 
-  /* demands that every piece of markup with text or interaction is claimed
-     by a component from the map below */
-  strictMode: true,
+  /* Gherkin scenarios. This is the specification — see the zone header. */
+  scenarios: [],
 
-  /* The mapping between the prototype's markup and what the library already
-     has. Prototyping by hand is fast; the map keeps the home-made version
-     from becoming a new component in production. It goes into the .feature
-     as "# ui:". */
-  primitives: {
-    ".btn":               "Button",
-    ".card":              "Card",
-    ".var":               "Card",
-    ".empty":             "EmptyState",
-    ".aviso":             "Alert",
-    ".trava":             "Banner",
-    ".tag":               "Badge",
-    ".app-hd":            "AppHeader",
-    ".actions":           "ContentToolbar",
-    "[data-async]":       "AsyncStateContainer",
-    "[data-estado=vazio]":      "EmptyState",
-    "[data-estado=erro]":       "ErrorState",
-    "[data-estado=carregando]": "LoadingState",
-    "[data-card=margem]": "StatCard",
-    /* text and fields are components too — without this, strict mode reports
-       raw markup, which is exactly the point */
-    "h1, h2":             "Heading",
-    ".linha":             "Button",
-    ".linha b, .linha .cat, .linha .qtd, .linha .nome, .var span": "Text",
-    ".voltar":            "Button",
-    "[data-act=recarregar-lista]": "Button",
-    ".app-hd p, .card p, .estado p, .trava p": "Paragraph",
-    ".var b":             "Text",
-    "input.preco":        "Input"
-  },
-
-  feature: {
-    name: "Variações de produto",
-    as:   "lojista",
-    want: "cadastrar tamanhos diferentes do mesmo produto",
-    so:   "o cliente escolha no cardápio sem eu duplicar o item",
-    /* inherited by every scenario that does not declare its own */
-    impl: {
-      component:"ProdutoEditor",
-      route:"/produtos/:id",
-      moduleName:"catalogo/produtos",
-      notes:"Button, Alert e TextField de @12-apps/ui"
-    }
-  },
-
-  context: [
-    {
-      id:"plano", label:"Plano", kind:"escala", value:"pro",
-      options:[
-        { id:"free",  label:"Free"  },
-        { id:"basic", label:"Basic", allows:["produto.variacoes"] },
-        { id:"pro",   label:"Pro",   allows:["relatorio.margem"] },
-        { id:"ultra", label:"Ultra", allows:["api.usar"] }
-      ]
-    },
-    {
-      id:"papel", label:"Papel do usuário", kind:"opcao", value:"dono",
-      options:[
-        { id:"dono",    label:"Dono",    allows:["*"] },
-        { id:"gerente", label:"Gerente", allows:["produto.editar","relatorio.margem"] },
-        { id:"garcom",  label:"Garçom",  allows:["mesa.atender"] }
-      ]
-    },
-    {
-      id:"flags", label:"Funcionalidades", kind:"flags", value:["cozinha"],
-      options:[
-        { id:"cozinha", label:"Cozinha" },
-        { id:"estoque", label:"SKU e estoque" }
-      ]
-    }
-  ],
-
-  scenarios: [
-    {
-      id:"cardapio-navega",
-      name:"Percorrer o cardápio e voltar",
-      page:"lista", tags:["@catálogo","@feliz"],
-      impl:{ component:"CardapioLista", route:"/produtos" },
-      given:{
-        text:"que o lojista abriu o cardápio",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { then:"o cardápio lista os produtos com quantas variações cada um tem",
-          check:(a, el) => el.querySelectorAll(".linha .qtd").length === 2 },
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { then:"o editor abre com as variações que vieram da API",
-          check:(a, el) => el.querySelectorAll(".var").length === 3 },
-        { when:"o lojista volta para o cardápio", click:'[data-act="voltar"]' },
-        { then:"o cardápio continua completo",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 },
-        { when:"o lojista recarrega a lista", click:'[data-act="recarregar-lista"]' },
-        { then:"os produtos continuam lá depois de recarregar",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 }
-      ]
-    },
-    {
-      id:"produto-consulta",
-      name:"Consultar dois produtos seguidos",
-      page:"produto", tags:["@catálogo","@feliz"],
-      impl:{ component:"ProdutoEditor", route:"/produtos/:id" },
-      given:{
-        text:"que o lojista abriu o cardápio",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { then:"vê os três tamanhos com preço",
-          check:(a, el) => el.querySelectorAll(".var").length === 3 },
-        { when:"volta para o cardápio", click:'[data-act="voltar"]' },
-        { when:"abre Calabresa", click:'[data-act="abrir-produto"][data-id="2"]' },
-        { then:"o editor troca de produto sem sobrar dado do anterior",
-          check:(a, el) => el.querySelectorAll(".var").length === 0
-                        && (el.querySelector("h1") || {}).textContent === "Calabresa" }
-      ]
-    },
-    {
-      id:"cardapio-larguras",
-      name:"O cardápio em cada largura",
-      page:"lista", tags:["@catálogo","@retorno"],
-      impl:{ component:"CardapioLista", notes:"grade por container query; ação fixa no rodapé até sm" },
-      given:{
-        text:"que o lojista abre o cardápio em <largura>",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { then:"a lista aparece em <colunas> coluna(s)",
-          check:(a, el, s) => {
-            /* measures the real columns when there is a layout engine; without
-               one (the gate with no browser) it falls back to what the
-               screen declares */
-            const g = el.querySelector(".grade");
-            let measured = 0;
-            try {
-              const gtc = g && getComputedStyle(g).gridTemplateColumns;
-              if (gtc && gtc !== "none" && gtc.indexOf("px") > -1) measured = gtc.trim().split(/\s+/).length;
-            } catch {}
-            if (measured) return measured === Number(s.ex.colunas);
-            const c = el.querySelector("[data-colunas]");
-            return !!c && c.getAttribute("data-colunas") === String(s.ex.colunas);
-          } },
-        { when:"o lojista abre o primeiro produto", click:'[data-act="abrir-produto"]' },
-        { then:"o editor abre sem perder a largura",
-          check:(a, el) => !!el.querySelector('[data-act="voltar"]') },
-        { when:"o lojista volta", click:'[data-act="voltar"]' },
-        { then:"a ação principal fica <onde>",
-          check:(a, el, s) => {
-            const c = el.querySelector("[data-acao]");
-            return !!c && c.getAttribute("data-acao") === String(s.ex.onde);
-          } }
-      ],
-      examples:{
-        columns:["largura","colunas","onde"],
-        tableRows:[
-          ["xxs", "1", "rodape"],
-          ["md",  "2", "topo"],
-          ["xlg", "3", "topo"]
-        ]
-      }
-    },
-    {
-      id:"lista-carregando",
-      name:"Abrir o cardápio e esperar ele chegar",
-      page:"lista", tags:["@catálogo","@carregando"],
-      impl:{ component:"CardapioLista", route:"/produtos", notes:"AsyncStateContainer + LoadingState" },
-      network:{ "GET /api/produtos": "pendente" },
-      given:{
-        text:"que o lojista abriu o cardápio e a resposta ainda não chegou",
-        state: async (ex, api) => {
-          api.get("/api/produtos").catch(() => {});   /* left stalled on purpose */
-          return { page:"lista", loading:true };
-        }
-      },
-      steps:[
-        { then:"a lista mostra o esqueleto no lugar das linhas",
-          check:(a, el) => !!el.querySelector('[data-estado="carregando"] .esqueleto') },
-        { when:"a resposta do servidor chega", waitFor:"GET /api/produtos",
-          applyState:(a, payload) => ({ ...a, products:payload, loading:false }) },
-        { when:"o lojista abre o primeiro produto", click:'[data-act="abrir-produto"]' },
-        { then:"o editor abre com os dados que vieram da API",
-          check:(a, el) => !!el.querySelector('[data-act="voltar"]') }
-      ]
-    },
-    {
-      id:"lista-vazia",
-      name:"Loja nova: do cardápio vazio ao primeiro produto",
-      page:"lista", tags:["@catálogo","@vazio","@feliz","@pode:produto.editar"],
-      impl:{ component:"CardapioLista", route:"/produtos", notes:"EmptyState com a ação principal dentro" },
-      network:{ "GET /api/produtos": { status:200, payload:[] } },
-      given:{
-        text:"que a loja acabou de abrir e não cadastrou nada",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { then:"o cardápio convida a criar o primeiro produto",
-          check:(a, el) => !!el.querySelector('[data-estado="vazio"] [data-act="novo-produto"]') },
-        { when:"o lojista cria o primeiro produto", click:'[data-act="novo-produto"]' },
-        { then:"o editor abre no produto recém-criado",
-          check:(a, el) => !!el.querySelector('[data-act="voltar"]') },
-        { when:"o lojista adiciona a primeira variação", click:'[data-act="add"]' },
-        { then:"a variação aparece com preço próprio",
-          check:(a, el) => el.querySelectorAll(".var").length === 1 },
-        { when:"o lojista salva", click:'[data-act="salvar"]' },
-        { then:"a loja sai do zero com o produto salvo",
-          check:(a, el) => !!el.querySelector(".tag") }
-      ]
-    },
-    {
-      id:"lista-erro",
-      name:"Cardápio fora do ar e a tentativa de voltar",
-      page:"lista", tags:["@catálogo","@erro","@recuperacao"],
-      impl:{ component:"CardapioLista", route:"/produtos", notes:"ErrorState com recarregar" },
-      /* the failure comes from the fixtures (fails once, works next time), not
-         from network: — that is what lets Tentar de novo reach an outcome */
-      fixtureFailure:true,
-      given:{
-        text:"que o lojista abriu o cardápio e a API caiu na primeira tentativa",
-        state: async (ex, api) => {
-          api.data_.listFailsOnce = true;
-          try { return { page:"lista", products: await api.get("/api/produtos") }; }
-          catch (e){ return { page:"lista", error_:e.message }; }
-        }
-      },
-      steps:[
-        { then:"a tela explica a falha em vez de ficar em branco",
-          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista tenta de novo", click:'[data-act="recarregar-lista"]' },
-        { then:"o cardápio carrega e a explicação some",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2
-                        && !el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista abre o primeiro produto", click:'[data-act="abrir-produto"]' },
-        { then:"o editor abre normalmente depois da recuperação",
-          check:(a, el) => !!el.querySelector('[data-act="voltar"]') }
-      ]
-    },
-    {
-      id:"criar-produto-falha",
-      name:"Criar produto e receber recusa do servidor",
-      page:"lista", tags:["@catálogo","@conflito"],
-      impl:{ component:"CardapioLista", notes:"o erro fica dentro do EmptyState, sem trocar de tela" },
-      network:{ "GET /api/produtos": { status:200, payload:[] },
-              "POST /api/produtos": { status:500, payload:{ error_:"Não foi possível criar o produto" } } },
-      given:{
-        text:"que o cardápio está vazio e o servidor vai recusar a criação",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista tenta criar o produto", click:'[data-act="novo-produto"]' },
-        { then:"o erro aparece sem tirar o convite da tela",
-          check:(a, el) => !!el.querySelector('[data-erro="lista"]')
-                        && !!el.querySelector('[data-estado="vazio"]') },
-        { when:"o lojista pede a lista de novo", click:'[data-act="recarregar-lista"]' },
-        { then:"o cardápio segue vazio, sem levar embora o aviso do erro",
-          check:(a, el) => !!el.querySelector('[data-estado="vazio"]') }
-      ]
-    },
-    {
-      id:"produto-carregando",
-      name:"Abrir um produto e esperar o detalhe",
-      page:"produto", tags:["@catálogo","@carregando","@retorno"],
-      impl:{ component:"AsyncStateContainer", notes:"LoadingState com esqueleto, sem spinner solto" },
-      network:{ "GET /api/produtos/:id": "pendente" },
-      given:{
-        text:"que o lojista tocou num produto e o detalhe ainda não chegou",
-        state: async (ex, api) => {
-          api.get("/api/produtos/1").catch(() => {});
-          return { page:"produto", loading:true };
-        }
-      },
-      steps:[
-        { then:"o editor mostra o esqueleto, não uma tela em branco",
-          check:(a, el) => !!el.querySelector('[data-estado="carregando"] .esqueleto') },
-        { and:"a região é anunciada como ocupada",
-          check:(a, el) => el.querySelector('[data-estado="carregando"]').getAttribute("aria-busy") === "true" },
-        { when:"o detalhe chega", waitFor:"GET /api/produtos/:id",
-          applyState:(a, payload) => ({ ...a, product:payload, loading:false }) },
-        { when:"o lojista volta para o cardápio", click:'[data-act="voltar"]' },
-        { then:"o cardápio aparece de novo",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 }
-      ]
-    },
-    {
-      id:"catalogo-vazio",
-      name:"Produto sem variações: criar a primeira e salvar",
-      page:"produto", tags:["@catálogo","@vazio","@pode:produto.editar"],
-      impl:{ component:"AsyncStateContainer", notes:"EmptyState com a ação principal dentro" },
-      given:{
-        text:"que o lojista está no cardápio e o produto 2 não tem variações",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Calabresa", click:'[data-act="abrir-produto"][data-id="2"]' },
-        { then:"o editor convida a criar a primeira variação",
-          check:(a, el) => !!el.querySelector('[data-estado="vazio"] [data-act="add"]') },
-        { when:"o lojista adiciona a variação", click:'[data-act="add"]' },
-        { then:"a lista sai do vazio",
-          check:(a, el) => el.querySelectorAll(".var").length === 1 && !el.querySelector('[data-estado="vazio"]') },
-        { when:"o lojista salva", click:'[data-act="salvar"]' },
-        { then:"a confirmação aparece",
-          check:(a, el) => !!el.querySelector(".tag") }
-      ]
-    },
-    {
-      id:"produto-fora-do-ar",
-      name:"Detalhe do produto fora do ar",
-      page:"produto", tags:["@catálogo","@erro","@recuperacao"],
-      impl:{ component:"AsyncStateContainer", notes:"ErrorState com ação de tentar de novo" },
-      network:{ "GET /api/produtos/:id": 503 },
-      given:{
-        text:"que o lojista tocou num produto e a API do catálogo caiu",
-        state: async (ex, api) => {
-          try { return { page:"produto", product: await api.get("/api/produtos/1") }; }
-          catch (e){ return { page:"produto", error_:e.message }; }
-        }
-      },
-      steps:[
-        { then:"a tela explica a falha em vez de ficar vazia",
-          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista tenta de novo", click:'[data-act="tentar"]' },
-        { then:"a explicação continua enquanto a API não volta",
-          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista volta para o cardápio", click:'[data-act="voltar"]' },
-        { then:"o cardápio carrega normalmente",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 }
-      ]
-    },
-    {
-      id:"primeira-variacao",
-      name:"Do cardápio até criar e salvar a primeira variação",
-      page:"produto", tags:["@catálogo","@basic","@pode:produto.editar","@feliz"],
-      impl:{ component:"ProdutoEditor", route:"/produtos/:id", moduleName:"catalogo/produtos" },
-      given:{
-        text:"que o lojista está no cardápio",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Calabresa", click:'[data-act="abrir-produto"][data-id="2"]' },
-        { when:"toca em Adicionar variação", click:'[data-act="add"]' },
-        { then:"a variação aparece na lista com preço próprio",
-          check:(a, el) => el.querySelectorAll(".var").length === 1 },
-        { and:"o convite de lista vazia sai da tela",
-          check:(a, el) => !el.querySelector('[data-estado="vazio"]') },
-        { when:"o lojista corrige o preço", local:true,
-          fill:{ sel:'[data-campo="preco"]', val:"22,00" } },
-        { when:"salva o produto", click:'[data-act="salvar"]' },
-        { then:"a confirmação aparece com a variação na tela",
-          check:(a, el) => !!el.querySelector(".tag") && el.querySelectorAll(".var").length === 1 }
-      ]
-    },
-    {
-      id:"limite-por-plano",
-      name:"Esbarrar no limite de variações do plano",
-      page:"produto", tags:["@catálogo","@pode:produto.editar"],
-      impl:{ component:"VariacoesLista", notes:"o limite vem do plano do tenant, não do formulário" },
-      network: ex => (ex.resultado === "bloqueio"
-        ? { "POST /api/produtos/:id/variacoes": { status:409, payload:{ error_:"Limite do plano atingido" } } }
-        : {}),
-      given:{
-        text:"que a loja está no plano <plano> e já usou <usadas> variações",
-        state: async (ex, api) => {
-          const p = await api.get("/api/produtos/1");
-          p.variants = p.variants.slice(0, Number(ex.usadas));
-          return { page:"produto", product:p, limite:Number(ex.limite) };
-        }
-      },
-      steps:[
-        { when:"o lojista tenta adicionar mais uma variação", click:'[data-act="add"]' },
-        { then:"a loja fica com <resultado>",
-          check:(a, el, s) => s.ex.resultado === "bloqueio"
-            ? !!el.querySelector('[data-erro="variacao"]')
-            : !el.querySelector('[data-erro="variacao"]') },
-        { when:"o lojista volta para o cardápio", click:'[data-act="voltar"]' },
-        { then:"o cardápio continua acessível",
-          check:(a, el) => el.querySelectorAll(".linha").length >= 2 }
-      ],
-      examples:{
-        columns:["plano","limite","usadas","resultado"],
-        tableRows:[
-          ["Free",  "1", "1", "bloqueio"],
-          ["Basic", "3", "2", "variação nova"],
-          ["Pro",  "10", "3", "variação nova"]
-        ]
-      }
-    },
-    {
-      id:"criar-variacao-falha",
-      name:"Criação da variação recusada pelo servidor",
-      page:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
-      impl:{ component:"VariacoesLista", notes:"o erro fica na lista, sem derrubar a página inteira" },
-      network:{ "POST /api/produtos/:id/variacoes": { status:500, payload:{ error_:"Não foi possível criar a variação" } } },
-      given:{
-        text:"que o lojista está no cardápio e o servidor vai recusar a criação",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Calabresa", click:'[data-act="abrir-produto"][data-id="2"]' },
-        { when:"tenta adicionar uma variação", click:'[data-act="add"]' },
-        { then:"a tela explica que não deu certo",
-          check:(a, el) => !!el.querySelector('[data-erro="variacao"]') },
-        { and:"o convite continua na tela para tentar de novo",
-          check:(a, el) => !!el.querySelector('[data-estado="vazio"]') }
-      ]
-    },
-    {
-      id:"salvar-falha",
-      name:"Salvar e receber recusa do servidor",
-      page:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
-      impl:{ component:"ProdutoEditor", notes:"o erro fica junto do botão, sem perder o que foi digitado" },
-      network:{ "PUT /api/produtos/:id": { status:422, payload:{ error_:"Preço inválido para a variação Pequena" } } },
-      given:{
-        text:"que o lojista está no cardápio e o servidor vai recusar o salvamento",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { and:"muda o preço da primeira variação", local:true,
-          fill:{ sel:'[data-campo="preco"]', val:"19,90" } },
-        { when:"tenta salvar", click:'[data-act="salvar"]' },
-        { then:"a tela mostra por que não salvou",
-          check:(a, el) => !!el.querySelector('[data-erro="salvar"]') },
-        { and:"o que ele digitou continua na tela",
-          check:(a, el) => el.querySelectorAll(".var").length === 3 }
-      ]
-    },
-    {
-      id:"resposta-do-provedor",
-      name:"Pagar o pedido e ver a resposta do provedor",
-      page:"produto", tags:["@catálogo"],
-      impl:{ component:"CheckoutPagamento", route:"/pedidos/:id/pagamento",
-             notes:"Alert para recusa, ErrorState para indisponibilidade" },
-      network: ex => ({ "POST /api/pagamentos": ex.resposta === "sucesso" ? null : {
-        status: Number(ex.status), payload: { error_: ex.mensagem } } }),
-      given:{
-        text:"que o lojista está no cardápio e o provedor vai responder <resposta>",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { when:"confirma o pagamento", click:'[data-act="pagar"]' },
-        { then:"a loja vê <tela>",
-          check:(a, el, s) => s.ex.resposta === "sucesso"
-            ? !!el.querySelector('[data-pg="ok"]')
-            : !!el.querySelector('[data-pg="erro"]') },
-        { and:"o texto explica o que aconteceu, sem jargão do provedor",
-          check:(a, el, s) => s.ex.resposta === "sucesso"
-            ? true
-            : (el.querySelector('[data-pg="erro"]') || {}).textContent.indexOf(s.ex.mensagem) > -1 }
-      ],
-      examples:{
-        columns:["resposta","status","mensagem","tela"],
-        tableRows:[
-          ["sucesso",         "200", "—",                              "confirmação"],
-          ["cartão recusado", "402", "Cartão recusado pelo banco",     "aviso recuperável"],
-          ["provedor fora",   "503", "Pagamentos indisponíveis agora", "aviso de indisponibilidade"]
-        ]
-      }
-    },
-    {
-      id:"garcom-nao-edita",
-      name:"Garçom abre o produto e não consegue editar",
-      page:"produto", tags:["@garcom"],
-      impl:{ component:"ProdutoEditor", notes:"somente leitura: sem campos, sem barra de ação" },
-      given:{
-        text:"que quem está no cardápio é um garçom",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o garçom abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { then:"os preços aparecem como texto, não como campo",
-          check:(a, el) => el.querySelectorAll(".var").length === 3 && !el.querySelector('[data-campo="preco"]') },
-        { and:"o botão Salvar não aparece",
-          check:(a, el) => !el.querySelector('[data-act="salvar"]') },
-        { and:"a tela explica por que está só de leitura",
-          check:(a, el) => !!el.querySelector(".aviso") },
-        { when:"o garçom volta para o cardápio", click:'[data-act="voltar"]' },
-        { then:"o cardápio continua disponível para ele",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 }
-      ]
-    },
-    {
-      id:"margem-por-variacao",
-      name:"Acompanhar margem por variação",
-      page:"produto", tags:["@pro","@pode:relatorio.margem"],
-      impl:{ component:"MargemCard", moduleName:"relatorios/margem" },
-      given:{
-        text:"que a loja acompanha margem e o lojista está no cardápio",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos"), margin:true })
-      },
-      steps:[
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { then:"o cartão de margem aparece no editor",
-          check:(a, el) => !!el.querySelector('[data-card="margem"]') },
-        { when:"o lojista volta para o cardápio", click:'[data-act="voltar"]' },
-        { when:"recarrega o cardápio", click:'[data-act="recarregar-lista"]' },
-        { then:"a lista volta inteira depois de consultar a margem",
-          check:(a, el) => el.querySelectorAll(".linha").length === 2 }
-      ]
-    },
-    {
-      id:"preparo-cozinha",
-      name:"Ajustar preparo e salvar com a cozinha ligada",
-      page:"produto", tags:["@cozinha","@pode:produto.editar"],
-      impl:{ component:"ProdutoEditor", notes:"bloco de preparo por variação" },
-      given:{
-        text:"que a loja prepara os pedidos na cozinha e o lojista está no cardápio",
-        state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") })
-      },
-      steps:[
-        { when:"o lojista abre Pizza margherita", click:'[data-act="abrir-produto"][data-id="1"]' },
-        { then:"o bloco da cozinha aparece junto das variações",
-          check:(a, el) => el.textContent.indexOf("tempo de preparo") > -1 },
-        { when:"o lojista salva o produto", click:'[data-act="salvar"]' },
-        { then:"a confirmação aparece sem tirar as variações da tela",
-          check:(a, el) => !!el.querySelector(".tag") && el.querySelectorAll(".var").length === 3 }
-      ]
-    }
-  ],
-
-  render(s){
-    /* the page comes from the state; when in doubt, whatever has a list is
-     the list */
-    const pg = s.app.page || (s.app.products ? "lista" : "produto");
-    return pg === "lista" ? listScreen(s) : productScreen(s);
-  },
-
-  defaultPage: "produto"
+  render: () => `
+    <div class="empty-bench">
+      <h1>Empty bench</h1>
+      <p>Write the prototype in the three ▼ zones of this file.</p>
+    </div>`
 });
 
-function listScreen(s){
-  const items = s.app.products;
-  const st_ = (s.app.loading || s.waitingFor()) ? "carregando"
-               : s.app.error_       ? "erro"
-               : (items && !items.length) ? "vazio"
-               : "conteudo";
-
-  const payload =
-    st_ === "carregando" ? `
-      <div class="estado" data-estado="carregando" aria-busy="true">
-        <div class="esqueleto"><i></i><i></i><i></i><i></i></div>
-        <p>Carregando o cardápio…</p>
-      </div>` :
-    st_ === "erro" ? `
-      <div class="estado erro" data-estado="erro">
-        <h2>Não deu para carregar o cardápio</h2>
-        <p>${Proto.esc(s.app.error_ || "")}</p>
-        <button class="btn" data-act="recarregar-lista">Tentar de novo</button>
-      </div>` :
-    st_ === "vazio" ? `
-      <div class="estado" data-estado="vazio">
-        ${s.app.listError ? `<div class="aviso" data-erro="lista">${Proto.esc(s.app.listError)}</div>` : ``}
-        <h2>Nenhum produto no cardápio</h2>
-        <p>Cadastre o primeiro item para a loja abrir.</p>
-        <button class="btn" data-act="novo-produto">Criar produto</button>
-      </div>` : `
-      <div data-estado="conteudo" data-colunas="${s.rung === "xlg" ? 3 : (s.widthPx >= 768 ? 2 : 1)}"
-           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
-        <div class="grade">
-        ${(items || []).map(p => `
-          <button class="linha" data-act="abrir-produto" data-id="${Proto.esc(p.id)}">
-            <span class="nome">
-              <b>${Proto.esc(p.nameStr)}</b>
-              <span class="cat">${Proto.esc(p.category)}</span>
-            </span>
-            <span class="qtd">${p.variants} ${p.variants === 1 ? "variação" : "variações"}</span>
-          </button>`).join("")}
-        </div>
-        <div class="acao-fixa"><button class="btn" data-act="novo-produto">Novo produto</button></div>
-      </div>`;
-
-  return `
-    <div class="app">
-      <header class="app-hd">
-        <h1>Cardápio</h1>
-        <p>${items ? items.length + (items.length === 1 ? " produto" : " produtos") : "—"}</p>
-        <button class="voltar" data-act="recarregar-lista">Recarregar</button>
-      </header>
-      <div class="app-bd" data-async data-estado-atual="${st_}">${payload}</div>
-    </div>`;
-}
-
-function productScreen(s){
-    const prod = s.app.product;
-    const vars = (prod && prod.variants) || [];
-    const canEdit = s.can("produto.editar");
-    const incomplete = vars.some(v => !v.price);
-
-    /* AsyncStateContainer: the four paths live in one place, and each marks
-       data-estado — that is what the harness asserts on its own. */
-    const st_ = (s.app.loading || s.waitingFor()) ? "carregando"
-                 : s.app.error_       ? "erro"
-                 : (!vars.length && !s.app.payment) ? "vazio"
-                 : "conteudo";
-
-    const loading = `
-      <div class="estado" data-estado="carregando" aria-busy="true">
-        <div class="esqueleto"><i></i><i></i><i></i></div>
-        <p>Carregando o produto…</p>
-      </div>`;
-
-    const error_ = `
-      <div class="estado erro" data-estado="erro">
-        <h2>Não deu para carregar</h2>
-        <p>${Proto.esc(s.app.error_ || "")}</p>
-        <button class="btn" data-act="tentar">Tentar de novo</button>
-      </div>`;
-
-    const empty = `
-      <div class="estado" data-estado="vazio">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
-        <h2>Nenhuma variação ainda</h2>
-        <p>Crie tamanhos ou sabores sem duplicar o produto.</p>
-        ${canEdit ? `<button class="btn" data-act="add">Adicionar variação</button>` : ``}
-      </div>`;
-
-    const content = `
-      <div data-estado="conteudo" data-colunas="${s.widthPx >= 768 ? 2 : 1}"
-           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
-        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Proto.esc(s.app.variantError)}</div>` : ``}
-        ${s.app.saved ? `<span class="tag">Produto salvo</span>` : ``}
-        ${s.app.saveError ? `<div class="aviso" data-erro="salvar">${Proto.esc(s.app.saveError)}</div>` : ``}
-        ${s.app.payment ? `<span class="tag" data-pg="ok">Pagamento aprovado · ${Proto.esc(s.app.payment.id)}</span>` : ``}
-        ${s.app.paymentError ? `<div class="aviso" data-pg="erro">${Proto.esc(s.app.paymentError)}</div>` : ``}
-
-        ${!canEdit ? `<div class="aviso">
-          Você pode consultar este produto, mas quem edita preço é o gerente ou o dono.
-        </div>` : ``}
-
-        <div class="grade">
-        ${vars.map((v, i) => `
-          <div class="var">
-            <b>${Proto.esc(v.nameStr)}</b>
-            ${canEdit
-              ? `<input class="preco" data-campo="preco" data-i="${i}" inputmode="decimal"
-                        value="${Proto.esc(v.price)}" placeholder="0,00"
-                        aria-label="Preço de ${Proto.esc(v.nameStr)}">`
-              : `<span>${v.price ? "R$ " + Proto.esc(v.price) : "sem preço"}</span>`}
-          </div>`).join("")}
-
-        ${s.app.blocked ? `<div class="trava">
-          <h2>Limite de variações do plano</h2>
-          <p>Este plano vai até ${Proto.esc(String(s.app.limite || 0))}. Suba de plano para criar mais.</p>
-        </div>` : ``}
-
-        ${s.app.margin && s.can("relatorio.margem") ? `
-        <div class="card" data-card="margem">
-          <h2>Margem por variação</h2>
-          <p>Custo da ficha técnica contra o preço de venda de cada tamanho.</p>
-        </div>` : ``}
-
-        ${s.flag("cozinha") ? `
-        <div class="card">
-          <h2>Cozinha</h2>
-          <p>Cada variação pode ter tempo de preparo diferente.</p>
-        </div>` : ``}
-
-        ${s.flag("estoque") ? `
-        <div class="card">
-          <h2>SKU e estoque</h2>
-          <p>Cada variação baixa do estoque separadamente.</p>
-        </div>` : ``}
-
-        ${canEdit && vars.length ? `<button class="btn ghost" data-act="add">Adicionar variação</button>` : ``}
-        <button class="btn ghost" data-act="pagar">Confirmar pagamento</button>
-        </div>
-      </div>`;
-
-    const payload = st_ === "carregando" ? loading
-                : st_ === "erro"       ? error_
-                : st_ === "vazio"      ? empty
-                : content;
-
-    return `
-      <div class="app">
-        <header class="app-hd">
-          <button class="voltar" data-act="voltar">← Cardápio</button>
-          <h1>${prod ? Proto.esc(prod.nameStr) : "Produto"}</h1>
-          <p>${vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}</p>
-        </header>
-
-        <div class="app-bd" data-async data-estado-atual="${st_}">${payload}</div>
-
-        ${canEdit && st_ === "conteudo" ? `<div class="actions acao-fixa">
-          <button class="btn" data-act="salvar" ${incomplete || !vars.length ? "disabled" : ""}>Salvar</button>
-        </div>` : ``}
-      </div>`;
-}
-
-/* navigating is a request: opening the product fetches the detail, going
-       back refetches the list */
-Proto.on("click", '[data-act="abrir-produto"]', async (e, el) => {
-  try {
-    const p = await Proto.api.get(`/api/produtos/${el.dataset.id}`);
-    Proto.set({ page:"produto", product:p, error_:null, saved:false });
-  } catch (err){ Proto.set({ page:"produto", error_:err.message }); }
-});
-
-Proto.on("click", '[data-act="novo-produto"]', async () => {
-  try {
-    const newer = await Proto.api.post("/api/produtos", { nameStr:"Novo produto", category:"Sem categoria" });
-    Proto.set({ page:"produto", product:newer, listError:null });
-  } catch (err){ Proto.set({ listError: err.message }); }
-});
-
-Proto.on("click", '[data-act="voltar"]', async () => {
-  try { Proto.set({ page:"lista", products: await Proto.api.get("/api/produtos"), error_:null }); }
-  catch (err){ Proto.set({ page:"lista", error_:err.message }); }
-});
-
-Proto.on("click", '[data-act="recarregar-lista"]', async () => {
-  try { Proto.set({ products: await Proto.api.get("/api/produtos"), error_:null }); }
-  catch (err){ Proto.set({ error_:err.message }); }
-});
-
-/* asks the API and only then updates the screen — no inventing the record */
-Proto.on("click", '[data-act="add"]', async (e, el, s) => {
-  const prod = s.app.product;
-  const vars = (prod && prod.variants) || [];
-  const names = ["Pequena","Média","Grande","Família"];
-  try {
-    const fresh = await Proto.api.post(`/api/produtos/${prod.id}/variacoes`,
-      { nameStr:names[vars.length] || "Nova", price:"18,00" });
-    Proto.set({ product:{ ...prod, variants:vars.concat(fresh) }, saved:false, variantError:null });
-  } catch (err){
-    /* an item failure does not bring the page down: the AsyncStateContainer
-       stays in the state it was in and the warning sits next to the list */
-    Proto.set({ variantError: err.message });
-  }
-});
-
-Proto.on("input", '[data-campo="preco"]', (e, el, s) => {
-  const prod = s.app.product;
-  const vars = ((prod && prod.variants) || []).slice();
-  const i = Number(el.dataset.i);
-  if (!vars[i]) return;
-  vars[i] = { ...vars[i], price: el.value };
-  Proto.set({ product:{ ...prod, variants:vars }, saved:false });
-});
-
-Proto.on("click", '[data-act="pagar"]', async (e, el, s) => {
-  try {
-    const pg = await Proto.api.post("/api/pagamentos", { val:4200 });
-    Proto.set({ payment:pg, paymentError:null });
-  } catch (err){
-    Proto.set({ paymentError:err.message, statusPagamento:err.status });
-  }
-});
-
-Proto.on("click", '[data-act="tentar"]', async () => {
-  try { Proto.set({ product: await Proto.api.get("/api/produtos/1"), error_:null }); }
-  catch (e){ Proto.set({ error_:e.message }); }
-});
-
-Proto.on("click", '[data-act="salvar"]', async (e, el, s) => {
-  const prod = s.app.product;
-  try {
-    const saved = await Proto.api.put(`/api/produtos/${prod.id}`, { variants: prod.variants });
-    Proto.set({ product:saved, saved:true, saveError:null });
-  } catch (err){
-    Proto.set({ saveError: err.message, saved:false });
-  }
-});
+/* Delegated handlers survive a re-render, and the steps that say `click`
+   run these very functions:
+     Proto.on("click", '[data-act="save"]', async (e, el, s) => { … }); */
 </script>
 <!-- ▲ APP ▲ -->
 </body>

@@ -37,6 +37,8 @@ PROTO_CHROME=/path/to/chrome node verify.js file.html
 
 `.github/workflows/gate.yml` runs the gate on every pull request and on pushes to `main`. The runner ships a Chromium and the workflow installs puppeteer alongside jsdom, so CI runs in `[browser]` mode and the measurement rules count there.
 
+It verifies every prototype it finds — `examples/`, and anything copied to the repo root — and fails if it finds none. It skips `proto.html`, which is the bench itself: with empty zones the gate passes it with `0 ok`, and a green that counts nothing is worse than no check at all.
+
 Two failure modes are worth knowing about, because both once made this gate approve anything:
 
 - `verifyAll()` is async. Calling it without `await` yields the pending Promise, whose `bad` is `undefined` — a falsy value that reads as "no failures".
