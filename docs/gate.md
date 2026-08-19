@@ -27,6 +27,8 @@ The output says which one ran:
 
 **Without the marker** — it fell back to jsdom, which resolves the DOM but does no layout: `@container` never matches. The measurement rules declare themselves unverifiable instead of approving in the dark. Everything else (journeys, routes, states, permissions, disappearing content) still applies.
 
+Either engine has to load `harness.js` and the catalog, since a prototype includes the harness rather than containing it. jsdom does that with `resources: "usable"` over a `file://` url, so the gate has to be run where those relative paths resolve — from the repo, not from a copy of the prototype on its own.
+
 To force a specific browser:
 
 ```bash

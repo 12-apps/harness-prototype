@@ -24,14 +24,23 @@ because the scenario text and the screen are checked against each other.
 
 ## Starting point
 
-**Do not rebuild the harness. Copy `proto.html`** and edit **only** the marked zones.
+**Do not rebuild the harness. Copy `proto.html`** and fill the marked zones.
 
-`proto.html` is the bench and nothing else: its zones are empty, so on its own it
-reports `0 ok` — there is nothing in it to check. The filled-in reference is
-[`examples/product-editor.html`](../examples/product-editor.html), the same harness
-with a complete prototype in these zones; read it when you want to see the shape of
-real scenarios, routes and states. Never edit the bench to try something out — copy
-it first, or you leave the next prototype carrying your experiment.
+The harness is not in your file. A prototype includes it:
+
+```html
+<link rel="stylesheet" href="harness.css">
+<script src="harness.js"></script>
+```
+
+so `harness.js` and `harness.css` are never opened, never copied and never edited
+from a prototype — there is nothing of the harness in the file you are working on to
+edit by accident. `proto.html` is the empty template (~130 lines, all of it yours);
+on its own it reports `0 ok`, because it has no prototype in it yet. The filled-in
+reference is [`examples/product-editor.html`](../examples/product-editor.html) —
+read it when you want the shape of real scenarios, routes and states.
+
+Keep your copy next to `harness.js`, or fix the two paths if you put it deeper.
 
 - `▼ DATA ▼` — fixtures and routes
 - `▼ APP ▼ (1 of 2)` — the prototype's styles

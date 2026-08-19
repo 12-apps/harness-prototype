@@ -1,6 +1,6 @@
 # Proto · prototype harness
 
-A single HTML file that serves as a bench for designing and **stress-testing** UI before it becomes code. The prototype is not a picture of what will be built: it is the specification, executable, with real Gherkin scenarios checked against the DOM.
+A bench for designing and **stress-testing** UI before it becomes code. The prototype is not a picture of what will be built: it is the specification, executable, with real Gherkin scenarios checked against the DOM.
 
 ```bash
 npm install jsdom
@@ -8,23 +8,32 @@ node verify.js examples/product-editor.html
 # ✓ product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
 
-## Two files, two jobs
+## The harness is not in your file
 
-`proto.html` is the **bench**: the harness and nothing else. Its three zones are
-empty, so it reports `0 ok` — there is no prototype in it to check. Copy it to start.
+A prototype **includes** the harness; it never contains it.
 
-`examples/product-editor.html` is a **prototype**: the same harness with all three
-zones filled in, and the reference to read when you want to see what good scenarios,
-routes and states look like.
+```
+harness.js    the engine — 3.5k lines you never open
+harness.css   the chrome around the stage
+proto.html    the template you copy: ~130 lines, all of it yours
+```
 
-Keeping them apart is deliberate. They used to be the same file, which left the bench
-carrying somebody else's demo and made it easy — for a person or an agent — to edit
-the wrong one.
+A prototype is a small file: two includes and the three ▼ zones. That is the whole
+point — editing a prototype cannot reach the harness, because the harness is not
+there to edit. Nothing to skim past, nothing to break by accident, and a diff on a
+prototype shows only the prototype.
+
+It used to be one 5,200-line file per prototype, harness and all, copied each time.
+
+`proto.html` is the empty template; it reports `0 ok` because it has no prototype in
+it yet. `examples/product-editor.html` is the filled-in reference to read when you
+want to see what real scenarios, routes and states look like.
 
 ## How it is used
 
-1. Copy `proto.html` and rename it to `<area>-<thing>.html`.
-2. Edit **only** the three marked zones inside the file:
+1. Copy `proto.html` and rename it to `<area>-<thing>.html`. Keep it next to
+   `harness.js`, or fix the two `src`/`href` paths if you put it deeper.
+2. Fill the three marked zones — they are the whole file:
    - `▼ DATA ▼` — fixtures and routes
    - `▼ APP ▼ (1 of 2)` — the prototype's styles
    - `▼ APP ▼ (2 of 2)` — context, scenarios and render
@@ -81,7 +90,9 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 
 | path | what it is |
 |---|---|
-| `proto.html` | the bench — harness only, empty zones; copy it per prototype |
+| `harness.js` | the engine. Included by every prototype, edited by none |
+| `harness.css` | the chrome the harness draws around the stage |
+| `proto.html` | the empty template; copy it per prototype |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
 | `catalog/` | the 128 components of `@12-apps/ui` and what each one demands in wiring |

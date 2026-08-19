@@ -21,6 +21,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { pathToFileURL } = require("url");
 
 const args = process.argv.slice(2);
 const file = args.find(a => !a.startsWith("--"));
@@ -139,10 +140,16 @@ try {
   process.exit(3);
 }
 const html = fs.readFileSync(file, "utf8");
+/* A prototype includes the harness rather than containing it, so jsdom has
+   to fetch harness.js and the catalog: `resources: "usable"` turns that on,
+   and a real file:// url is what makes the relative paths resolve. The
+   origin is opaque there, so localStorage throws — the harness already
+   treats storage as optional. */
 const dom = new JSDOM(html, {
   runScripts: "dangerously",
+  resources: "usable",
   pretendToBeVisual: true,
-  url: "https://proto.local/" + path.basename(file)
+  url: pathToFileURL(path.resolve(file)).href
 });
 const w = dom.window;
 
