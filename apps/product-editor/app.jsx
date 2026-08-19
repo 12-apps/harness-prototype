@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Box } from "@12-apps/ui/mui/Box";
+import { AppBar } from "@12-apps/ui/mui/AppBar";
 import { Heading } from "@12-apps/ui/typography/Heading";
 import { Paragraph } from "@12-apps/ui/typography/Paragraph";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -84,7 +85,7 @@ function ListScreen({ s }){
           {(items || []).map(p => (
             <Button key={p.id} className="linha" data-act="abrir-produto" data-id={p.id}>
               <Text className="nome">
-                <Text component="b">{p.nameStr}</Text>
+                <Text weight="bold">{p.nameStr}</Text>
                 <Text className="cat">{p.category}</Text>
               </Text>
               <Text className="qtd">
@@ -101,13 +102,13 @@ function ListScreen({ s }){
 
   return (
     <Box className="app">
-      <Box className="app-hd" component="header">
+      <AppBar className="app-hd" position="sticky" color="transparent" elevation={0}>
         <Heading level="h1">Cardápio</Heading>
         <Paragraph>
           {items ? items.length + (items.length === 1 ? " produto" : " produtos") : "—"}
         </Paragraph>
         <Button className="voltar" data-act="recarregar-lista">Recarregar</Button>
-      </Box>
+      </AppBar>
       <Box className="app-bd" data-async data-estado-atual={st}>{body}</Box>
     </Box>
   );
@@ -156,7 +157,7 @@ function ProductScreen({ s }){
         <Box className="grade">
           {vars.map((v, i) => (
             <Card key={v.id || i} className="var">
-              <Text component="b">{v.nameStr}</Text>
+              <Text weight="bold">{v.nameStr}</Text>
               {canEdit ? (
                 <Input
                   value={v.price}
@@ -212,13 +213,13 @@ function ProductScreen({ s }){
 
   return (
     <Box className="app">
-      <Box className="app-hd" component="header">
+      <AppBar className="app-hd" position="sticky" color="transparent" elevation={0}>
         <Button className="voltar" data-act="voltar">← Cardápio</Button>
         <Heading level="h1">{prod ? prod.nameStr : "Produto"}</Heading>
         <Paragraph>
           {vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}
         </Paragraph>
-      </Box>
+      </AppBar>
 
       <Box className="app-bd" data-async data-estado-atual={st}>{body}</Box>
 

@@ -27,7 +27,7 @@ because the scenario text and the screen are checked against each other.
 **Do not rebuild the harness, and do not open it.** A prototype is three files:
 
 ```
-cp -r apps/_template apps/<area>-<thing>
+cp -r apps/_react-template apps/<area>-<thing>
 ```
 
 ```
@@ -39,6 +39,10 @@ apps/<area>-<thing>/
 
 Open it with `proto.html?app=<area>-<thing>`. The bench loads those three, in that
 order, so `app.jsx` can count on the fixtures already existing.
+
+A prototype is React — `app.jsx`, always. The rules below are read out of the
+JSX source, so a vanilla `app.js` gives them nothing to read; the gate refuses
+one outright rather than passing it on rules that never ran.
 
 The harness is never copied: one `harness.js` and one `harness.css` serve every
 prototype, and neither appears in the files you edit. The chrome also sits in a
@@ -202,11 +206,27 @@ What the check demands:
 
 - no lowercase JSX elements at all — `<div>` is `<Box>`, `<p>` is `<Paragraph>`,
   `<h2>` is `<Heading>`. Fragments (`<>…</>`) are fine, they are not elements;
+- and none of the three ways raw HTML reaches the DOM without being a tag:
+
+  ```jsx
+  <Text component="b">…</Text>                          {/* the tag as a prop  */}
+  <Box dangerouslySetInnerHTML={{ __html: "<b>x</b>" }} />
+  <Text>{`<div class="x"><h1>…</h1></div>`}</Text>       {/* markup as text     */}
+  ```
+
+  Use the prop the component already has — `<Text weight="bold">` — or the
+  component that means it: a page header is `<AppBar>`, not
+  `<Box component="header">`. `component={SomeComponent}` is composition and
+  stays allowed. Step text is safe: `<colunas>` reads as a Gherkin placeholder,
+  not a tag, because the check matches real HTML element names;
 - every component imported from `@12-apps/ui`, nothing from anywhere else;
 - every name present in `catalog/ui-catalog.md`, imported from the exact path it
   gives — a typo or a component that does not exist fails;
-- components you define yourself are fine. Composing design-system parts into a
-  screen is the job; the rule is about raw HTML, not about composition.
+- components you define yourself are fine, and are reported as a warning rather
+  than a failure. Composing design-system parts into a screen is the job, and
+  everything a local renders is checked on the line that writes it; the warning
+  exists so a screen built from five private components is visible as what it
+  is.
 
 The root `@12-apps/ui` barrel is intentionally empty, so import by subpath:
 

@@ -61,19 +61,30 @@ const appName = isApp ? path.basename(path.resolve(file)) : null;
 const pageFile = isApp ? path.join(__dirname, "proto.html") : file;
 const label = isApp ? appName : path.basename(file);
 
-/* A prototype is React (app.jsx) or vanilla (app.js). React is the one that
-   can be held to the component rule, because the rule lives in the source:
-   once <Button> renders, MUI emits a real <button> and nothing downstream can
-   tell it from one an agent typed. */
+/* A prototype is React. It is not a style preference: the component rule
+   lives in the SOURCE, because once <Button> renders MUI emits a real
+   <button> and nothing downstream can tell it from one an agent typed. A
+   vanilla app.js builds its screen from template strings, so every check
+   here — no raw HTML, every component from the catalog, every `exige`
+   component wired — has nothing to read. It passed clean with <div><h1><p>
+   in it, which is the whole rule quietly not applying. */
 const jsxEntry = isApp && fs.existsSync(path.join(file, "app.jsx"));
 /* the components the prototype imports; the build fills this and the page
    gets it, so the .feature can list what an implementer actually needs */
 let usedComponents = [];
 
 if (isApp){
-  const need = ["styles.css", "data.js", jsxEntry ? "app.jsx" : "app.js"];
+  const need = ["styles.css", "data.js", "app.jsx"];
   for (const f of need){
     if (!fs.existsSync(path.join(file, f))){
+      if (f === "app.jsx" && fs.existsSync(path.join(file, "app.js"))){
+        console.error("✕ " + file + " has an app.js. A prototype is React — app.jsx.");
+        console.error("  A vanilla app.js writes its screen as HTML text, so the component rule");
+        console.error("  cannot see it and every check below silently passes. Start from");
+        console.error("  apps/_react-template, or rename app.js to app.jsx and build the screen");
+        console.error("  from @12-apps/ui components.");
+        process.exit(3);
+      }
       console.error("✕ " + file + " is missing " + f + " — a prototype is all three files.");
       process.exit(3);
     }
@@ -86,6 +97,8 @@ if (isApp){
     let problems;
     try { problems = lint(entry, loadCatalog(__dirname), loadWiring(__dirname)); }
     catch (e){ console.error("✕ could not check the component rule: " + e.message); process.exit(3); }
+    problems.filter(p => p.warn).forEach(p => console.error(`  ! ${entry}:${p.line}  ${p.msg}`));
+    problems = problems.filter(p => !p.warn);
     if (problems.length){
       problems.forEach(p => console.error(`  ${entry}:${p.line}  ${p.msg}`));
       console.error(`\n✕ DO NOT SHIP. ${problems.length} violation(s) of the component rule — `
@@ -235,7 +248,7 @@ ${read(here("catalog/ui-catalog.js"))}
 ${read(app("data.js"))}
 </script>
 <script>
-${read(jsxEntry ? path.join(appDir, ".build", "app.js") : app("app.js"))}
+${read(path.join(appDir, ".build", "app.js"))}
 </script>
 </body>
 </html>
@@ -264,7 +277,7 @@ function writeArtifacts(dir, arts){
   if (isApp){
     const srcDir = path.join(dir, "source");
     fs.mkdirSync(srcDir, { recursive: true });
-    ["styles.css", "data.js", jsxEntry ? "app.jsx" : "app.js"].forEach(f => {
+    ["styles.css", "data.js", "app.jsx"].forEach(f => {
       const from = path.join(file, f);
       if (!fs.existsSync(from)) return;
       fs.copyFileSync(from, path.join(srcDir, f));
