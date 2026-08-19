@@ -58,6 +58,29 @@ context dimensions, its settled UX decisions — belongs in that product's own
 instructions, not here. `examples/` carries a worked set of those for a real product,
 written in Brazilian Portuguese, next to the demo prototype they describe.
 
+## Handing it to whoever implements it
+
+The prototype is the specification, so handing it over should not mean handing over a
+folder to reverse-engineer. Three files come out of the run the gate already does:
+
+```bash
+node verify.js my-screen.html --export handoff/
+# → handoff/: my-screen.feature, api.md, my-screen.html
+```
+
+| file | what it carries |
+|---|---|
+| `<name>.feature` | the scenarios as Gherkin, with the component and route hints |
+| `api.md` | every declared route, with a request and response **actually observed** while the scenarios ran — not an example someone wrote and never checked |
+| `<name>.html` | the prototype itself, harness chrome stripped, still runnable |
+
+The same three are a click away in the browser: open **Gherkin** and use *Baixar tudo*,
+or take them one at a time. `--export` only writes when the gate passes — handing over
+a specification that failed its own checks is worse than handing over nothing.
+
+They are on the API too (`Proto.gherkin()`, `Proto.apiContract()`, `Proto.source()`),
+so an agent can produce them without a browser.
+
 ## What the harness gives you
 
 A width ladder (`xxs … xlg`), a scenario bar with search and grouping, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, `.feature` export, isolated verification in an iframe with automatic resume, and a blocking failure screen with a pasteable report.

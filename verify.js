@@ -8,6 +8,7 @@
 
      node verify.js product-editor.html
      node verify.js file.html --strict
+     node verify.js file.html --export handoff/    write the handoff files
 
    Exit codes:
      0  passed
@@ -24,11 +25,26 @@ const { execSync } = require("child_process");
 const { pathToFileURL } = require("url");
 
 const args = process.argv.slice(2);
-const file = args.find(a => !a.startsWith("--"));
 const strict = args.includes("--strict");
 
+/* --export <dir> writes the three handoff files. It runs only when the gate
+   passes: handing an implementer a specification that failed its own checks
+   is worse than handing them nothing. */
+let exportDir = null, exportValueAt = -1;
+const eqArg = args.find(a => a.startsWith("--export="));
+if (eqArg) exportDir = eqArg.slice("--export=".length) || ".";
+else {
+  const i = args.indexOf("--export");
+  if (i > -1){
+    const next = args[i + 1];
+    if (next && !next.startsWith("--")){ exportDir = next; exportValueAt = i + 1; }
+    else exportDir = ".";
+  }
+}
+const file = args.find((a, i) => !a.startsWith("--") && i !== exportValueAt);
+
 if (!file){
-  console.error("usage: node verify.js <file.html> [--strict]");
+  console.error("usage: node verify.js <file.html> [--strict] [--export <dir>]");
   process.exit(3);
 }
 if (!fs.existsSync(file)){
@@ -85,14 +101,39 @@ async function runInBrowser(file, chrome, pptr){
     pg.on("pageerror", e => errors.push(String(e.message).split("\n")[0]));
     await pg.goto("file://" + path.resolve(file), { waitUntil:"load" });
     await pg.waitForFunction("window.Proto && typeof window.Proto.verifyAll === 'function'", { timeout:20000 });
-    const r = await pg.evaluate(async () => {
+    const r = await pg.evaluate(async (wantArtifacts) => {
       const s = await window.Proto.verifyAll();
-      return { ok:s.ok, bad:s.bad, warnings:s.warnings || [], infos:s.infos || [],
-               coverage:s.coverage || null, report: s.bad ? window.Proto.report() : "" };
-    });
+      const out = { ok:s.ok, bad:s.bad, warnings:s.warnings || [], infos:s.infos || [],
+                    coverage:s.coverage || null, report: s.bad ? window.Proto.report() : "" };
+      if (wantArtifacts && !s.bad){
+        out.artifacts = { feature: window.Proto.gherkin(),
+                          api: window.Proto.apiContract(),
+                          html: window.Proto.source() };
+      }
+      return out;
+    }, !!exportDir);
     r.errors = errors;
     return r;
   } finally { await b.close(); }
+}
+
+/* The three things whoever implements this needs: the scenarios as Gherkin,
+   the routes with a request and response actually observed, and the
+   prototype itself. Same artefacts the browser's "Baixar tudo" produces. */
+function writeArtifacts(dir, arts){
+  const base = path.basename(file).replace(/\.html?$/i, "");
+  fs.mkdirSync(dir, { recursive: true });
+  const wrote = [];
+  const put = (nameStr, text) => {
+    if (typeof text !== "string" || !text) return;
+    const full = path.join(dir, nameStr);
+    fs.writeFileSync(full, text);
+    wrote.push(nameStr + " (" + Buffer.byteLength(text) + " bytes)");
+  };
+  put(base + ".feature", arts.feature);
+  put("api.md", arts.api);
+  put(base + ".html", arts.html);
+  console.log("→ " + dir + ": " + (wrote.length ? wrote.join(", ") : "nothing to write"));
 }
 
 let JSDOM;
@@ -114,6 +155,7 @@ if (chrome && pptr){
       process.exit(1);
     }
     console.log(`✓ ${path.basename(file)} — ${line}`);
+    if (exportDir && r.artifacts) writeArtifacts(exportDir, r.artifacts);
     warnings.forEach(a => console.log("  ! " + a));
     (r.infos || []).forEach(i => console.log("  · " + i));
     (r.errors || []).forEach(e => console.log("  ! page error: " + e));
@@ -197,6 +239,10 @@ w.addEventListener("load", () => {
     }
 
     console.log(`✓ ${path.basename(file)} — ${line}`);
+
+    if (exportDir){
+      writeArtifacts(exportDir, { feature: P.gherkin(), api: P.apiContract(), html: P.source() });
+    }
 
     if (warnings.length){
       warnings.forEach(a => console.log("  ! " + a));

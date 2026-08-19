@@ -8,6 +8,9 @@ node verify.js <thing>.html
 node verify.js <thing>.html --strict
 ```
 
+Add `--export <dir>` to write the handoff files — the `.feature`, `api.md` and the
+prototype itself — when, and only when, the run passes.
+
 | exit | means | what to do |
 |---|---|---|
 | `0` | passed | you can ship |

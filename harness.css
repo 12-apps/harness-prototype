@@ -482,3 +482,10 @@ body{
   font:12px/1.6 var(--h-mono);padding:16px;
 }
 .h-spec textarea:focus-visible{outline:2px solid var(--h-accent);outline-offset:1px}
+
+/* handoff row under the spec: the three files an implementer needs */
+.h-spec-dl{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:8px 12px;border-top:1px solid var(--h-line-2);
+}
+.h-spec-dl span{font-size:11.5px;color:var(--h-fg-mute);margin-right:2px}
