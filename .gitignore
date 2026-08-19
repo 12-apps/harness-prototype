@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# built prototypes — verify.js compiles app.jsx into these
+apps/*/.build/

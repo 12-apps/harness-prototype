@@ -61,12 +61,54 @@ const appName = isApp ? path.basename(path.resolve(file)) : null;
 const pageFile = isApp ? path.join(__dirname, "proto.html") : file;
 const label = isApp ? appName : path.basename(file);
 
+/* A prototype is React (app.jsx) or vanilla (app.js). React is the one that
+   can be held to the component rule, because the rule lives in the source:
+   once <Button> renders, MUI emits a real <button> and nothing downstream can
+   tell it from one an agent typed. */
+const jsxEntry = isApp && fs.existsSync(path.join(file, "app.jsx"));
+
 if (isApp){
-  for (const need of ["styles.css", "data.js", "app.js"]){
-    if (!fs.existsSync(path.join(file, need))){
-      console.error("✕ " + file + " is missing " + need + " — a prototype is all three files.");
+  const need = ["styles.css", "data.js", jsxEntry ? "app.jsx" : "app.js"];
+  for (const f of need){
+    if (!fs.existsSync(path.join(file, f))){
+      console.error("✕ " + file + " is missing " + f + " — a prototype is all three files.");
       process.exit(3);
     }
+  }
+
+  if (jsxEntry){
+    /* 1. the component rule, before a browser is even started */
+    const { lint, loadCatalog } = require("./scripts/lint-prototype.js");
+    const entry = path.join(file, "app.jsx");
+    let problems;
+    try { problems = lint(entry, loadCatalog(__dirname)); }
+    catch (e){ console.error("✕ could not check the component rule: " + e.message); process.exit(3); }
+    if (problems.length){
+      problems.forEach(p => console.error(`  ${entry}:${p.line}  ${p.msg}`));
+      console.error(`\n✕ DO NOT SHIP. ${problems.length} violation(s) of the component rule — `
+                  + `a prototype uses ${"@12-apps/ui"}, never raw HTML.`);
+      process.exit(1);
+    }
+
+    /* 2. build it, so the bench can load one plain script */
+    const outFile = path.join(file, ".build", "app.js");
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    let esbuild;
+    try { esbuild = require("esbuild"); }
+    catch { console.error("✕ esbuild is not installed. Run: pnpm install"); process.exit(3); }
+    const t0 = Date.now();
+    const built = esbuild.buildSync({
+      entryPoints: [entry], outfile: outFile, bundle: true, format: "iife",
+      jsx: "automatic", logLevel: "silent", write: true,
+      define: { "process.env.NODE_ENV": '"development"' },
+      absWorkingDir: __dirname
+    });
+    if (built.errors && built.errors.length){
+      built.errors.forEach(e => console.error("  " + (e.text || e)));
+      console.error("\n✕ the prototype did not build.");
+      process.exit(1);
+    }
+    console.log(`built ${path.relative(__dirname, entry)} in ${Date.now() - t0}ms`);
   }
   if (!fs.existsSync(pageFile)){
     console.error("✕ proto.html not found next to verify.js");

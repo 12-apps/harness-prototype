@@ -1,0 +1,3 @@
+/* The prototype's styles. The design system brings its own; this is only for
+   layout the components do not cover. Use @container, not @media. */
+.screen { padding: 20px; display: grid; gap: 14px; }

@@ -12,7 +12,11 @@
   },
   "devDependencies": {
     "@12-apps/ui": "^5.3.0",
-    "jsdom": "^24.0.0"
+    "@babel/parser": "^8.0.4",
+    "esbuild": "^0.28.2",
+    "jsdom": "^24.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "private": true
 }

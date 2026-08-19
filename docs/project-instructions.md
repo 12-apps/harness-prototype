@@ -183,9 +183,47 @@ On top of that, verification measures, rung by rung:
 
 Prefer `@container` over `@media`: the frame is the container.
 
-## Components
+## Components — raw HTML is not allowed
 
-When the product has a component library, map to it. For `@12-apps/ui` the 210 components are listed in `ui-catalog.md`, generated from what the package actually exports, with the import path for each. `ui-interactions.md` classifies what needs wiring, but it is curated by hand and covers 116 of them. The `primitives` map links a selector to a component **by name**; the import path comes from the catalog, and a name outside it is called out instead of generating an invented import. `strictMode: true` demands that every piece of markup with text or interaction is claimed. Never write a hex value when a token exists.
+A prototype is React, and **every element comes from `@12-apps/ui`**. Not "prefer
+components". Not "claim your markup in a map". A raw tag fails the gate:
+
+```
+$ node verify.js apps/cardapio
+  apps/cardapio/app.jsx:24  <button> is raw HTML. Use <Button> from @12-apps/ui/form/Button
+✕ DO NOT SHIP. 1 violation(s) of the component rule — a prototype uses @12-apps/ui, never raw HTML.
+```
+
+This is checked on the **source**, before a browser starts — and it has to be. Once
+`<Button>` renders, the design system emits a real `<button>` into the DOM, so
+nothing downstream could tell it from one you typed.
+
+What the check demands:
+
+- no lowercase JSX elements at all — `<div>` is `<Box>`, `<p>` is `<Paragraph>`,
+  `<h2>` is `<Heading>`. Fragments (`<>…</>`) are fine, they are not elements;
+- every component imported from `@12-apps/ui`, nothing from anywhere else;
+- every name present in `catalog/ui-catalog.md`, imported from the exact path it
+  gives — a typo or a component that does not exist fails;
+- components you define yourself are fine. Composing design-system parts into a
+  screen is the job; the rule is about raw HTML, not about composition.
+
+The root `@12-apps/ui` barrel is intentionally empty, so import by subpath:
+
+```jsx
+import { Button } from "@12-apps/ui/form/Button";
+import { Heading } from "@12-apps/ui/typography/Heading";
+```
+
+## Rendering
+
+The harness measures the DOM immediately after drawing, and React commits
+concurrently, so a prototype mounts with `flushSync` — `apps/_react-template/app.jsx`
+has the four lines that do it. Supply `mount`, not `render`; the harness has had a
+mount hook all along and needs to know nothing about React.
+
+`node verify.js apps/<name>` lints the source, builds it with esbuild (~300ms) and
+then runs the suite. Build output goes to `apps/<name>/.build/` and is not committed.
 
 ## Before shipping — mandatory
 
