@@ -738,13 +738,13 @@ body{
 const Paladira = (() => {
   /* carimbo de build: serve para saber, olhando a tela, se o arquivo
      aberto é o mais novo — passe o mouse no nome Paladira */
-  const VERSAO = "v3.7 · 2026-08-17 · primeira pintura imediata";
+  const VERSION = "v3.7 · 2026-08-17 · primeira pintura imediata";
   /* ---------- escada de pontos de quebra ----------
      Nomear as larguras muda o que se pede ao protótipo: "funciona no
      celular" é vago; "em xxs a ação principal vai para o rodapé fixo" é
      verificável. A escada é a régua — os aparelhos são só atalhos para
      larguras de mercado. Troque em `larguras` na configuração. */
-  const ESCADA_PADRAO = [
+  const DEFAULT_LADDER = [
     { id:"xxs", label:"xxs · 320",  w:320,  h:640,  nivel:true },
     { id:"xs",  label:"xs · 380",   w:380,  h:780,  nivel:true },
     { id:"sm",  label:"sm · 480",   w:480,  h:860,  nivel:true },
@@ -753,7 +753,7 @@ const Paladira = (() => {
     { id:"xlg", label:"xlg · 1440", w:1440, h:900,  nivel:true }
   ];
 
-  const APARELHOS = [
+  const DEVICES = [
     { id:"se",    label:"iPhone SE",          w:375,  h:667  },
     { id:"pro",   label:"iPhone 16 Pro Max",  w:440,  h:956  },
     { id:"mini",  label:"iPad Mini",          w:744,  h:1133 },
@@ -761,13 +761,13 @@ const Paladira = (() => {
     { id:"livre", label:"Largura livre",      w:0, h:0, livre:true }
   ];
 
-  let ESCADA = ESCADA_PADRAO.slice();
-  let VIEWPORTS = ESCADA.concat(APARELHOS);
+  let LADDER = DEFAULT_LADDER.slice();
+  let VIEWPORTS = LADDER.concat(DEVICES);
 
   /* em que degrau uma largura cai: o maior degrau que ela alcança */
-  function degrauDe(w){
-    let atual = ESCADA[0];
-    for (const d of ESCADA) if (w >= d.w) atual = d;
+  function rungOf(w){
+    let atual = LADDER[0];
+    for (const d of LADDER) if (w >= d.w) atual = d;
     return atual;
   }
 
@@ -779,14 +779,14 @@ const Paladira = (() => {
   let results = {};      /* ao vivo: cenarioId -> { passo: bool } */
   let suite   = null;    /* última verificação completa */
   let muteHash = false;
-  let busca = "", buscaFocada = false, soFalhas = false;
+  let busca = "", buscaFocada = false, onlyFailures = false;
   const gruposFechados = new Set();
-  let semeouEstados = false;
+  let seededStates = false;
   /* A verificação segura a fila por ~30s. Sem isto, clicar num cenário
      no meio da rodada não faz nada — a navegação fica esperando a suíte
      terminar e a barra parece morta. Navegar cancela a rodada: quem está
      olhando a tela tem prioridade sobre quem está conferindo. */
-  let cancelarVerificacao = false;
+  let cancelVerification = false;
   /* o contexto que a PESSOA escolheu. A verificação troca de contexto a
      cada cenário; ao terminar (ou ser interrompida) tem de voltar para o
      que está marcado agora, não para o instantâneo do começo — senão
@@ -806,16 +806,16 @@ const Paladira = (() => {
   let parcial = null;
   let timerRetomada = null;
   function agendarRetomada(){
-    if (cfg.retomarVerificacao === false) return;
+    if (cfg.resumeVerification === false) return;
     clearTimeout(timerRetomada);
     timerRetomada = setTimeout(() => {
-      if (emVerificacao || !interrompida) return;
-      verificar().then(r => { if (r && r.bad && !r.cancelada) mostrarFalhaSeguro(); });
+      if (verifying || !interrompida) return;
+      verify().then(r => { if (r && r.bad && !r.cancelada) showFailureSafely(); });
     }, cfg.esperaRetomada || 1200);
   }
 
   /* mostrarFalha vive dentro do init; este é o gancho para alcançá-lo */
-  let mostrarFalhaSeguro = () => {};
+  let showFailureSafely = () => {};
   let porTeclado = false;
   let escolhaManual = false;   /* a pessoa mexeu no seletor de largura agora */
   let aguardando = null;
@@ -837,8 +837,8 @@ const Paladira = (() => {
     esperando(){ return rede.emVooTela > 0; },
     /* degrau em que a tela está sendo desenhada: deixa o protótipo mudar
        de estrutura, não só de CSS, quando o arranjo pede */
-    get degrau(){ return degrauDe(larguraAtual().w).id; },
-    get larguraPx(){ return larguraAtual().w; },
+    get rung(){ return rungOf(currentWidth().w).id; },
+    get widthPx(){ return currentWidth().w; },
     opcao(dimId){ return this.ctx[dimId]; },
     flag(id){
       for (const d of cfg.contexto){
@@ -930,17 +930,17 @@ const Paladira = (() => {
                     : base[k[0]] != null ? base[k[0]] : base[k[1]];
     const out = {
       componente: pick(["componente","component"]),
-      rota:       pick(["rota","route"]),
+      route:       pick(["rota","route"]),
       modulo:     pick(["modulo","module"]),
       notas:      pick(["notas","notes"])
     };
-    return (out.componente || out.rota || out.modulo || out.notas) ? out : null;
+    return (out.componente || out.route || out.modulo || out.notas) ? out : null;
   }
 
   function implLine(im){
     const bits = [];
     if (im.componente) bits.push("componente " + im.componente);
-    if (im.rota)       bits.push("rota " + im.rota);
+    if (im.route)       bits.push("rota " + im.route);
     if (im.modulo)     bits.push("módulo " + im.modulo);
     return bits.join(" · ");
   }
@@ -1001,7 +1001,7 @@ const Paladira = (() => {
     if (!cfg.primitivas) return [];
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = larguraAtual().w + "px";
+    probe.style.width = currentWidth().w + "px";
     document.body.appendChild(probe);
     const steps = (s.steps || []).length;
     const built = await buildState(s, steps - 1, 0);
@@ -1036,9 +1036,9 @@ const Paladira = (() => {
   const localSuspeito = [];
   const chegadas = new Set();
   /* passos que efetivamente mudaram o estado: `${cenario}|${indice}` */
-  const mudouEstado = new Set();
+  const stateChanged = new Set();
   const rotulosMentirosos = [];
-  const exercitados = new Set();   /* "tipo seletor" de handler que já disparou de verdade */
+  const exercised = new Set();   /* "tipo seletor" de handler que já disparou de verdade */
 
   /* Nem toda interação é um clique. Um campo se preenche, um select se
      escolhe, um switch se alterna — e cada um dispara eventos diferentes.
@@ -1055,9 +1055,9 @@ const Paladira = (() => {
        durabilidade  a escrita mudou as fixtures? senão recarregar desfaz.
 
      Nenhum é infalível sozinho; juntos cobrem o caso do "Salvar" falso. */
-  const VERBOS_PERSISTENTES = /\b(salvar|guardar|gravar|confirmar|enviar|publicar|excluir|remover|apagar|criar|cadastrar|adicionar|atualizar|editar|pagar|finalizar|aplicar|convidar|aprovar|recusar|cancelar pedido)\b/i;
+  const PERSISTENT_VERBS = /\b(salvar|guardar|gravar|confirmar|enviar|publicar|excluir|remover|apagar|criar|cadastrar|adicionar|atualizar|editar|pagar|finalizar|aplicar|convidar|aprovar|recusar|cancelar pedido)\b/i;
 
-  const ACOES = {
+  const ACTIONS = {
     clique:   { evs:["click"],           rotulo:"clica em"    },
     preenche: { evs:["input","change"],  rotulo:"preenche"    },
     escolhe:  { evs:["change"],          rotulo:"escolhe em"  },
@@ -1066,7 +1066,7 @@ const Paladira = (() => {
 
   /* solta os pedidos parados: o servidor respondeu */
   async function soltarParados(filtro){
-    const alvo = rede.parados.filter(p => !filtro || p.rotaId.indexOf(filtro) > -1);
+    const alvo = rede.parados.filter(p => !filtro || p.routeId.indexOf(filtro) > -1);
     rede.parados = rede.parados.filter(p => alvo.indexOf(p) < 0);
     const corpos = [];
     for (const p of alvo){
@@ -1078,7 +1078,7 @@ const Paladira = (() => {
   }
 
   function specOf(st){
-    for (const tipo of Object.keys(ACOES)){
+    for (const tipo of Object.keys(ACTIONS)){
       if (!st[tipo]) continue;
       const v = st[tipo];
       return typeof v === "string"
@@ -1092,7 +1092,7 @@ const Paladira = (() => {
     const { tipo, sel, valor } = spec;
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = larguraAtual().w + "px";
+    probe.style.width = currentWidth().w + "px";
     document.body.appendChild(probe);
 
     const shown = { ...state, app, ex:exRow };
@@ -1101,26 +1101,26 @@ const Paladira = (() => {
       else if (cfg.render) probe.innerHTML = cfg.render(shown);
     } catch (e){
       probe.remove();
-      return { app, erro:"a tela quebrou antes de " + ACOES[tipo].rotulo + " " + sel + ": " + e.message };
+      return { app, error_:"a tela quebrou antes de " + ACTIONS[tipo].rotulo + " " + sel + ": " + e.message };
     }
 
     const el = probe.querySelector(sel);
-    if (!el){ probe.remove(); return { app, erro:"não há " + sel + " nesta tela" }; }
-    if (el.disabled){ probe.remove(); return { app, erro:sel + " está desabilitado" }; }
+    if (!el){ probe.remove(); return { app, error_:"não há " + sel + " nesta tela" }; }
+    if (el.disabled){ probe.remove(); return { app, error_:sel + " está desabilitado" }; }
 
     /* preencher um botão ou clicar num campo é erro de roteiro, não de código */
     const tag = el.tagName.toLowerCase();
     const ehCampo = tag === "input" || tag === "textarea" || tag === "select";
     if (tipo !== "clique" && !ehCampo){
       probe.remove();
-      return { app, erro:sel + " não é campo — não dá para " + ACOES[tipo].rotulo };
+      return { app, error_:sel + " não é campo — não dá para " + ACTIONS[tipo].rotulo };
     }
 
     if (tipo === "alterna") el.checked = !el.checked;
     else if (tipo !== "clique"){
       if (valor === undefined){
         probe.remove();
-        return { app, erro:"o passo não diz com que valor " + ACOES[tipo].rotulo + " " + sel };
+        return { app, error_:"o passo não diz com que valor " + ACTIONS[tipo].rotulo + " " + sel };
       }
       el.value = String(valor);
     }
@@ -1129,14 +1129,14 @@ const Paladira = (() => {
     sandbox = { app: clone(app) };
     const s = { ...state, app: sandbox.app, ex: exRow };
     let tocou = 0;
-    ACOES[tipo].evs.forEach(ev => {
+    ACTIONS[tipo].evs.forEach(ev => {
       handlers.forEach(h => {
         if (h.type !== ev) return;
         let bate = false;
         try { bate = el.matches(h.selector); } catch { bate = false; }
         if (!bate) return;
         tocou++;
-        exercitados.add(h.type + " " + h.selector);
+        exercised.add(h.type + " " + h.selector);
         try { h.fn({ target:el, currentTarget:el, preventDefault(){}, stopPropagation(){} }, el, s); }
         catch (e){ problemas.push("handler de " + h.selector + " quebrou: " + e.message); }
       });
@@ -1150,7 +1150,7 @@ const Paladira = (() => {
     const rotulo = ((el.textContent || "") + " " + (el.getAttribute("data-act") || "")
                     + " " + (el.getAttribute("aria-label") || "")).trim();
     probe.remove();
-    if (!tocou) return { app: out, rotulo, erro:"nenhum handler responde a " + sel + " para " + tipo };
+    if (!tocou) return { app: out, rotulo, error_:"nenhum handler responde a " + sel + " para " + tipo };
     return { app: out, rotulo };
   }
 
@@ -1232,7 +1232,7 @@ const Paladira = (() => {
      de iframe, que é onde estes arquivos abrem. Interceptar fetch dá a
      mesma disciplina: trocar por um backend de verdade é apagar o
      interceptador, não reescrever a tela. */
-  const rede = { emVoo:0, log:[], tela:[], falhas:{}, contador:0, seq:0, origem:null, parados:[], rotasVistas:{}, emVooTela:0 };
+  const rede = { emVoo:0, log:[], tela:[], failures:{}, contador:0, seq:0, origem:null, parados:[], seenRoutes:{}, emVooTela:0 };
 
   function paraRegex(caminho){
     return new RegExp("^" + caminho
@@ -1240,11 +1240,11 @@ const Paladira = (() => {
       .replace(/:([A-Za-z_]+)/g, "(?<$1>[^/]+)") + "/?$");
   }
 
-  function acharRota(metodo, caminho){
-    for (const r of (cfg.rotas || [])){
+  function findRoute(metodo, caminho){
+    for (const r of (cfg.routes || [])){
       if ((r.metodo || "GET").toUpperCase() !== metodo) continue;
       const m = paraRegex(r.caminho).exec(caminho);
-      if (m) return { rota:r, params:m.groups || {} };
+      if (m) return { route:r, params:m.groups || {} };
     }
     return null;
   }
@@ -1258,11 +1258,11 @@ const Paladira = (() => {
       opts = opts || {};
       const metodo = String(opts.method || "GET").toUpperCase();
       const caminho = String(url).replace(/^https?:\/\/[^/]+/, "").split("?")[0];
-      const achado = acharRota(metodo, caminho);
+      const achado = findRoute(metodo, caminho);
       const t0 = Date.now();
 
       /* rota que o cenário mandou falhar: é assim que se testa ErrorState */
-      const forcado = rede.falhas[metodo + " " + caminho] || (achado && rede.falhas[metodo + " " + achado.rota.caminho]);
+      const forcado = rede.failures[metodo + " " + caminho] || (achado && rede.failures[metodo + " " + achado.route.caminho]);
 
       const registrar = (status, obs, envio, volta) => {
         /* contador à parte: o log é uma janela de 60 e descarta os antigos,
@@ -1270,8 +1270,8 @@ const Paladira = (() => {
            dá zero assim que a janela enche */
         rede.contador++;
         const reg = { id:++rede.seq, metodo, caminho, status, ms: Date.now() - t0,
-                      obs: obs || "", verif: emVerificacao,
-                      rotaId: achado ? (metodo + " " + achado.rota.caminho) : null,
+                      obs: obs || "", verifyState: verifying,
+                      routeId: achado ? (metodo + " " + achado.route.caminho) : null,
                       origem: rede.origem ? { ...rede.origem } : null,
                       envio: envio === undefined ? null : envio,
                       volta: volta === undefined ? null : volta };
@@ -1280,13 +1280,13 @@ const Paladira = (() => {
         /* o que ESTA tela pediu: a verificação roda fora da tela e não conta */
         /* cobertura de rota vive fora do log: o log é uma janela de 60 e,
            com a varredura passo a passo, chamadas reais saem dela */
-        if (reg.rotaId && reg.origem){
-          const v = rede.rotasVistas[reg.rotaId] = rede.rotasVistas[reg.rotaId]
-            || { ok:new Set(), erro:new Set(), origens:new Set() };
-          if (status) (status < 300 ? v.ok : v.erro).add(reg.origem.nome);
-          v.origens.add(reg.origem.passo >= 0 ? "passo" : "dado");
+        if (reg.routeId && reg.origem){
+          const v = rede.seenRoutes[reg.routeId] = rede.seenRoutes[reg.routeId]
+            || { ok:new Set(), error_:new Set(), origens:new Set() };
+          if (status) (status < 300 ? v.ok : v.error_).add(reg.origem.nome);
+          v.origens.add(reg.origem.stp >= 0 ? "passo" : "dado");
         }
-        if (!emVerificacao){
+        if (!verifying){
           rede.tela.push(reg);
           if (rede.tela.length > 25) rede.tela.shift();
         }
@@ -1294,8 +1294,8 @@ const Paladira = (() => {
       };
 
       if (!achado){
-        registrar(404, "rota não declarada", null, { erro:"rota não declarada" });
-        return Promise.resolve(resposta(404, { erro:"rota não declarada: " + metodo + " " + caminho }));
+        registrar(404, "rota não declarada", null, { error_:"rota não declarada" });
+        return Promise.resolve(resposta(404, { error_:"rota não declarada: " + metodo + " " + caminho }));
       }
 
       const corpo = opts.body ? tentarJson(opts.body) : null;
@@ -1304,34 +1304,34 @@ const Paladira = (() => {
       /* decide AQUI se este pedido conta como espera visível: a resposta
          chega depois, quando `reproduzindo` já pode ter mudado, e usar a
          flag na volta fazia o contador descer sem nunca ter subido */
-      const contaNaTela = !emVerificacao && !reproduzindo;
+      const contaNaTela = !verifying && !reproduzindo;
       if (contaNaTela){ rede.emVooTela++; avisaRede(); }
-      const ctx = { params: achado.params, corpo, dados: cfg.dados, query:{} };
+      const ctx = { params: achado.params, corpo, data_: cfg.data_, query:{} };
 
       const executar = () => {
         if (forcado && forcado !== "pendente"){
           /* o cenário manda: número vira status seco, objeto leva corpo —
              é assim que se reproduz "o provedor devolveu cartão recusado" */
           const st = typeof forcado === "object" ? (forcado.status || 500) : forcado;
-          const corpoErro = typeof forcado === "object"
-            ? (forcado.corpo || { erro: forcado.erro || "falha simulada" })
-            : { erro:"falha simulada" };
-          registrar(st, "resposta ditada pelo cenário", corpo, corpoErro);
-          return resposta(st, corpoErro);
+          const errorBody = typeof forcado === "object"
+            ? (forcado.corpo || { error_: forcado.error_ || "falha simulada" })
+            : { error_:"falha simulada" };
+          registrar(st, "resposta ditada pelo cenário", corpo, errorBody);
+          return resposta(st, errorBody);
         }
         try {
           /* uma rota de escrita que responde 200 sem alterar as fixtures é
              fachada: a tela diz "salvo", nada foi salvo, e o recarregar
              desmente. Comparar o antes e o depois é objetivo. */
           const escreve = metodo === "POST" || metodo === "PUT" || metodo === "PATCH" || metodo === "DELETE";
-          const antes = escreve ? JSON.stringify(cfg.dados) : null;
-          const r = achado.rota.responde(ctx);
+          const antes = escreve ? JSON.stringify(cfg.data_) : null;
+          const r = achado.route.responde(ctx);
           const reg = registrar(200, "", corpo, r === undefined ? null : r);
-          if (escreve && antes === JSON.stringify(cfg.dados)) reg.naoPersistiu = true;
+          if (escreve && antes === JSON.stringify(cfg.data_)) reg.naoPersistiu = true;
           return resposta(200, r === undefined ? null : r);
         } catch (e){
-          registrar(500, e.message, corpo, { erro:e.message });
-          return resposta(500, { erro:e.message });
+          registrar(500, e.message, corpo, { error_:e.message });
+          return resposta(500, { error_:e.message });
         }
       };
 
@@ -1347,7 +1347,7 @@ const Paladira = (() => {
         rede.emVoo--;
         registrar(0, "parado até o passo aguarda", corpo, null);
         return new Promise(res => {
-          rede.parados.push({ rotaId: metodo + " " + achado.rota.caminho, solta: () => {
+          rede.parados.push({ routeId: metodo + " " + achado.route.caminho, solta: () => {
             rede.emVoo++;
             const r = executar();
             rede.emVoo--;
@@ -1370,9 +1370,9 @@ const Paladira = (() => {
       const sorteia = () => Array.isArray(faixa)
         ? Math.round(faixa[0] + Math.random() * (faixa[1] - faixa[0]))
         : faixa;
-      const espera = (emVerificacao || reproduzindo)
+      const espera = (verifying || reproduzindo)
         ? 0
-        : (achado.rota.atraso != null ? achado.rota.atraso : sorteia());
+        : (achado.route.atraso != null ? achado.route.atraso : sorteia());
       return new Promise(res => {
         const fim = () => {
           rede.emVoo--;
@@ -1426,7 +1426,7 @@ const Paladira = (() => {
   const api = {
     /* as fixtures VIVAS desta reprodução — cada cenário recebe uma cópia
        nova, então mexer aqui não vaza para o cenário seguinte */
-    get dados(){ return cfg.dados; },
+    get data_(){ return cfg.data_; },
     async get(caminho){ return pedir("GET", caminho); },
     async post(caminho, corpo){ return pedir("POST", caminho, corpo); },
     async put(caminho, corpo){ return pedir("PUT", caminho, corpo); },
@@ -1439,13 +1439,13 @@ const Paladira = (() => {
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
       headers: { "Content-Type":"application/json" }
     });
-    const dados = await r.json();
+    const data_ = await r.json();
     if (!r.ok){
-      const e = new Error((dados && dados.erro) || ("HTTP " + r.status));
+      const e = new Error((data_ && data_.error_) || ("HTTP " + r.status));
       e.status = r.status;
       throw e;
     }
-    return dados;
+    return data_;
   }
 
   /* Preferências de contexto e layout sobrevivem ao recarregar. Em
@@ -1467,10 +1467,10 @@ const Paladira = (() => {
     } catch {}
   }
 
-  const BARRA_MIN = 288;
+  const MIN_SIDEBAR = 288;
   function aplicarBarra(px){
-    const teto = Math.max(BARRA_MIN, Math.min(680, (window.innerWidth || 1280) - 340));
-    state.barra = Math.round(Math.max(BARRA_MIN, Math.min(teto, px)));
+    const teto = Math.max(MIN_SIDEBAR, Math.min(680, (window.innerWidth || 1280) - 340));
+    state.barra = Math.round(Math.max(MIN_SIDEBAR, Math.min(teto, px)));
     document.documentElement.style.setProperty("--h-side-w", state.barra + "px");
     fit();
   }
@@ -1481,9 +1481,9 @@ const Paladira = (() => {
 
   let iniciado = false;   /* enquanto false, ninguém escreve no hash */
   let pendente = null;
-  let emVerificacao = false;
+  let verifying = false;
   let reproduzindo = false;   /* refazendo passos passados: sem atraso simulado */
-  let dadosBase = null;
+  let baseData = null;
   const primCache = {};
 
   /* ---------- estados obrigatórios da página ----------
@@ -1491,16 +1491,16 @@ const Paladira = (() => {
      conteúdo. A tag do cenário diz qual estado ele cobre, e o harness
      assere sozinho que a tela marcou aquele estado — sem depender de
      alguém lembrar de escrever o Então. */
-  const ESTADOS = ["carregando", "vazio", "erro"];
+  const STATES = ["carregando", "vazio", "erro"];
 
-  function estadoDe(s){
-    const t = (s.tags || []).map(x => x.replace(/^@/, "")).find(x => ESTADOS.indexOf(x) > -1);
+  function stateOf(s){
+    const t = (s.tags || []).map(x => x.replace(/^@/, "")).find(x => STATES.indexOf(x) > -1);
     return t || null;
   }
 
-  function paginaDe(app){
+  function pageOf(app){
     if (!app) return null;
-    return app.pagina || (app.produtos ? "lista" : (app.produto ? "produto" : null));
+    return app.page || (app.produtos ? "lista" : (app.produto ? "produto" : null));
   }
 
   /* Jornada primeiro, verificação de estado depois. Carregando, vazio e
@@ -1509,7 +1509,7 @@ const Paladira = (() => {
      A ordem de declaração é preservada dentro de cada bloco. */
   function ordemDeLeitura(lista){
     const peso = s => {
-      const e = estadoDe(s);
+      const e = stateOf(s);
       if (!e) return 0;
       return 1 + ["carregando", "vazio", "erro"].indexOf(e);
     };
@@ -1523,24 +1523,24 @@ const Paladira = (() => {
      O harness põe o quadro naquela largura antes de desenhar e de rodar
      o Então — é o que transforma "é responsivo" em algo conferível:
      cada linha declara o arranjo e é medida naquela largura. */
-  const COLUNA_LARGURA = "largura";
+  const COLUMN_WIDTH = "largura";
 
-  function larguraDeExemplo(s, exIndex){
+  function sampleWidth(s, exIndex){
     if (!isOutline(s)) return null;
-    const cols = s.exemplos.colunas;
-    const i = cols.indexOf(cfg.colunaLargura || COLUNA_LARGURA);
+    const cols = s.exemplos.columns;
+    const i = cols.indexOf(cfg.columnWidth || COLUMN_WIDTH);
     if (i < 0) return null;
     const bruto = String(s.exemplos.linhas[Math.max(0, Math.min(s.exemplos.linhas.length - 1, exIndex || 0))][i]).trim();
-    const degrau = ESCADA.find(d => d.id === bruto);
-    if (degrau) return { id:degrau.id, w:degrau.w, h:degrau.h };
+    const rung = LADDER.find(d => d.id === bruto);
+    if (rung) return { id:rung.id, w:rung.w, h:rung.h };
     const n = parseInt(bruto, 10);
-    if (!isNaN(n)) return { id:degrauDe(n).id, w:n, h:900 };
+    if (!isNaN(n)) return { id:rungOf(n).id, w:n, h:900 };
     return null;
   }
 
   /* largura que vale AGORA: a do exemplo, se ele declarar; senão a da tela */
-  let larguraForcada = null;
-  function larguraAtual(){ return larguraForcada || vp(); }
+  let forcedWidth = null;
+  function currentWidth(){ return forcedWidth || vp(); }
 
   function scnById(id){ return cfg.scenarios.find(s => s.id === id); }
   function scn(id){ return scnById(id) || visible()[0]; }
@@ -1562,7 +1562,7 @@ const Paladira = (() => {
 
   function exampleRow(s, i){
     if (!isOutline(s)) return null;
-    const cols = s.exemplos.colunas;
+    const cols = s.exemplos.columns;
     const row  = s.exemplos.linhas[Math.max(0, Math.min(s.exemplos.linhas.length - 1, i || 0))];
     const obj  = {};
     cols.forEach((c, k) => { obj[c] = row[k]; });
@@ -1594,7 +1594,7 @@ const Paladira = (() => {
     return "outro";
   }
 
-  function palavraDoPasso(st, natAnterior){
+  function stepWord(st, natAnterior){
     const nat = natureza(st);
     if (nat === "outro") return kindOf(st);
     if (nat === natAnterior) return { kw:"E", key:"e", text:kindOf(st).text };
@@ -1638,12 +1638,12 @@ const Paladira = (() => {
       out += `# ui: as linhas "# ui:" abaixo mapeiam a marcação do protótipo `
            + `para componentes de ${cfg.biblioteca} — use o componente, não recrie o CSS\n`;
     }
-    if (suite && suite.cobertura){
-      const c = suite.cobertura;
-      out += `# cobertura: ${c.exercitados} de ${c.total} handlers disparados por algum passo\n`;
+    if (suite && suite.coverage){
+      const c = suite.coverage;
+      out += `# cobertura: ${c.exercised} de ${c.total} handlers disparados por algum passo\n`;
     }
-    if (suite && suite.avisos && suite.avisos.length){
-      suite.avisos.forEach(a => { out += `# aviso: ${a}\n`; });
+    if (suite && suite.warnings && suite.warnings.length){
+      suite.warnings.forEach(a => { out += `# aviso: ${a}\n`; });
     }
     out += "\n";
 
@@ -1672,13 +1672,13 @@ const Paladira = (() => {
       out += `    Dado ${s.given.text}\n`;
       let natAnt = "dado";
       (s.steps || []).forEach(st => {
-        const k = palavraDoPasso(st, natAnt);
+        const k = stepWord(st, natAnt);
         natAnt = natureza(st);
         out += `    ${k.kw} ${k.text}\n`;
       });
       if (isOutline(s)){
         out += `\n    Exemplos:\n`;
-        out += table(s.exemplos.colunas, s.exemplos.linhas);
+        out += table(s.exemplos.columns, s.exemplos.linhas);
       }
     });
     return out;
@@ -1701,19 +1701,19 @@ const Paladira = (() => {
     const reproduzindoAntes = reproduzindo;
     reproduzindo = true;
     try {
-      return await buildStateInterno(s, upTo, exIndex, aoVivo);
+      return await buildStateInternal(s, upTo, exIndex, aoVivo);
     } finally { reproduzindo = reproduzindoAntes; }
   }
 
-  async function buildStateInterno(s, upTo, exIndex, aoVivo){
+  async function buildStateInternal(s, upTo, exIndex, aoVivo){
     const ex = exampleRow(s, exIndex);
     const eix = exIndex || 0;
-    const larguraAnterior = larguraForcada;
-    larguraForcada = larguraDeExemplo(s, eix);
+    const previousWidth = forcedWidth;
+    forcedWidth = sampleWidth(s, eix);
     /* a chave carrega o contexto: o mesmo passo rende telas diferentes
        para dono e para garçom */
     const ctxSig = JSON.stringify(state.ctx);
-    const larg = larguraForcada ? larguraForcada.id : "tela";
+    const larg = forcedWidth ? forcedWidth.id : "tela";
     const chave = k => s.id + "|" + eix + "|" + k + "|" + ctxSig + "|" + larg;
 
     /* Cenário com `aguarda` não entra no cache: o pedido pendurado é uma
@@ -1722,21 +1722,21 @@ const Paladira = (() => {
     const usaParado = (s.steps || []).some(st => st.aguarda);
     const cache = usaParado ? null : memo;
 
-    const passos = (s.steps || []).slice(0, upTo + 1);
+    const stps = (s.steps || []).slice(0, upTo + 1);
     /* Ao vivo, o que precisa acontecer de verdade é a ÚLTIMA AÇÃO até
        aqui — não o último passo. Parar num Então depois de "recarrega a
        lista" tem de disparar o recarregar; senão a tela aparece pronta
        sem pedido nenhum, que é o que fazia parecer quebrado. */
     let idxAcao = -1;
     if (aoVivo){
-      for (let i = passos.length - 1; i >= 0; i--){
-        if (specOf(passos[i]) || passos[i].aguarda){ idxAcao = i; break; }
+      for (let i = stps.length - 1; i >= 0; i--){
+        if (specOf(stps[i]) || stps[i].aguarda){ idxAcao = i; break; }
       }
     }
 
     const restaurar = c => {
-      cfg.dados = JSON.parse(c.dados);
-      return { app: clone(c.app), erros: c.erros.slice(), pedidos: c.pedidos };
+      cfg.data_ = JSON.parse(c.data_);
+      return { app: clone(c.app), errors_: c.errors_.slice(), pedidos: c.pedidos };
     };
 
     /* Na navegação, o passo que está sendo olhado roda de verdade: é ele
@@ -1749,11 +1749,11 @@ const Paladira = (() => {
       const r = restaurar(c);
       /* devolver cedo não pode pular a restauração: sem isto a largura
          forçada pelo degrau some e quem desenha depois usa a da tela */
-      larguraForcada = larguraAnterior;
-      return { app:r.app, ex, erros:r.erros, pedidos:r.pedidos, jaVisto:true };
+      forcedWidth = previousWidth;
+      return { app:r.app, ex, errors_:r.errors_, pedidos:r.pedidos, jaVisto:true };
     }
 
-    let app, erros, pedidosBase, inicio;
+    let app, errors_, pedidosBase, inicio;
 
     /* maior prefixo já conhecido */
     let deK = -2;
@@ -1764,32 +1764,32 @@ const Paladira = (() => {
 
     if (deK >= -1){
       const r = restaurar(cache.get(chave(deK)));
-      app = r.app; erros = r.erros; pedidosBase = r.pedidos;
+      app = r.app; errors_ = r.errors_; pedidosBase = r.pedidos;
       inicio = deK + 1;
-      rede.origem = { scn:s.id, nome:s.name, passo:inicio, kw:"Quando" };
+      rede.origem = { scn:s.id, nome:s.name, stp:inicio, kw:"Quando" };
     } else {
       /* cada reprodução começa com as fixtures como estavam no arquivo e
          sem pedidos pendurados de reproduções anteriores — senão um
          `aguarda` acha o parado de outra rodada, ou não acha o seu */
-      if (dadosBase) cfg.dados = JSON.parse(dadosBase);
+      if (baseData) cfg.data_ = JSON.parse(baseData);
       rede.parados.length = 0;
-      rede.falhas = typeof s.rede === "function" ? (s.rede(ex) || {}) : (s.rede || {});
-      rede.origem = { scn:s.id, nome:s.name, passo:-1, kw:"Dado" };
+      rede.failures = typeof s.rede === "function" ? (s.rede(ex) || {}) : (s.rede || {});
+      rede.origem = { scn:s.id, nome:s.name, stp:-1, kw:"Dado" };
       const antesGiven = rede.contador;
       app = typeof s.given.state === "function" ? await s.given.state(ex, api) : clone(s.given.state);
-      erros = [];
+      errors_ = [];
       pedidosBase = rede.contador - antesGiven;
       inicio = 0;
-      if (cache) cache.set(chave(-1), instantaneo(app, erros, pedidosBase));
+      if (cache) cache.set(chave(-1), instantaneo(app, errors_, pedidosBase));
     }
 
-    rede.falhas = typeof s.rede === "function" ? (s.rede(ex) || {}) : (s.rede || {});
+    rede.failures = typeof s.rede === "function" ? (s.rede(ex) || {}) : (s.rede || {});
     const inicial0 = clone(app);
     const contadorEntrada = rede.contador;
 
-    for (let i = inicio; i < passos.length; i++){
-      const st = passos[i];
-      rede.origem = { scn:s.id, nome:s.name, passo:i, kw:kindOf(st).kw };
+    for (let i = inicio; i < stps.length; i++){
+      const st = stps[i];
+      rede.origem = { scn:s.id, nome:s.name, stp:i, kw:kindOf(st).kw };
 
       if (st.aguarda){
         const antesAguarda = JSON.stringify(app);
@@ -1797,13 +1797,13 @@ const Paladira = (() => {
         const r = await soltarParados(st.aguarda === true ? null : st.aguarda);
         app = sandbox.app; sandbox = null;
         if (!r.n){
-          erros.push({ passo:i, erro:"não havia pedido parado para soltar em " + st.aguarda });
+          errors_.push({ stp:i, error_:"não havia pedido parado para soltar em " + st.aguarda });
         } else if (typeof st.aplica === "function"){
           const next = st.aplica(app, r.corpo, ex);
           if (next && typeof next === "object") app = next;
         }
-        if (JSON.stringify(app) !== antesAguarda) mudouEstado.add(s.id + "|" + i);
-        if (cache) cache.set(chave(i), instantaneo(app, erros, pedidosBase + (rede.contador - contadorEntrada)));
+        if (JSON.stringify(app) !== antesAguarda) stateChanged.add(s.id + "|" + i);
+        if (cache) cache.set(chave(i), instantaneo(app, errors_, pedidosBase + (rede.contador - contadorEntrada)));
         continue;
       }
 
@@ -1816,16 +1816,16 @@ const Paladira = (() => {
         const cAntes = rede.contador;
         const r = await runAcao(spec, app, ex);
         app = r.app;
-        if (r.erro) erros.push({ passo:i, erro:r.erro });
+        if (r.error_) errors_.push({ stp:i, error_:r.error_ });
 
         if (ultimoAoVivo) reproduzindo = repAntes;
-        if (JSON.stringify(app) !== antes) mudouEstado.add(s.id + "|" + i);
-        if (!st.local && !r.erro && rede.contador === cAntes && JSON.stringify(app) !== antes){
-          mudancasMudas.push({ scn:s.id, nome:s.name, passo:i, sel:spec.sel, tipo:spec.tipo });
+        if (JSON.stringify(app) !== antes) stateChanged.add(s.id + "|" + i);
+        if (!st.local && !r.error_ && rede.contador === cAntes && JSON.stringify(app) !== antes){
+          mudancasMudas.push({ scn:s.id, nome:s.name, stp:i, sel:spec.sel, tipo:spec.tipo });
         }
-        if (!r.erro && rede.contador === cAntes && VERBOS_PERSISTENTES.test(r.rotulo || "")){
-          const verbo = (r.rotulo.match(VERBOS_PERSISTENTES) || [""])[0];
-          rotulosMentirosos.push({ scn:s.id, nome:s.name, passo:i, sel:spec.sel,
+        if (!r.error_ && rede.contador === cAntes && PERSISTENT_VERBS.test(r.rotulo || "")){
+          const verbo = (r.rotulo.match(PERSISTENT_VERBS) || [""])[0];
+          rotulosMentirosos.push({ scn:s.id, nome:s.name, stp:i, sel:spec.sel,
             rotulo:(r.rotulo || "").slice(0, 40), verbo });
         }
         if (st.local && JSON.stringify(app) !== antes){
@@ -1838,43 +1838,43 @@ const Paladira = (() => {
               const sp = specOf(x);
               return sp && !x.local;
             });
-            if (!persisteDepois) localSuspeito.push({ scn:s.id, nome:s.name, passo:i, sel:spec.sel });
+            if (!persisteDepois) localSuspeito.push({ scn:s.id, nome:s.name, stp:i, sel:spec.sel });
           }
         }
       } else if (typeof st.apply === "function"){
         const antesApply = JSON.stringify(app);
         const next = await st.apply(app, ex, api);
         if (next && typeof next === "object") app = next;
-        if (JSON.stringify(app) !== antesApply) mudouEstado.add(s.id + "|" + i);
+        if (JSON.stringify(app) !== antesApply) stateChanged.add(s.id + "|" + i);
       }
 
       if (cache && !(aoVivo && idxAcao >= 0 && i >= idxAcao)){
-        cache.set(chave(i), instantaneo(app, erros, pedidosBase + (rede.contador - contadorEntrada)));
+        cache.set(chave(i), instantaneo(app, errors_, pedidosBase + (rede.contador - contadorEntrada)));
       }
     }
 
-    larguraForcada = larguraAnterior;
+    forcedWidth = previousWidth;
     rede.origem = null;
-    const pgInicial = paginaDe(inicial0);
-    const pgFinal = paginaDe(app);
+    const pgInicial = pageOf(inicial0);
+    const pgFinal = pageOf(app);
     if (pgInicial && pgFinal && pgInicial !== pgFinal) chegadas.add(pgFinal);
 
-    return { app, ex, erros, pedidos: pedidosBase + (rede.contador - contadorEntrada) };
+    return { app, ex, errors_, pedidos: pedidosBase + (rede.contador - contadorEntrada) };
   }
 
-  function instantaneo(app, erros, pedidos){
-    return { app: clone(app), dados: JSON.stringify(cfg.dados), erros: erros.slice(), pedidos };
+  function instantaneo(app, errors_, pedidos){
+    return { app: clone(app), data_: JSON.stringify(cfg.data_), errors_: errors_.slice(), pedidos };
   }
 
   async function replay(){
     /* nada a cancelar: a suíte roda no mundo dela, dentro do iframe */
-    if (emVerificacao) cancelarVerificacao = true;   /* só no modo fallback */
+    if (verifying) cancelVerification = true;   /* só no modo fallback */
     return enfileirar(async () => {
     const s = scn(state.scenario);
     if (!s) return;
     rede.tela.length = 0;    /* o monitor mostra o que ESTA tela pediu */
     rede.emVooTela = 0;      /* pedido pendurado da tela anterior não conta aqui */
-    const r = await buildState(s, state.step, state.exemplo, !emVerificacao);
+    const r = await buildState(s, state.step, state.exemplo, !verifying);
     state.app = r.app;
     state.ex  = r.ex;
     });
@@ -1901,9 +1901,9 @@ const Paladira = (() => {
        garante que se vê o que foi verificado. Mas se a pessoa acabou de
        escolher um degrau à mão, a escolha dela manda: aí a troca de linha
        já aconteceu no seletor. */
-    const alvoLarg = larguraDeExemplo(scnById(scenarioId) || {}, state.exemplo);
+    const alvoLarg = sampleWidth(scnById(scenarioId) || {}, state.exemplo);
     if (alvoLarg && !escolhaManual && state.viewport !== alvoLarg.id
-        && ESCADA.some(d => d.id === alvoLarg.id)){
+        && LADDER.some(d => d.id === alvoLarg.id)){
       state.viewport = alvoLarg.id;
     }
     escolhaManual = false;
@@ -1913,15 +1913,15 @@ const Paladira = (() => {
        está dobrado e a barra parece não ter reagido */
     const alvo = scnById(scenarioId);
     if (alvo){
-      const pg = alvo.pagina || cfg.paginaPadrao || "única";
+      const pg = alvo.page || cfg.defaultPage || "única";
       gruposFechados.delete(pg);
-      if (estadoDe(alvo)) gruposFechados.delete(pg + "::estados");
+      if (stateOf(alvo)) gruposFechados.delete(pg + "::estados");
     }
 
     /* A primeira visita a um cenário refaz a jornada inteira e pode levar
        quase um segundo. Sem sinal nenhum, o clique parece perdido — então
        o passo já aparece marcado como aguardando, antes do await. */
-    aguardando = { id:scenarioId, passo:state.step };
+    aguardando = { id:scenarioId, stp:state.step };
     buildSidebar();
 
     await replay();
@@ -1966,7 +1966,7 @@ const Paladira = (() => {
     if (!raw) return false;
 
     const [path, query] = raw.split("?");
-    const [sid, stepSeg] = path.split("/");
+    const [sid, nextStep] = path.split("/");
     const target = scnById(sid);
     if (!target) return false;
 
@@ -1997,8 +1997,8 @@ const Paladira = (() => {
 
     const n = (target.steps || []).length;
     let step = -1;
-    if (stepSeg && stepSeg !== "dado"){
-      const p = parseInt(stepSeg, 10);
+    if (nextStep && nextStep !== "dado"){
+      const p = parseInt(nextStep, 10);
       if (!isNaN(p)) step = Math.max(-1, Math.min(n - 1, p - 1));
     }
     let exi = 0;
@@ -2047,14 +2047,14 @@ const Paladira = (() => {
      abre menu, Card inteiro vira alvo de clique, Badge se descarta. Então
      a auditoria não pergunta "que componente é este", e sim "esta tela
      está oferecendo algo para a pessoa operar". */
-  const PAPEIS_INTERATIVOS = ["button","link","checkbox","switch","tab","menuitem",
+  const INTERACTIVE_ROLES = ["button","link","checkbox","switch","tab","menuitem",
     "menuitemcheckbox","option","combobox","slider","radio","textbox","searchbox","spinbutton"];
 
   function temAfordancia(el){
     const tag = el.tagName.toLowerCase();
     if (["button","select","textarea","input"].indexOf(tag) > -1) return true;
     if (tag === "a" && el.getAttribute("href")) return true;
-    if (PAPEIS_INTERATIVOS.indexOf(el.getAttribute("role")) > -1) return true;
+    if (INTERACTIVE_ROLES.indexOf(el.getAttribute("role")) > -1) return true;
     if (el.hasAttribute("data-act") || el.hasAttribute("data-campo")) return true;
     if (el.hasAttribute("onclick")) return true;
     const ti = el.getAttribute("tabindex");
@@ -2089,7 +2089,7 @@ const Paladira = (() => {
      interação esteja reivindicada por algum componente do mapa. Div e
      span puramente estruturais (sem texto próprio) passam; o resto vira
      dívida explícita, com sugestão de qual componente usar. */
-  const SUGESTAO = {
+  const SUGGESTION = {
     h1:"Heading", h2:"Heading", h3:"Heading", h4:"Heading", h5:"Heading", h6:"Heading",
     p:"Paragraph", span:"Text", small:"Text", strong:"Text", em:"Text", b:"Text", i:"Text",
     label:"Label", button:"Button", a:"Link", img:"LazyImage", table:"Table",
@@ -2125,7 +2125,7 @@ const Paladira = (() => {
         onde: tag + cls,
         texto: (textoProprio(el) || "").slice(0, 34),
         opera,
-        sugestao: SUGESTAO[tag] || (opera ? "Button" : "Text")
+        sugestao: SUGGESTION[tag] || (opera ? "Button" : "Text")
       });
     });
     return soltos;
@@ -2140,12 +2140,12 @@ const Paladira = (() => {
      Precisa de motor de layout — container query não resolve sem alguém
      medir a caixa. No portão (jsdom) a regra se declara não verificável
      em vez de acusar falsamente. */
-  const PROPS_LAYOUT = ["display","flexDirection","flexWrap","gridTemplateColumns",
+  const LAYOUT_PROPS = ["display","flexDirection","flexWrap","gridTemplateColumns",
                         "position","order","justifyContent","alignItems","fontSize","textAlign"];
 
-  let temMotor = null;
-  function motorDeLayout(){
-    if (temMotor != null) return temMotor;
+  let hasEngine = null;
+  function layoutEngine(){
+    if (hasEngine != null) return hasEngine;
     try {
       const caixa = document.createElement("div");
       caixa.style.cssText = "position:absolute;left:-99999px;container-type:inline-size;width:200px";
@@ -2158,18 +2158,18 @@ const Paladira = (() => {
       document.body.appendChild(caixa);
       const vale = getComputedStyle(filho).display === "grid";
       caixa.remove(); regra.remove();
-      temMotor = vale;
-    } catch { temMotor = false; }
-    return temMotor;
+      hasEngine = vale;
+    } catch { hasEngine = false; }
+    return hasEngine;
   }
 
   /* o probe tem de acompanhar a largura vigente, senão a container query
      nunca muda e o Então mede sempre o mesmo arranjo */
   function ajustaProbe(probe){
-    if (probe) probe.style.width = larguraAtual().w + "px";
+    if (probe) probe.style.width = currentWidth().w + "px";
   }
 
-  function assinaturaLayout(root){
+  function layoutSignature(root){
     const partes = [];
     root.querySelectorAll("[data-estado],[data-colunas],[data-acao],.grade,.app-bd,.actions,.linha,.var,.card,.btn")
       .forEach((el, i) => {
@@ -2178,7 +2178,7 @@ const Paladira = (() => {
         try { cs = getComputedStyle(el); } catch { return; }
         if (!cs) return;
         const chave = (el.tagName + "." + String(el.className || "").split(" ")[0]).toLowerCase();
-        partes.push(chave + ":" + PROPS_LAYOUT.map(k => cs[k]).join("|"));
+        partes.push(chave + ":" + LAYOUT_PROPS.map(k => cs[k]).join("|"));
       });
     return partes.join("\u00a7");
   }
@@ -2188,28 +2188,28 @@ const Paladira = (() => {
      transbordo lateral, alvo pequeno demais para o dedo, texto miúdo,
      linha longa demais para ler, e conteúdo que some no estreito sem
      ninguém ter decidido isso. */
-  const ALVO_MINIMO = 44;     /* px — dedo médio */
-  const TEXTO_MINIMO = 12;    /* px */
-  const LINHA_MAXIMA = 75;    /* caracteres */
+  const MIN_TOUCH_TARGET = 44;     /* px — dedo médio */
+  const MIN_TEXT_SIZE = 12;    /* px */
+  const MAX_LINE_LENGTH = 75;    /* caracteres */
 
-  function medeFisica(root, degrau, largura){
+  function medeFisica(root, rung, width_){
     /* devolve pares [chave, detalhe]: a auditoria agrupa por chave e
        lista os degraus, senão o mesmo defeito vira seis avisos iguais */
     const achados = [];
-    const estreito = degrau.w <= 480;
+    const estreito = rung.w <= 480;
 
     /* transbordo lateral: rolagem horizontal é quase sempre acidente */
     const alvoRolagem = root.scrollWidth || 0;
-    if (alvoRolagem > largura + 2){
-      achados.push([`transborda na horizontal`, `${alvoRolagem - largura}px`]);
+    if (alvoRolagem > width_ + 2){
+      achados.push([`transborda na horizontal`, `${alvoRolagem - width_}px`]);
     }
 
     root.querySelectorAll("button,a[href],input,select,textarea,[role=button]").forEach(el => {
       if (el.disabled) return;
       const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
       if (!r || (!r.width && !r.height)) return;
-      if (estreito && (r.height < ALVO_MINIMO || r.width < ALVO_MINIMO)){
-        achados.push([`alvo ${alvoDe(el)} menor que ${ALVO_MINIMO}px para toque`,
+      if (estreito && (r.height < MIN_TOUCH_TARGET || r.width < MIN_TOUCH_TARGET)){
+        achados.push([`alvo ${alvoDe(el)} menor que ${MIN_TOUCH_TARGET}px para toque`,
           `${Math.round(r.width)}×${Math.round(r.height)}px`]);
       }
     });
@@ -2219,15 +2219,15 @@ const Paladira = (() => {
       try { cs = getComputedStyle(el); } catch { return; }
       if (!cs) return;
       const px = parseFloat(cs.fontSize) || 0;
-      if (px && px < TEXTO_MINIMO){
-        achados.push([`texto abaixo de ${TEXTO_MINIMO}px`, `${Math.round(px)}px`]);
+      if (px && px < MIN_TEXT_SIZE){
+        achados.push([`texto abaixo de ${MIN_TEXT_SIZE}px`, `${Math.round(px)}px`]);
       }
       /* linha longa demais só incomoda no largo, onde há espaço de sobra */
-      if (degrau.w >= 1024 && el.tagName === "P"){
+      if (rung.w >= 1024 && el.tagName === "P"){
         const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
         const ch = r && px ? r.width / (px * 0.5) : 0;
-        if (ch > LINHA_MAXIMA){
-          achados.push([`linha acima de ${LINHA_MAXIMA} caracteres`, `~${Math.round(ch)}ch`]);
+        if (ch > MAX_LINE_LENGTH){
+          achados.push([`linha acima de ${MAX_LINE_LENGTH} caracteres`, `~${Math.round(ch)}ch`]);
         }
       }
     });
@@ -2257,26 +2257,26 @@ const Paladira = (() => {
     return set;
   }
 
-  async function assinaturaNoDegrau(s, degrau, probe){
-    const antes = larguraForcada;
-    larguraForcada = { id:degrau.id, w:degrau.w, h:degrau.h };
-    probe.style.width = degrau.w + "px";
+  async function rungSignature(s, rung, probe){
+    const antes = forcedWidth;
+    forcedWidth = { id:rung.id, w:rung.w, h:rung.h };
+    probe.style.width = rung.w + "px";
     let sig = "", fisica = [], oferta = new Set();
     try {
       const built = await buildState(s, (s.steps || []).length - 1, 0);
       const shown = { ...state, app:built.app, ex:built.ex, scenario:s.id };
       if (cfg.mount)       cfg.mount(probe, shown);
       else if (cfg.render) probe.innerHTML = cfg.render(shown);
-      sig = assinaturaLayout(probe);
-      fisica = motorDeLayout() ? medeFisica(probe, degrau, degrau.w) : [];
+      sig = layoutSignature(probe);
+      fisica = layoutEngine() ? medeFisica(probe, rung, rung.w) : [];
       oferta = ofertaDe(probe);
     } catch { sig = "ERRO"; }
-    larguraForcada = antes;
+    forcedWidth = antes;
     return { sig, fisica, oferta };
   }
 
   async function auditar(){
-    const avisos = [];
+    const warnings = [];
     const infos = [];
     const fisicos = new Map();
     const feitos = new Set();          /* "tipo seletor" já exercitado */
@@ -2290,7 +2290,7 @@ const Paladira = (() => {
 
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = larguraAtual().w + "px";
+    probe.style.width = currentWidth().w + "px";
     document.body.appendChild(probe);
 
     const ctxAuditoria = clone(state.ctx);
@@ -2312,7 +2312,7 @@ const Paladira = (() => {
         if (natureza(st) !== "acao") return;
         const k = kindOf(st);
         const temEntao = steps.slice(i + 1).some(x => natureza(x) === "verificacao");
-        if (!temEntao) avisos.push(`${s.name}: "${k.text}" não tem Então depois — a ação não é verificada`);
+        if (!temEntao) warnings.push(`${s.name}: "${k.text}" não tem Então depois — a ação não é verificada`);
       });
 
       const rows = isOutline(s) ? s.exemplos.linhas.map((_, i) => i) : [0];
@@ -2320,24 +2320,24 @@ const Paladira = (() => {
       /* Dado literal com estrutura de domínio é dado inventado na tela.
          A regra: o cenário busca o que mostra. `semRede: true` isenta
          telas que de fato não dependem de servidor. */
-      if (!s.semRede && estadoDe(s) !== "carregando"
+      if (!s.semRede && stateOf(s) !== "carregando"
           && s.given && s.given.state && typeof s.given.state !== "function"){
         const v = s.given.state;
         const temEstrutura = Object.keys(v || {}).some(k =>
           Array.isArray(v[k]) || (v[k] && typeof v[k] === "object"));
         if (temEstrutura){
-          avisos.push(`${s.name}: o Dado traz dado pronto no código — busque pela API `
+          warnings.push(`${s.name}: o Dado traz dado pronto no código — busque pela API `
             + `(state: async (ex, api) => …) ou marque semRede: true`);
         }
       }
 
       for (const ri of rows){
-        larguraForcada = larguraDeExemplo(s, ri);
+        forcedWidth = sampleWidth(s, ri);
         ajustaProbe(probe);
         const built = await buildState(s, steps.length - 1, ri);
-        built.erros.forEach(e => avisos.push(`${s.name}: passo ${e.passo + 1} — ${e.erro}`));
-        if (!s.semRede && estadoDe(s) !== "carregando" && !built.pedidos){
-          avisos.push(`${s.name}: nenhum pedido à rede — de onde veio o dado da tela?`);
+        built.errors_.forEach(e => warnings.push(`${s.name}: passo ${e.stp + 1} — ${e.error_}`));
+        if (!s.semRede && stateOf(s) !== "carregando" && !built.pedidos){
+          warnings.push(`${s.name}: nenhum pedido à rede — de onde veio o dado da tela?`);
         }
 
         /* varre TODA a jornada, não só o destino: numa jornada o botão de
@@ -2388,17 +2388,17 @@ const Paladira = (() => {
           });
         }
         }
-        larguraForcada = null;
+        forcedWidth = null;
       }
     }
     state.ctx = ctxAuditoria;
     probe.remove();
 
     const verbo = { clique:"clica", preenche:"preenche", escolhe:"escolhe em", alterna:"alterna" };
-    alvos.forEach((cenarios, chave) => {
+    alvos.forEach((scens, chave) => {
       if (feitos.has(chave)) return;
       const [tipo, ...resto] = chave.split(" ");
-      avisos.push(`${resto.join(" ")} aparece em ${[...cenarios].join(", ")} mas nenhum passo ${verbo[tipo]} nele`);
+      warnings.push(`${resto.join(" ")} aparece em ${[...scens].join(", ")} mas nenhum passo ${verbo[tipo]} nele`);
     });
 
     /* ---------- a tela muda por degrau? ---------- */
@@ -2410,36 +2410,36 @@ const Paladira = (() => {
       probeL.className = "h-probe";
       document.body.appendChild(probeL);
 
-      const semMotor = !motorDeLayout();
-      if (semMotor){
-        avisos.push("arranjo e medidas por degrau não verificáveis aqui (sem motor de layout) — "
+      const noEngine = !layoutEngine();
+      if (noEngine){
+        warnings.push("arranjo e medidas por degrau não verificáveis aqui (sem motor de layout) — "
           + "abra no navegador; o sumiço de conteúdo abaixo ainda vale");
       }
       {
-        const porPag = {};
+        const perPage = {};
         cfg.scenarios.forEach(x => {
-          if (estadoDe(x)) return;                   /* estado não representa arranjo */
-          const pg = x.pagina || cfg.paginaPadrao || "única";
-          (porPag[pg] = porPag[pg] || []).push(x);
+          if (stateOf(x)) return;                   /* estado não representa arranjo */
+          const pg = x.page || cfg.defaultPage || "única";
+          (perPage[pg] = perPage[pg] || []).push(x);
         });
 
-        for (const pg of Object.keys(porPag)){
+        for (const pg of Object.keys(perPage)){
           /* Olha algumas jornadas da página, não só a primeira: uma que
              termina no estado vazio não tem arranjo para comparar, e
              julgar a página por ela acusaria falso. Basta uma jornada
              mostrar arranjos diferentes para a página ter respondido. */
-          const candidatas = porPag[pg].slice(0, cfg.jornadasDeLayout || 3);
+          const candidatas = perPage[pg].slice(0, cfg.layoutJourneys || 3);
           let melhor = { distintas:1, herdados:[], nome:candidatas[0] && candidatas[0].name };
 
           for (const s of candidatas){
             state.ctx = contextoDe(s);
             const sigs = [];
-            for (const d of ESCADA) sigs.push({ d, ...(await assinaturaNoDegrau(s, d, probeL)) });
+            for (const d of LADDER) sigs.push({ d, ...(await rungSignature(s, d, probeL)) });
 
             sigs.forEach(x => (x.fisica || []).forEach(([chave, detalhe]) => {
               const k = `${pg}: ${chave}`;
-              const reg = fisicos.get(k) || { degraus:[], detalhes:new Set() };
-              if (reg.degraus.indexOf(x.d.id) < 0) reg.degraus.push(x.d.id);
+              const reg = fisicos.get(k) || { rungs:[], detalhes:new Set() };
+              if (reg.rungs.indexOf(x.d.id) < 0) reg.rungs.push(x.d.id);
               reg.detalhes.add(detalhe);
               fisicos.set(k, reg);
             }));
@@ -2466,13 +2466,13 @@ const Paladira = (() => {
             }
           }
 
-          if (semMotor){ /* sem motor não há arranjo para julgar */ }
+          if (noEngine){ /* sem motor não há arranjo para julgar */ }
           else if (melhor.distintas === 1){
-            avisos.push(`a página "${pg}" desenha o MESMO arranjo em toda a escada `
-              + `(${ESCADA.map(d => d.id).join(", ")}) — coube, mas não respondeu`);
+            warnings.push(`a página "${pg}" desenha o MESMO arranjo em toda a escada `
+              + `(${LADDER.map(d => d.id).join(", ")}) — coube, mas não respondeu`);
           } else {
             if (melhor.distintas < (cfg.arranjosMinimos || 2)){
-              avisos.push(`a página "${pg}" tem só ${melhor.distintas} arranjo(s) em ${ESCADA.length} degraus`);
+              warnings.push(`a página "${pg}" tem só ${melhor.distintas} arranjo(s) em ${LADDER.length} degraus`);
             }
             if (melhor.herdados.length){
               infos.push(`"${pg}": ${melhor.distintas} arranjos (via ${melhor.nome}); `
@@ -2484,9 +2484,9 @@ const Paladira = (() => {
       }
       probeL.remove();
       fisicos.forEach((reg, k) => {
-        if (typeof reg === "string"){ avisos.push(reg); return; }
-        avisos.push(`${k} — ${[...reg.detalhes].slice(0, 3).join(", ")} `
-          + `(em ${reg.degraus.join(", ")})`);
+        if (typeof reg === "string"){ warnings.push(reg); return; }
+        warnings.push(`${k} — ${[...reg.detalhes].slice(0, 3).join(", ")} `
+          + `(em ${reg.rungs.join(", ")})`);
       });
     }
 
@@ -2501,47 +2501,47 @@ const Paladira = (() => {
          @conflito     o servidor recusa: e-mail já existe, limite, 422
          @recuperacao  quebra no meio e a pessoa se recupera sozinha
          @retorno      quem já usou volta: sai da tela e entra de novo   */
-    if (cfg.jornadas !== false){
-      const TIPOS = ["feliz", "conflito", "recuperacao", "retorno"];
+    if (cfg.journeys !== false){
+      const TYPES = ["feliz", "conflito", "recuperacao", "retorno"];
       const tipoDe = s => (s.tags || []).map(t => t.replace(/^@/, ""))
-                                        .find(t => TIPOS.indexOf(t) > -1) || null;
+                                        .find(t => TYPES.indexOf(t) > -1) || null;
 
-      const porPagina = {};
+      const byPage = {};
       cfg.scenarios.forEach(s => {
-        const pg = s.pagina || cfg.paginaPadrao || "única";
-        (porPagina[pg] = porPagina[pg] || []).push(s);
+        const pg = s.page || cfg.defaultPage || "única";
+        (byPage[pg] = byPage[pg] || []).push(s);
       });
 
-      for (const pg of Object.keys(porPagina)){
-        const doGrupo = porPagina[pg];
+      for (const pg of Object.keys(byPage)){
+        const doGrupo = byPage[pg];
         const tipos = new Set(doGrupo.map(tipoDe).filter(Boolean));
 
         if (!tipos.has("feliz")){
-          avisos.push(`a página "${pg}" não tem jornada @feliz — falta o caminho `
+          warnings.push(`a página "${pg}" não tem jornada @feliz — falta o caminho `
             + `que dá certo de ponta a ponta`);
         }
         if (!["conflito", "recuperacao", "retorno"].some(t => tipos.has(t))){
-          avisos.push(`a página "${pg}" só tem caminho feliz — falta pelo menos uma `
+          warnings.push(`a página "${pg}" só tem caminho feliz — falta pelo menos uma `
             + `jornada @conflito, @recuperacao ou @retorno`);
         }
 
         /* assinatura igual = cenário clonado com outro nome */
-        const assinaturas = {};
+        const signatures = {};
         doGrupo.forEach(s => {
           const sig = (s.steps || []).map(st => { const sp = specOf(st); return sp ? sp.tipo + " " + sp.sel : null; })
                                      .filter(Boolean).join(" > ");
           if (!sig) return;
-          if (assinaturas[sig]){
-            avisos.push(`"${s.name}" e "${assinaturas[sig]}" percorrem exatamente os mesmos `
+          if (signatures[sig]){
+            warnings.push(`"${s.name}" e "${signatures[sig]}" percorrem exatamente os mesmos `
               + `controles — são o mesmo cenário com nomes diferentes`);
-          } else assinaturas[sig] = s.name;
+          } else signatures[sig] = s.name;
         });
 
         /* pelo menos uma jornada de ponta a ponta por página */
         const maisLonga = Math.max(0, ...doGrupo.map(s =>
           (s.steps || []).filter(st => specOf(st) || st.aguarda).length));
         if (maisLonga < (cfg.acoesPontaAPonta || 3)){
-          avisos.push(`a página "${pg}" não tem nenhuma jornada de ponta a ponta `
+          warnings.push(`a página "${pg}" não tem nenhuma jornada de ponta a ponta `
             + `(a maior tem ${maisLonga} ações) — falta o percurso completo`);
         }
       }
@@ -2551,36 +2551,36 @@ const Paladira = (() => {
         state.ctx = contextoDe(s);
         const tipo = tipoDe(s);
         if (!tipo) continue;
-        const passos = (s.steps || []).length;
+        const stps = (s.steps || []).length;
 
-        const marcasDeErro = el => !!(el.querySelector('[data-erro]')
+        const errorMarks = el => !!(el.querySelector('[data-erro]')
           || el.querySelector('[data-estado="erro"]') || el.querySelector('[data-pg="erro"]'));
 
-        larguraForcada = larguraDeExemplo(s, 0);
+        forcedWidth = sampleWidth(s, 0);
         ajustaProbe(probe);
         let fim = null, meio = false;
-        for (let k = -1; k < passos; k++){
+        for (let k = -1; k < stps; k++){
           try {
             const b = await buildState(s, k, 0);
             const shown = { ...state, app:b.app, ex:b.ex, scenario:s.id };
             if (cfg.mount)       cfg.mount(probe, shown);
             else if (cfg.render) probe.innerHTML = cfg.render(shown);
-            if (marcasDeErro(probe)) meio = true;
-            if (k === passos - 1) fim = marcasDeErro(probe);
+            if (errorMarks(probe)) meio = true;
+            if (k === stps - 1) fim = errorMarks(probe);
           } catch { /* já acusado em outro lugar */ }
         }
 
-        larguraForcada = null;
+        forcedWidth = null;
         if (tipo === "feliz" && (fim || meio)){
-          avisos.push(`${s.name}: marcado @feliz mas a tela mostra erro no caminho — `
+          warnings.push(`${s.name}: marcado @feliz mas a tela mostra erro no caminho — `
             + `caminho feliz não passa por falha`);
         }
         if (tipo === "conflito" && !fim){
-          avisos.push(`${s.name}: marcado @conflito mas termina sem erro na tela — `
+          warnings.push(`${s.name}: marcado @conflito mas termina sem erro na tela — `
             + `o conflito precisa aparecer para quem usa`);
         }
         if (tipo === "recuperacao" && !(meio && !fim)){
-          avisos.push(`${s.name}: marcado @recuperacao mas ${meio ? "termina no erro" : "nunca falha"} — `
+          warnings.push(`${s.name}: marcado @recuperacao mas ${meio ? "termina no erro" : "nunca falha"} — `
             + `recuperação é quebrar no meio e sair inteiro do outro lado`);
         }
       }
@@ -2591,11 +2591,11 @@ const Paladira = (() => {
       (s.steps || []).forEach((st, i) => {
         const nat = natureza(st);
         if (nat === "acao" && st.then != null){
-          avisos.push(`${s.name}: passo ${i + 1} está escrito como "Então" mas executa uma ação `
+          warnings.push(`${s.name}: passo ${i + 1} está escrito como "Então" mas executa uma ação `
             + `— Então descreve o que se vê; a ação é Quando`);
         }
         if (nat === "verificacao" && st.when != null){
-          avisos.push(`${s.name}: passo ${i + 1} está escrito como "Quando" mas só verifica `
+          warnings.push(`${s.name}: passo ${i + 1} está escrito como "Quando" mas só verifica `
             + `— Quando é a ação; o que se observa é Então`);
         }
       });
@@ -2605,8 +2605,8 @@ const Paladira = (() => {
        "Dado que o usuário não pagou / Então a tela fica vazia" não é
        cenário: é um print com legenda. Cenário é o caminho — chegar na
        tela, agir, e ver o que mudou. As regras abaixo cobram isso. */
-    if (cfg.jornadas !== false){
-      const MIN_ACOES = cfg.minAcoes || 2;
+    if (cfg.journeys !== false){
+      const MIN_ACTIONS = cfg.minAcoes || 2;
 
       /* E herda a palavra anterior: um E depois de Então É um Então.
          Então ação escrita como E-de-Então mente sobre o que o passo faz.
@@ -2619,36 +2619,36 @@ const Paladira = (() => {
           if (k.kw === "Quando" || k.kw === "Então" || k.kw === "Dado") herdado = k.kw;
           const efetivo = (k.kw === "E" || k.kw === "Mas") ? herdado : k.kw;
           const agiu = !!(specOf(st) || st.aguarda);
-          const verificou = typeof st.check === "function";
+          const verified = typeof st.check === "function";
 
           /* mudou o estado? então é Quando, sempre. Não importa se veio de
              clique, de apply ou da resposta que chegou: passo que altera o
              mundo é ação, e ação em Gherkin se escreve Quando. */
-          if (mudouEstado.has(s.id + "|" + i) && efetivo !== "Quando"){
-            avisos.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") muda o estado, `
+          if (stateChanged.has(s.id + "|" + i) && efetivo !== "Quando"){
+            warnings.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") muda o estado, `
               + `então é Quando — está escrito como ${k.kw}`
               + (k.kw === "E" ? ` depois de ${herdado}` : ""));
           }
           if (agiu && efetivo === "Então"){
-            avisos.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") age, mas está escrito `
+            warnings.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") age, mas está escrito `
               + `como ${k.kw} depois de Então — E herda o Então, use Quando`);
           }
-          if (verificou && efetivo === "Quando"){
-            avisos.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") verifica, mas está `
+          if (verified && efetivo === "Quando"){
+            warnings.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") verifica, mas está `
               + `escrito como ${k.kw} depois de Quando — use Então`);
           }
         });
       });
 
       cfg.scenarios.forEach(s => {
-        if (s.jornada === false) return;
+        if (s.journey === false) return;
         const steps = s.steps || [];
         const acoes = steps.map((st, i) => ({ st, i, spec:specOf(st) || (st.aguarda ? { sel:"(resposta)" } : null) }))
                            .filter(x => x.spec);
         const nome = s.name;
 
-        if (acoes.length < MIN_ACOES){
-          avisos.push(`${nome}: ${acoes.length} ação(ões) — não é jornada. `
+        if (acoes.length < MIN_ACTIONS){
+          warnings.push(`${nome}: ${acoes.length} ação(ões) — não é jornada. `
             + `Mostre o caminho inteiro (chegar na tela, agir, ver o resultado), `
             + `não só o estado final`);
         }
@@ -2658,30 +2658,30 @@ const Paladira = (() => {
         const primeiraAcao = acoes.length ? acoes[0].i : Infinity;
         const temEntaoDepois = steps.some((st, i) => i > primeiraAcao && typeof st.check === "function");
         if (acoes.length && !temEntaoDepois){
-          avisos.push(`${nome}: nenhum Então depois da última ação — `
+          warnings.push(`${nome}: nenhum Então depois da última ação — `
             + `o cenário age e não verifica o que aconteceu`);
         }
 
         /* clicar três vezes no mesmo botão não é percurso */
         const alvos = new Set(acoes.map(a => a.spec.sel));
-        if (acoes.length >= MIN_ACOES && alvos.size < 2){
-          avisos.push(`${nome}: todas as ações são no mesmo alvo (${[...alvos][0]}) — `
+        if (acoes.length >= MIN_ACTIONS && alvos.size < 2){
+          warnings.push(`${nome}: todas as ações são no mesmo alvo (${[...alvos][0]}) — `
             + `uma jornada passa por controles diferentes`);
         }
       });
 
       /* toda página precisa de pelo menos um cenário que CHEGUE nela
          vindo de outra: senão ninguém especificou como se entra ali */
-      const paginas = {};
+      const pages = {};
       visible().forEach(s => {
-        const pg = s.pagina || cfg.paginaPadrao || "única";
-        paginas[pg] = paginas[pg] || { chegou:false, total:0 };
-        paginas[pg].total++;
+        const pg = s.page || cfg.defaultPage || "única";
+        pages[pg] = pages[pg] || { chegou:false, total:0 };
+        pages[pg].total++;
       });
-      chegadas.forEach(pg => { if (paginas[pg]) paginas[pg].chegou = true; });
-      Object.keys(paginas).forEach(pg => {
-        if (!paginas[pg].chegou && Object.keys(paginas).length > 1){
-          avisos.push(`nenhum cenário chega na página "${pg}" vindo de outra tela — `
+      chegadas.forEach(pg => { if (pages[pg]) pages[pg].chegou = true; });
+      Object.keys(pages).forEach(pg => {
+        if (!pages[pg].chegou && Object.keys(pages).length > 1){
+          warnings.push(`nenhum cenário chega na página "${pg}" vindo de outra tela — `
             + `falta a jornada de entrada (navegar até ali e só então agir)`);
         }
       });
@@ -2691,34 +2691,34 @@ const Paladira = (() => {
        pontas: dando certo e dando errado. Uma rota só exercitada no
        sucesso é metade do comportamento — o tratamento de erro fica
        para alguém descobrir em produção. */
-    if (cfg.rotas && cfg.rotas.length && cfg.rotasCobertas !== false){
-      const porRota = {};
-      cfg.rotas.forEach(r => {
-        porRota[(r.metodo || "GET").toUpperCase() + " " + r.caminho] =
-          { ok:new Set(), erro:new Set(), origens:new Set(), naCarga: !!r.naCarga };
+    if (cfg.routes && cfg.routes.length && cfg.coveredRoutes !== false){
+      const byRoute = {};
+      cfg.routes.forEach(r => {
+        byRoute[(r.metodo || "GET").toUpperCase() + " " + r.caminho] =
+          { ok:new Set(), error_:new Set(), origens:new Set(), naCarga: !!r.naCarga };
       });
-      Object.keys(rede.rotasVistas).forEach(id => {
-        const v = rede.rotasVistas[id], alvo = porRota[id];
+      Object.keys(rede.seenRoutes).forEach(id => {
+        const v = rede.seenRoutes[id], alvo = byRoute[id];
         if (!alvo) return;
         v.ok.forEach(n => alvo.ok.add(n));
-        v.erro.forEach(n => alvo.erro.add(n));
+        v.error_.forEach(n => alvo.error_.add(n));
         v.origens.forEach(o => alvo.origens.add(o));
       });
 
-      Object.keys(porRota).forEach(id => {
-        const r = porRota[id];
-        if (!r.ok.size && !r.erro.size){
-          avisos.push(`${id} está declarada mas nenhum cenário a chama — rota morta?`);
+      Object.keys(byRoute).forEach(id => {
+        const r = byRoute[id];
+        if (!r.ok.size && !r.error_.size){
+          warnings.push(`${id} está declarada mas nenhum cenário a chama — rota morta?`);
           return;
         }
-        if (!r.ok.size)   avisos.push(`${id} só aparece falhando — falta o cenário de sucesso`);
-        if (!r.erro.size) avisos.push(`${id} só aparece dando certo — falta o cenário de erro `
+        if (!r.ok.size)   warnings.push(`${id} só aparece falhando — falta o cenário de sucesso`);
+        if (!r.error_.size) warnings.push(`${id} só aparece dando certo — falta o cenário de erro `
           + `(rede:{ "${id}": 500 })`);
         /* atribuição: toda chamada nasce de um passo. Só no Dado é
            carregamento de tela — legítimo, mas tem de ser declarado com
            naCarga:true, senão ninguém sabe quem dispara aquilo. */
         if (!r.origens.has("passo") && !r.naCarga){
-          avisos.push(`${id} só é chamada pelo Dado — se ela carrega junto com a tela, `
+          warnings.push(`${id} só é chamada pelo Dado — se ela carrega junto com a tela, `
             + `marque naCarga:true na rota; se não, falta o Quando que a dispara`);
         }
       });
@@ -2726,27 +2726,27 @@ const Paladira = (() => {
 
     /* a página precisa dos três estados. Faltar um não é estilo: é um
        caminho que ninguém desenhou e que o usuário vai encontrar. */
-    if (cfg.estados !== false){
+    if (cfg.states !== false){
       /* cada página tem o seu AsyncStateContainer, então a exigência é
          por página: uma lista sem estado vazio é tão furada quanto um
          detalhe sem estado de erro */
-      const paginas = {};
+      const pages = {};
       cfg.scenarios.forEach(x => {
-        const pg = x.pagina || cfg.paginaPadrao || "única";
-        (paginas[pg] = paginas[pg] || {})[estadoDe(x) || "_"] = x;
+        const pg = x.page || cfg.defaultPage || "única";
+        (pages[pg] = pages[pg] || {})[stateOf(x) || "_"] = x;
       });
 
-      Object.keys(paginas).forEach(pg => {
-        const cobertos = paginas[pg];
-        ESTADOS.forEach(e => {
+      Object.keys(pages).forEach(pg => {
+        const cobertos = pages[pg];
+        STATES.forEach(e => {
           if (!cobertos[e]){
-            avisos.push(`a página "${pg}" não tem cenário de ${e} — todo AsyncStateContainer `
+            warnings.push(`a página "${pg}" não tem cenário de ${e} — todo AsyncStateContainer `
               + `precisa de carregando, vazio e erro (marque um cenário com @${e} e pagina:"${pg}")`);
           }
         });
-        const sErro = cobertos.erro;
-        if (sErro && !sErro.rede && !sErro.falhaNasFixtures){
-          avisos.push(`${sErro.name}: marcado @erro mas não força falha em nenhuma rota `
+        const errStr = cobertos.error_;
+        if (errStr && !errStr.rede && !errStr.fixtureFailure){
+          warnings.push(`${errStr.name}: marcado @erro mas não força falha em nenhuma rota `
             + `— declare rede:{ "GET /api/…": 500 }`);
         }
       });
@@ -2756,53 +2756,53 @@ const Paladira = (() => {
       const temASC = Object.values(cfg.primitivas || {}).some(v =>
         (typeof v === "string" ? v : v && v.nome) === "AsyncStateContainer");
       if (cfg.primitivas && !temASC){
-        avisos.push(`nenhum seletor mapeia AsyncStateContainer — a tela está `
+        warnings.push(`nenhum seletor mapeia AsyncStateContainer — a tela está `
           + `desenhando carregando/vazio/erro à mão?`);
       }
     }
 
     crus.forEach(m => {
-      avisos.push(`marcação crua: ${m.onde}${m.texto ? ` ("${m.texto}")` : ""} `
+      warnings.push(`marcação crua: ${m.onde}${m.texto ? ` ("${m.texto}")` : ""} `
         + `não pertence a nenhum componente — use ${m.sugestao}`);
     });
 
     const fachada = new Set();
-    rede.log.forEach(l => { if (l.naoPersistiu && l.rotaId) fachada.add(l.rotaId); });
+    rede.log.forEach(l => { if (l.naoPersistiu && l.routeId) fachada.add(l.routeId); });
     fachada.forEach(id => {
-      avisos.push(`${id} respondeu 200 mas não alterou as fixtures — a rota é fachada, `
+      warnings.push(`${id} respondeu 200 mas não alterou as fixtures — a rota é fachada, `
         + `então "salvo" é mentira: recarregar desfaz`);
     });
 
     const vistos = new Set();
     mudancasMudas.splice(0).forEach(m => {
-      const k = m.scn + "#" + m.passo;
+      const k = m.scn + "#" + m.stp;
       if (vistos.has(k)) return;
       vistos.add(k);
-      avisos.push(`${m.nome}: passo ${m.passo + 1} mudou a tela ao ${m.tipo} ${m.sel} `
+      warnings.push(`${m.nome}: passo ${m.stp + 1} mudou a tela ao ${m.tipo} ${m.sel} `
         + `mas não fez nenhum pedido — a alteração se perde ao recarregar? `
         + `(se for só de interface, marque local: true no passo)`);
     });
 
     const vistosRot = new Set();
     rotulosMentirosos.splice(0).forEach(m => {
-      const k = m.scn + "#" + m.passo;
+      const k = m.scn + "#" + m.stp;
       if (vistosRot.has(k)) return;
       vistosRot.add(k);
-      avisos.push(`${m.nome}: o controle "${m.rotulo}" diz "${m.verbo}" mas o passo ${m.passo + 1} `
+      warnings.push(`${m.nome}: o controle "${m.rotulo}" diz "${m.verbo}" mas o passo ${m.stp + 1} `
         + `não fez pedido nenhum — rótulo que promete gravar tem de gravar`);
     });
 
     const vistosLocal = new Set();
     localSuspeito.splice(0).forEach(m => {
-      const k = m.scn + "#" + m.passo;
+      const k = m.scn + "#" + m.stp;
       if (vistosLocal.has(k)) return;
       vistosLocal.add(k);
-      avisos.push(`${m.nome}: passo ${m.passo + 1} está marcado local: true mas alterou dado `
+      warnings.push(`${m.nome}: passo ${m.stp + 1} está marcado local: true mas alterou dado `
         + `do servidor em ${m.sel}, e nenhum passo depois persiste — ou salve, ou não é local`);
     });
 
     semHandler.forEach(sel => {
-      avisos.push(`${sel} parece operável na tela mas nenhum handler responde — afordância sem ação`);
+      warnings.push(`${sel} parece operável na tela mas nenhum handler responde — afordância sem ação`);
     });
 
     /* Cada Paladira.on é um onClick/onChange. Três estados diferentes, três
@@ -2813,16 +2813,16 @@ const Paladira = (() => {
     handlers.forEach(h => {
       const chave = h.type + " " + h.selector;
       if (!handlersUsados.has(h.selector)){
-        avisos.push(`handler ${h.type} ${h.selector} nunca casa com a tela — código morto?`);
-      } else if (!exercitados.has(chave)){
-        avisos.push(`handler ${h.type} ${h.selector} existe e casa com a tela, mas nenhum passo o dispara — comportamento sem cobertura`);
+        warnings.push(`handler ${h.type} ${h.selector} nunca casa com a tela — código morto?`);
+      } else if (!exercised.has(chave)){
+        warnings.push(`handler ${h.type} ${h.selector} existe e casa com a tela, mas nenhum passo o dispara — comportamento sem cobertura`);
       }
     });
 
     return {
-      avisos: avisos.concat(problemas.splice(0)),
+      warnings: warnings.concat(problemas.splice(0)),
       infos,
-      cobertura: { total: handlers.length, exercitados: exercitados.size }
+      coverage: { total: handlers.length, exercised: exercised.size }
     };
   }
 
@@ -2836,12 +2836,12 @@ const Paladira = (() => {
      Worker não serve: a verificação DESENHA o render de verdade e
      pergunta ao DOM se a tela cumpriu o Então. Worker não tem DOM.
      O iframe tem — e ainda é o mesmo código, sem simulação. */
-  let iframeVerif = null;
+  let verifyIframe = null;
 
-  function verificarIsolado(){
+  function verifyIsolated(){
     return new Promise(resolve => {
       try {
-        if (iframeVerif) iframeVerif.remove();
+        if (verifyIframe) verifyIframe.remove();
         const v = vp();
         const marca = "<scr" + "ipt>window.__PALADIRA_FILHO=1;</scr" + "ipt>";
         const copia = "<!DOCTYPE html>" +
@@ -2851,7 +2851,7 @@ const Paladira = (() => {
         ifr.setAttribute("aria-hidden", "true");
         ifr.style.cssText = "position:absolute;left:-99999px;top:0;border:0;"
                           + "width:" + Math.max(1000, v.w) + "px;height:" + Math.max(800, v.h) + "px";
-        iframeVerif = ifr;
+        verifyIframe = ifr;
 
         /* Se o iframe não der sinal de vida, a suíte roda no mesmo mundo,
            como antes. Ambiente que bloqueia iframe (ou srcdoc sem script)
@@ -2860,7 +2860,7 @@ const Paladira = (() => {
         const desistir = setTimeout(() => {
           if (vivo) return;
           window.removeEventListener("message", aoReceber);
-          ifr.remove(); iframeVerif = null;
+          ifr.remove(); verifyIframe = null;
           resolve(null);
         }, cfg.esperaIframe || 6000);
 
@@ -2872,7 +2872,7 @@ const Paladira = (() => {
           if (m.tipo === "resultado"){
             clearTimeout(desistir);
             window.removeEventListener("message", aoReceber);
-            ifr.remove(); iframeVerif = null;
+            ifr.remove(); verifyIframe = null;
             resolve(m.suite);
           }
         };
@@ -2889,11 +2889,11 @@ const Paladira = (() => {
 
   let progressoExterno = () => {};
   let rodando = false, rodandoFeitos = 0;
-  let modoVerificacao = "—";
+  let verificationMode = "—";
 
   /* Roda a suíte isolada e adota o resultado. Como nada é compartilhado,
      não há o que cancelar: a pessoa continua navegando enquanto roda. */
-  async function verificar(){
+  async function verify(){
     const btn = $("h-verify");
     const total = cfg.scenarios.length;
     const pill = $("h-checks");
@@ -2908,17 +2908,17 @@ const Paladira = (() => {
     if (btn){ btn.setAttribute("aria-busy", "true"); btn.textContent = "Verificando…"; }
     progressoExterno(0, total);
 
-    const r = await verificarIsolado();
+    const r = await verifyIsolated();
     rodando = false;
     progressoExterno = () => {};
     if (btn){ btn.removeAttribute("aria-busy"); btn.textContent = "Verificar"; }
 
     if (!r){
       /* ambiente sem iframe: roda no mesmo mundo, como antes */
-      modoVerificacao = "mesmo mundo (sem iframe)";
+      verificationMode = "mesmo mundo (sem iframe)";
       return verifyAll();
     }
-    modoVerificacao = "isolado no iframe";
+    verificationMode = "isolado no iframe";
     suite = r;
     interrompida = false;
     parcial = null;
@@ -2931,18 +2931,18 @@ const Paladira = (() => {
     return enfileirar(async () => {
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = larguraAtual().w + "px";
+    probe.style.width = currentWidth().w + "px";
     document.body.appendChild(probe);
 
     const by = parcial ? parcial.by : {};
     let ok = parcial ? parcial.ok : 0;
     let bad = parcial ? parcial.bad : 0;
-    const falhas = parcial ? parcial.falhas : [];
+    const failures = parcial ? parcial.failures : [];
 
-    emVerificacao = true;
-    cancelarVerificacao = false;
+    verifying = true;
+    cancelVerification = false;
     interrompida = false;
-    rede.rotasVistas = {};
+    rede.seenRoutes = {};
 
     /* 20 segundos sem sinal de vida parece travado: a pílula vira contador
        e o botão fica ocupado enquanto a suíte anda */
@@ -2963,11 +2963,11 @@ const Paladira = (() => {
     if (btn){ btn.setAttribute("aria-busy", "true"); btn.textContent = "Verificando…"; }
     progresso();
     await new Promise(r => setTimeout(r, 0));   /* deixa a tela pintar antes de travar */
-    exercitados.clear();   /* evidência vale por rodada inteira */
+    exercised.clear();   /* evidência vale por rodada inteira */
     memo = new Map();      /* rodada nova começa com o cache limpo */
     let idxAtual = inicioIdx;
     for (const s of todos.slice(inicioIdx)){
-      if (cancelarVerificacao) break;
+      if (cancelVerification) break;
       state.ctx = contextoDe(s);
       by[s.id] = {};
       feitos++; idxAtual++; progresso();
@@ -2976,37 +2976,37 @@ const Paladira = (() => {
       const rows = isOutline(s) ? s.exemplos.linhas.map((_, i) => i) : [0];
 
       for (const ri of rows){
-        const passos = s.steps || [];
-        for (let i = 0; i < passos.length; i++){
-          const st = passos[i];
+        const stps = s.steps || [];
+        for (let i = 0; i < stps.length; i++){
+          const st = stps[i];
           if (typeof st.check !== "function") continue;
           /* a largura da linha vale também na hora de desenhar e conferir,
              não só durante a reprodução — senão o Então mede a tela errada */
-          larguraForcada = larguraDeExemplo(s, ri);
+          forcedWidth = sampleWidth(s, ri);
           ajustaProbe(probe);
           const built = await buildState(s, i, ri);
           const probeState = { ...state, app:built.app, ex:built.ex, scenario:s.id, step:i, exemplo:ri };
           /* se um passo anterior não conseguiu agir, o motivo real é aquele,
              não a asserção que veio depois */
-          const erroPasso = (built.erros || []).map(e => e.erro)[0];
+          const stepError = (built.errors_ || []).map(e => e.error_)[0];
 
           let passed, motivo = null;
           try {
             if (cfg.mount)       cfg.mount(probe, probeState);
             else if (cfg.render) probe.innerHTML = cfg.render(probeState);
             passed = !!st.check(built.app, probe, probeState);
-            if (!passed) motivo = erroPasso || "a verificação do Então devolveu falso";
+            if (!passed) motivo = stepError || "a verificação do Então devolveu falso";
           } catch (e){
             passed = false;
-            motivo = erroPasso || ("quebrou ao desenhar: " + e.message);
+            motivo = stepError || ("quebrou ao desenhar: " + e.message);
           }
 
           passed ? ok++ : bad++;
           if (!passed){
             const k = kindOf(st);
-            falhas.push({
-              cenario:s.name, tags:(s.tags || []).join(" "),
-              passo:i + 1, kw:k.kw, texto:subst(k.text, built.ex),
+            failures.push({
+              scen:s.name, tags:(s.tags || []).join(" "),
+              stp:i + 1, kw:k.kw, texto:subst(k.text, built.ex),
               exemplo: isOutline(s) ? s.exemplos.linhas[ri].join(" | ") : null,
               motivo,
               link:`#${s.id}/${i + 1}` + (isOutline(s) && ri ? `?ex=${ri + 1}` : "")
@@ -3014,7 +3014,7 @@ const Paladira = (() => {
           }
           by[s.id][i] = (by[s.id][i] == null ? passed : (by[s.id][i] && passed));
           by[s.id]["ex" + ri] = (by[s.id]["ex" + ri] == null ? passed : (by[s.id]["ex" + ri] && passed));
-          larguraForcada = null;
+          forcedWidth = null;
         }
       }
     }
@@ -3025,14 +3025,14 @@ const Paladira = (() => {
        ponto do caminho — exigir no último passo obrigaria o cenário a
        terminar parado no erro, que é justamente o que não queremos. */
     for (const s of todos){
-      if (cancelarVerificacao) break;
+      if (cancelVerification) break;
       state.ctx = contextoDe(s);
-      const est = estadoDe(s);
+      const est = stateOf(s);
       if (!est) continue;
       const total = (s.steps || []).length;
       let achou = false, motivo = null, onde = null;
 
-      larguraForcada = larguraDeExemplo(s, 0);
+      forcedWidth = sampleWidth(s, 0);
       ajustaProbe(probe);
       for (let i = -1; i < total && !achou; i++){
         try {
@@ -3048,30 +3048,30 @@ const Paladira = (() => {
                + `o AsyncStateContainer cobriu este caso?`;
       }
 
-      larguraForcada = null;
+      forcedWidth = null;
       achou ? ok++ : bad++;
       if (!achou){
-        falhas.push({ cenario:s.name, tags:(s.tags || []).join(" "), passo:"—",
+        failures.push({ scen:s.name, tags:(s.tags || []).join(" "), stp:"—",
           kw:"Estado", texto:est, exemplo:null, motivo, link:`#${s.id}/dado` });
       }
     }
 
-    if (!cancelarVerificacao){
+    if (!cancelVerification){
       for (const s of todos){ state.ctx = contextoDe(s); primCache[s.id] = await primOf(s); }
     }
     state.ctx = clone(ctxUsuario);
 
     probe.remove();
 
-    if (cancelarVerificacao){
+    if (cancelVerification){
       /* guarda o que já foi apurado para continuar depois, em vez de
          jogar fora e refazer tudo */
-      parcial = { idx: idxAtual, by, ok, bad, falhas };
-      emVerificacao = false;
+      parcial = { idx: idxAtual, by, ok, bad, failures };
+      verifying = false;
       state.ctx = clone(ctxUsuario);
       suite = null;
       interrompida = true;
-      cancelarVerificacao = false;
+      cancelVerification = false;
       if (btn){ btn.removeAttribute("aria-busy"); btn.textContent = "Verificar"; }
       const pill = $("h-checks");
       if (pill){
@@ -3079,26 +3079,26 @@ const Paladira = (() => {
         pill.innerHTML = `pausada em <b>${idxAtual}</b>/${total}`;
         pill.title = "Continua sozinha quando você parar de mexer";
       }
-      return { ok:0, bad:0, avisos:[], cancelada:true };
+      return { ok:0, bad:0, warnings:[], cancelada:true };
     }
 
     const aud = await auditar();
     parcial = null;
-    emVerificacao = false;
+    verifying = false;
     /* NÃO limpar: o que a suíte acabou de calcular é exatamente o que a
        pessoa vai navegar em seguida. Descartar aqui obrigaria a refazer
        cada jornada do zero no primeiro clique. */
     if (btn){ btn.removeAttribute("aria-busy"); btn.textContent = "Verificar"; }
     state.ctx = clone(ctxUsuario);
-    suite = { by, ok, bad, falhas, skipped: cfg.scenarios.length - visible().length,
-              avisos: aud.avisos, infos: aud.infos || [], cobertura: aud.cobertura };
+    suite = { by, ok, bad, failures, skipped: cfg.scenarios.length - visible().length,
+              warnings: aud.warnings, infos: aud.infos || [], coverage: aud.coverage };
     render();
     return suite;
     });
   }
 
   /* Relatório de uma tela só, para colar de volta em quem editou. */
-  function relatorio(){
+  function report(){
     if (!suite) return "";
     const ctx = cfg.contexto.map(d => {
       const v = state.ctx[d.id];
@@ -3109,20 +3109,20 @@ const Paladira = (() => {
     t += `protótipo: ${cfg.title}\n`;
     t += `contexto: ${ctx}\n`;
     t += `placar: ${suite.bad} falha${suite.bad === 1 ? "" : "s"} · ${suite.ok} ok`;
-    if (suite.cobertura) t += ` · handlers ${suite.cobertura.exercitados}/${suite.cobertura.total}`;
+    if (suite.coverage) t += ` · handlers ${suite.coverage.exercised}/${suite.coverage.total}`;
     t += `\n`;
 
-    (suite.falhas || []).forEach((f, i) => {
-      t += `\nFALHA ${i + 1} — ${f.cenario}${f.tags ? "  " + f.tags : ""}\n`;
+    (suite.failures || []).forEach((f, i) => {
+      t += `\nFALHA ${i + 1} — ${f.scen}${f.tags ? "  " + f.tags : ""}\n`;
       if (f.exemplo) t += `  exemplo: ${f.exemplo}\n`;
-      t += `  passo ${f.passo} · ${f.kw} ${f.texto}\n`;
+      t += `  passo ${f.stp} · ${f.kw} ${f.texto}\n`;
       t += `  motivo: ${f.motivo}\n`;
       t += `  abrir: ${f.link}\n`;
     });
 
-    if ((suite.avisos || []).length){
-      t += `\nAVISOS (${suite.avisos.length})\n`;
-      suite.avisos.forEach(a => { t += `  - ${a}\n`; });
+    if ((suite.warnings || []).length){
+      t += `\nAVISOS (${suite.warnings.length})\n`;
+      suite.warnings.forEach(a => { t += `  - ${a}\n`; });
     }
     return t;
   }
@@ -3167,14 +3167,14 @@ const Paladira = (() => {
        verificação apagava o contador e parecia que ela tinha morrido */
     if (rodando){ progressoExterno(rodandoFeitos, cfg.scenarios.length); return; }
     if (suite){
-      const av = (suite.avisos || []).length;
-      pill.className = "h-pill " + (suite.bad ? "bad" : (av ? "warn" : "ok"));
+      const warn = (suite.warnings || []).length;
+      pill.className = "h-pill " + (suite.bad ? "bad" : (warn ? "warn" : "ok"));
       pill.innerHTML = (suite.bad ? `<b>${suite.ok}</b> ok · <b>${suite.bad}</b> falhando`
                                   : `<b>${suite.ok}</b> ok`)
-                     + (av ? ` · <b>${av}</b> aviso${av === 1 ? "" : "s"}` : "");
-      const c = suite.cobertura;
-      pill.title = (c ? `handlers: ${c.exercitados}/${c.total} disparados. ` : "")
-                 + (av ? "Os avisos vão no topo do Gherkin" : "Tudo verificado");
+                     + (warn ? ` · <b>${warn}</b> aviso${warn === 1 ? "" : "s"}` : "");
+      const c = suite.coverage;
+      pill.title = (c ? `handlers: ${c.exercised}/${c.total} disparados. ` : "")
+                 + (warn ? "Os avisos vão no topo do Gherkin" : "Tudo verificado");
       return;
     }
     if (interrompida){
@@ -3214,7 +3214,7 @@ const Paladira = (() => {
   }
 
   /* ---------- medidas ---------- */
-  const PALCO_PAD = 48;
+  const STAGE_PAD = 48;
 
   function vp(){
     const v = VIEWPORTS.find(x => x.id === state.viewport) || VIEWPORTS[1];
@@ -3223,13 +3223,13 @@ const Paladira = (() => {
          que é o ponto desta opção. Girar não se aplica. */
       const stage = $("h-stage");
       return { ...v,
-        w: Math.max(320, Math.round(((stage && stage.clientWidth)  || 1280) - PALCO_PAD)),
-        h: Math.max(320, Math.round(((stage && stage.clientHeight) ||  900) - PALCO_PAD)) };
+        w: Math.max(320, Math.round(((stage && stage.clientWidth)  || 1280) - STAGE_PAD)),
+        h: Math.max(320, Math.round(((stage && stage.clientHeight) ||  900) - STAGE_PAD)) };
     }
     return state.landscape ? { ...v, w:v.h, h:v.w } : v;
   }
   function bpLabel(w){
-    const d = degrauDe(w);
+    const d = rungOf(w);
     /* largura exata do degrau aparece limpa; entre degraus mostra o de
        baixo com ~, para não fingir precisão que não existe */
     return (w === d.w ? "" : "~") + d.id;
@@ -3246,7 +3246,7 @@ const Paladira = (() => {
     if (v.livre){
       scale = 1;                       /* o quadro já é do tamanho do palco */
     } else if (state.zoom === "fit"){
-      scale = Math.min(1, (stage.clientWidth - PALCO_PAD) / v.w, (stage.clientHeight - PALCO_PAD) / v.h);
+      scale = Math.min(1, (stage.clientWidth - STAGE_PAD) / v.w, (stage.clientHeight - STAGE_PAD) / v.h);
     } else scale = Number(state.zoom) / 100;
 
     frame.style.transform = `scale(${scale})`;
@@ -3370,9 +3370,9 @@ const Paladira = (() => {
     const q = semAcento(busca);
     if (q) list = list.filter(x =>
       semAcento(x.name).indexOf(q) > -1 || semAcento((x.tags || []).join(" ")).indexOf(q) > -1);
-    if (soFalhas) list = list.filter(x => failCount(x) > 0);
+    if (onlyFailures) list = list.filter(x => failCount(x) > 0);
 
-    const comFalha = visiveis.filter(x => failCount(x) > 0).length;
+    const withFailure = visiveis.filter(x => failCount(x) > 0).length;
 
     html += `<div class="h-count">`
          +  `<p class="h-side-title">Cenários · ${list.length}`
@@ -3387,9 +3387,9 @@ const Paladira = (() => {
     html += `<div class="h-filtros">`
          +  `<input class="h-busca" id="h-busca" placeholder="filtrar por nome ou @tag" title="↑↓ troca de cenário · ←→ anda nos passos"`
          +  ` value="${esc(busca)}" spellcheck="false">`
-         +  (comFalha
-              ? `<button class="h-mini falha" id="h-so-falhas" aria-pressed="${soFalhas}">`
-                + `${comFalha} falhando</button>`
+         +  (withFailure
+              ? `<button class="h-mini falha" id="h-so-falhas" aria-pressed="${onlyFailures}">`
+                + `${withFailure} falhando</button>`
               : "")
          +  `</div>`;
 
@@ -3402,16 +3402,16 @@ const Paladira = (() => {
     /* agrupado por página: com dezesseis cenários a lista corrida vira
        um paredão, e o que a pessoa procura é "os da lista" ou "os do
        editor" antes de procurar um cenário específico */
-    if (!semeouEstados){
-      semeouEstados = true;
+    if (!seededStates){
+      seededStates = true;
       cfg.scenarios.forEach(x => {
-        if (estadoDe(x)) gruposFechados.add((x.pagina || cfg.paginaPadrao || "única") + "::estados");
+        if (stateOf(x)) gruposFechados.add((x.page || cfg.defaultPage || "única") + "::estados");
       });
     }
 
     const grupos = {};
     list.forEach(x => {
-      const g = x.pagina || cfg.paginaPadrao || "única";
+      const g = x.page || cfg.defaultPage || "única";
       (grupos[g] = grupos[g] || []).push(x);
     });
 
@@ -3430,23 +3430,23 @@ const Paladira = (() => {
       /* os cenários de estado ficam num bloco próprio, fechado ao abrir:
          são obrigatórios e conferidos sozinhos, então não precisam ocupar
          a barra o tempo todo — quem abre quer ver as jornadas */
-      const jornadas = itens.filter(x => !estadoDe(x));
-      const estados  = itens.filter(x => estadoDe(x));
-      let emEstados = false;
+      const journeys = itens.filter(x => !stateOf(x));
+      const states  = itens.filter(x => stateOf(x));
+      let inStates = false;
 
       itens.forEach(s => {
-        if (estadoDe(s) && !emEstados){
-          emEstados = true;
+        if (stateOf(s) && !inStates){
+          inStates = true;
           const chaveEst = nomeGrupo + "::estados";
           const fech = gruposFechados.has(chaveEst);
-          const ruinsEst = estados.reduce((n, x) => n + (failCount(x) ? 1 : 0), 0);
+          const ruinsEst = states.reduce((n, x) => n + (failCount(x) ? 1 : 0), 0);
           html += `<button class="h-grupo sub${fech ? " fechado" : ""}" data-grupo="${esc(chaveEst)}">`
                +  `<span class="chev">▶</span><span class="nm">estados</span>`
-               +  `<span class="ct">${estados.length}</span>`
+               +  `<span class="ct">${states.length}</span>`
                +  (ruinsEst ? `<span class="fl">${ruinsEst}</span>` : "")
                +  `</button>`;
         }
-        if (estadoDe(s) && gruposFechados.has(nomeGrupo + "::estados")) return;
+        if (stateOf(s) && gruposFechados.has(nomeGrupo + "::estados")) return;
       const oculto = showHidden;
       const on   = !oculto && s.id === state.scenario;
       const open = !oculto && s.id === state.expanded;
@@ -3480,7 +3480,7 @@ const Paladira = (() => {
         if (im || prim.length){
           html += `<div class="h-impl">`;
           if (im && im.componente) html += `<span class="k">componente</span><b>${esc(im.componente)}</b>`;
-          if (im && im.rota)       html += `<span class="k">rota</span><b>${esc(im.rota)}</b>`;
+          if (im && im.route)       html += `<span class="k">rota</span><b>${esc(im.route)}</b>`;
           if (im && im.modulo)     html += `<span class="k">módulo</span><b>${esc(im.modulo)}</b>`;
           if (prim.length){
             html += `<span class="ui"><span class="k">ui</span>`
@@ -3498,13 +3498,13 @@ const Paladira = (() => {
 
         html += `<div class="h-steps">`;
         html += stepRow(s, -1, "Dado", "dado", s.given.text, ex, on && state.step === -1, on && state.step > -1,
-          (aguardando && aguardando.id === s.id && aguardando.passo === -1) ? `<span class="h-spin sm"></span>` : "");
+          (aguardando && aguardando.id === s.id && aguardando.stp === -1) ? `<span class="h-spin sm"></span>` : "");
         let natAnt = "dado";
         (s.steps || []).forEach((st, i) => {
-          const k = palavraDoPasso(st, natAnt);
+          const k = stepWord(st, natAnt);
           natAnt = natureza(st);
           const r = checkAt(s.id, i);
-          const esperando = aguardando && aguardando.id === s.id && aguardando.passo === i;
+          const esperando = aguardando && aguardando.id === s.id && aguardando.stp === i;
           const dot = esperando
             ? `<span class="h-spin sm"></span>`
             : (r != null ? `<span class="dot ${r ? "ok" : "bad"}">●</span>` : "");
@@ -3515,11 +3515,11 @@ const Paladira = (() => {
         if (isOutline(s)){
           html += `<div class="h-ex"><p class="h-ex-hd">Exemplos</p>`;
           html += `<div class="h-ex-row head"><span class="st"></span>`
-               +  s.exemplos.colunas.map(c => `<span class="cel">${esc(c)}</span>`).join("")
+               +  s.exemplos.columns.map(c => `<span class="cel">${esc(c)}</span>`).join("")
                +  `</div>`;
           s.exemplos.linhas.forEach((row, ri) => {
             const st = exStatus(s.id, ri);
-            const lg = larguraDeExemplo(s, ri);
+            const lg = sampleWidth(s, ri);
             html += `<button class="h-ex-row${on && state.exemplo === ri ? " on" : ""}${lg ? " larg" : ""}"`
                  +  ` data-scn="${esc(s.id)}" data-ex="${ri}">`
                  +  `<span class="st${st == null ? "" : (st ? " ok" : " bad")}">${st == null ? "" : "●"}</span>`
@@ -3575,7 +3575,7 @@ const Paladira = (() => {
   function pintarMonitor(){
     const cx = $("h-mon");
     if (!cx) return;
-    if (!cfg.rotas || !cfg.rotas.length){ cx.hidden = true; return; }
+    if (!cfg.routes || !cfg.routes.length){ cx.hidden = true; return; }
     cx.hidden = false;
 
     const itens = rede.tela;
@@ -3608,7 +3608,7 @@ const Paladira = (() => {
         + `status ${sel.status}${sel.obs ? "  (" + sel.obs + ")" : ""} · ${sel.ms}ms\n`
         + (sel.origem
             ? `disparado por: ${sel.origem.kw} · ${sel.origem.nome}`
-              + (sel.origem.passo >= 0 ? ` (passo ${sel.origem.passo + 1})` : " (carga da tela)") + `\n`
+              + (sel.origem.stp >= 0 ? ` (passo ${sel.origem.stp + 1})` : " (carga da tela)") + `\n`
             : "")
         + `\n`
         + `enviado:\n${sel.envio == null ? "  (sem corpo)" : JSON.stringify(sel.envio, null, 2)}\n\n`
@@ -3660,7 +3660,7 @@ const Paladira = (() => {
     state.zoom = initial.zoom;
     state.landscape = false;
     state.exemplo = 0;
-    aplicarBarra(BARRA_MIN);
+    aplicarBarra(MIN_SIDEBAR);
     results = {}; suite = null; memo = new Map(); parcial = null;
     $("h-vp").value = state.viewport;
     $("h-zoomsel").value = state.zoom;
@@ -3683,7 +3683,7 @@ const Paladira = (() => {
 
     $("h-title").textContent = cfg.title || "protótipo";
     const marca = document.querySelector(".h-brand");
-    if (marca) marca.title = "harness " + VERSAO;
+    if (marca) marca.title = "harness " + VERSION;
     document.title = "Paladira · " + (cfg.title || "protótipo");
 
     cfg.contexto.forEach(d => {
@@ -3722,15 +3722,15 @@ const Paladira = (() => {
       ensureVisibleScenario();
     }
 
-    if (cfg.larguras && cfg.larguras.length){
-      ESCADA = cfg.larguras.map(d => ({ ...d, nivel:true }));
-      VIEWPORTS = ESCADA.concat(APARELHOS);
+    if (cfg.widths && cfg.widths.length){
+      LADDER = cfg.widths.map(d => ({ ...d, nivel:true }));
+      VIEWPORTS = LADDER.concat(DEVICES);
     }
     $("h-vp").innerHTML =
       `<optgroup label="Pontos de quebra">`
-      + ESCADA.map(v => `<option value="${v.id}">${v.label}</option>`).join("")
+      + LADDER.map(v => `<option value="${v.id}">${v.label}</option>`).join("")
       + `</optgroup><optgroup label="Aparelhos">`
-      + APARELHOS.map(v => `<option value="${v.id}">${v.label}</option>`).join("")
+      + DEVICES.map(v => `<option value="${v.id}">${v.label}</option>`).join("")
       + `</optgroup>`;
     $("h-vp").value = state.viewport;
     $("h-zoomsel").value = state.zoom;
@@ -3743,7 +3743,7 @@ const Paladira = (() => {
       const s = scnById(state.scenario);
       if (s && isOutline(s)){
         const i = s.exemplos.linhas.findIndex((_, ri) => {
-          const lg = larguraDeExemplo(s, ri);
+          const lg = sampleWidth(s, ri);
           return lg && lg.id === state.viewport;
         });
         if (i > -1 && i !== state.exemplo){ escolhaManual = true; goto(s.id, state.step, i); return; }
@@ -3756,29 +3756,29 @@ const Paladira = (() => {
     /* "Ver assim mesmo" dispensa ESTE conjunto de falhas. Reaparecer a
        cada verificação com o mesmo relatório é castigo, não aviso — mas
        se as falhas mudarem, a tela volta, porque aí é notícia nova. */
-    let falhaDispensada = null;
+    let dismissedFailure = null;
 
-    function assinaturaFalhas(){
-      if (!suite || !suite.falhas) return null;
-      return suite.falhas.map(f => f.cenario + "|" + f.passo + "|" + f.motivo).join("§");
+    function failureSignature(){
+      if (!suite || !suite.failures) return null;
+      return suite.failures.map(f => f.scen + "|" + f.stp + "|" + f.motivo).join("§");
     }
 
-    mostrarFalhaSeguro = () => mostrarFalha(true);
+    showFailureSafely = () => showFailure(true);
 
-    function mostrarFalha(abrir){
+    function showFailure(abrir){
       const painel = $("h-falha");
-      if (abrir && assinaturaFalhas() === falhaDispensada) return;   /* já dispensado */
+      if (abrir && failureSignature() === dismissedFailure) return;   /* já dispensado */
       painel.hidden = !abrir;
       if (abrir){
         const ta = $("h-falha-txt");
-        ta.value = relatorio();
+        ta.value = report();
         ta.focus(); ta.select();
       }
     }
 
     $("h-verify").addEventListener("click", async () => {
-      const r = await verificar();
-      if (r && r.bad && !r.cancelada) mostrarFalha(true);
+      const r = await verify();
+      if (r && r.bad && !r.cancelada) showFailure(true);
     });
     $("h-falha-copy").addEventListener("click", e => {
       const ta = $("h-falha-txt");
@@ -3790,13 +3790,13 @@ const Paladira = (() => {
       setTimeout(() => { e.currentTarget.textContent = "Copiar relatório"; }, 1500);
     });
     $("h-falha-ver").addEventListener("click", () => {
-      falhaDispensada = assinaturaFalhas();
-      mostrarFalha(false);
+      dismissedFailure = failureSignature();
+      showFailure(false);
     });
 
     $("h-checks").addEventListener("click", e => {
       /* com Alt, reabre o relatório mesmo dispensado; sem Alt, pula para a falha */
-      if (e.altKey && suite && suite.bad){ falhaDispensada = null; mostrarFalha(true); return; }
+      if (e.altKey && suite && suite.bad){ dismissedFailure = null; showFailure(true); return; }
       const f = firstFailure();
       if (f) goto(f.id, f.step);
     });
@@ -3829,51 +3829,51 @@ const Paladira = (() => {
       btn.setAttribute("aria-pressed", String(open));
       if (open) $("h-spec-text").value = gherkin();
     }
-    let verSuite = false, dadosSel = null;
+    let runSuite = false, dataSel = null;
 
     function pintarDados(){
-      $("h-dados-fix").value = JSON.stringify(cfg.dados || {}, null, 2);
-      const rotas = (cfg.rotas || []).map(r =>
+      $("h-dados-fix").value = JSON.stringify(cfg.data_ || {}, null, 2);
+      const routes = (cfg.routes || []).map(r =>
         `<div class="rota"><b>${(r.metodo || "GET").toUpperCase()}</b> ${esc(r.caminho)}</div>`).join("");
 
       /* a suíte dispara centenas de pedidos de 0ms; misturados com os da
          tela viram ruído, então por padrão ficam escondidos */
-      const daSuite = rede.log.filter(l => l.verif).length;
-      const lista = rede.log.filter(l => verSuite || !l.verif);
+      const fromSuite = rede.log.filter(l => l.verifyState).length;
+      const lista = rede.log.filter(l => runSuite || !l.verifyState);
 
-      const filtro = daSuite
-        ? `<button class="h-mini" id="h-dados-filtro" aria-pressed="${verSuite}">`
-          + (verSuite ? `ocultar ${daSuite} da verificação` : `mostrar ${daSuite} da verificação`)
+      const filtro = fromSuite
+        ? `<button class="h-mini" id="h-dados-filtro" aria-pressed="${runSuite}">`
+          + (runSuite ? `ocultar ${fromSuite} da verificação` : `mostrar ${fromSuite} da verificação`)
           + `</button>`
         : "";
 
       const log = lista.length
         ? lista.slice().reverse().map(l =>
-            `<button class="req${dadosSel === l.id ? " on" : ""}" data-req="${l.id}">`
+            `<button class="req${dataSel === l.id ? " on" : ""}" data-req="${l.id}">`
             + `<span class="m">${esc(l.metodo)}</span>`
             + `<span class="c">${esc(l.caminho)}</span>`
             + `<span class="s ${l.status < 300 ? "ok" : "bad"}">${l.status}</span>`
             + `<span class="t">${l.ms}ms</span>`
-            + (l.verif ? `<span class="v">suíte</span>` : "")
+            + (l.verifyState ? `<span class="v">suíte</span>` : "")
             + `</button>`).join("")
         : `<div class="vazio">Nenhum pedido ainda.</div>`;
 
-      const sel = rede.log.find(l => l.id === dadosSel);
+      const sel = rede.log.find(l => l.id === dataSel);
       const det = sel
         ? `<pre class="h-mon-det">${esc(
             `${sel.metodo} ${sel.caminho}\nstatus ${sel.status}`
             + `${sel.obs ? "  (" + sel.obs + ")" : ""} · ${sel.ms}ms`
-            + `${sel.verif ? " · pedido da verificação" : ""}\n`
+            + `${sel.verifyState ? " · pedido da verificação" : ""}\n`
             + (sel.origem
                 ? `disparado por: ${sel.origem.kw} · ${sel.origem.nome}`
-                  + (sel.origem.passo >= 0 ? ` (passo ${sel.origem.passo + 1})` : " (carga da tela)") + `\n`
+                  + (sel.origem.stp >= 0 ? ` (passo ${sel.origem.stp + 1})` : " (carga da tela)") + `\n`
                 : "")
             + `\n`
             + `enviado:\n${sel.envio == null ? "  (sem corpo)" : JSON.stringify(sel.envio, null, 2)}\n\n`
             + `recebido:\n${sel.volta == null ? "  (sem corpo)" : JSON.stringify(sel.volta, null, 2)}`)}</pre>`
         : "";
 
-      $("h-dados-log").innerHTML = rotas + "<hr>" + filtro + log + det;
+      $("h-dados-log").innerHTML = routes + "<hr>" + filtro + log + det;
     }
 
     function showDados(abrir){
@@ -3893,14 +3893,14 @@ const Paladira = (() => {
 
     $("h-dados-btn").addEventListener("click", () => showDados($("h-dados").hidden));
     $("h-dados-limpar").addEventListener("click", () => {
-      rede.log.length = 0; dadosSel = null; pintarDados();
+      rede.log.length = 0; dataSel = null; pintarDados();
     });
     $("h-dados-log").addEventListener("click", e => {
-      if (e.target.closest("#h-dados-filtro")){ verSuite = !verSuite; pintarDados(); return; }
+      if (e.target.closest("#h-dados-filtro")){ runSuite = !runSuite; pintarDados(); return; }
       const b = e.target.closest("[data-req]");
       if (!b) return;
       const id = Number(b.dataset.req);
-      dadosSel = (dadosSel === id ? null : id);
+      dataSel = (dataSel === id ? null : id);
       pintarDados();
     });
 
@@ -3943,7 +3943,7 @@ const Paladira = (() => {
 
     $("h-side").addEventListener("click", e => {
       if (e.target.closest("#h-toggle-ocultos")){ showHidden = !showHidden; render(); return; }
-      if (e.target.closest("#h-so-falhas")){ soFalhas = !soFalhas; buscaFocada = false; render(); return; }
+      if (e.target.closest("#h-so-falhas")){ onlyFailures = !onlyFailures; buscaFocada = false; render(); return; }
 
       const g = e.target.closest("[data-grupo]");
       if (g){
@@ -4006,9 +4006,9 @@ const Paladira = (() => {
       /* as setas percorrem o que está à mostra: pular para um cenário
          dentro de um bloco fechado seria navegar às cegas */
       const lista = ordemDeLeitura(visible()).filter(x => {
-        const pg = x.pagina || cfg.paginaPadrao || "única";
+        const pg = x.page || cfg.defaultPage || "única";
         if (gruposFechados.has(pg)) return false;
-        if (estadoDe(x) && gruposFechados.has(pg + "::estados")) return false;
+        if (stateOf(x) && gruposFechados.has(pg + "::estados")) return false;
         return true;
       });
       if (!lista.length) return;
@@ -4069,7 +4069,7 @@ const Paladira = (() => {
       alca.addEventListener("pointermove", mover);
       alca.addEventListener("pointerup", soltar);
     });
-    alca.addEventListener("dblclick", () => setBarra(BARRA_MIN));
+    alca.addEventListener("dblclick", () => setBarra(MIN_SIDEBAR));
     alca.addEventListener("keydown", e => {
       if (e.key === "ArrowLeft")  { e.preventDefault(); setBarra(state.barra - 24); }
       if (e.key === "ArrowRight") { e.preventDefault(); setBarra(state.barra + 24); }
@@ -4083,7 +4083,7 @@ const Paladira = (() => {
       if (applyHash()){ render(); fit(); }
     });
 
-    dadosBase = JSON.stringify(cfg.dados || {});
+    baseData = JSON.stringify(cfg.data_ || {});
     instalarRede();
     bindDelegation();
 
@@ -4112,8 +4112,8 @@ const Paladira = (() => {
       setTimeout(async () => {
         const r = await verifyAll();
         manda("resultado", { suite: {
-          ok:r.ok, bad:r.bad, falhas:r.falhas || [], avisos:r.avisos || [],
-          cobertura:r.cobertura || null, by:r.by || {}, skipped:r.skipped || 0
+          ok:r.ok, bad:r.bad, failures:r.failures || [], warnings:r.warnings || [],
+          coverage:r.coverage || null, by:r.by || {}, skipped:r.skipped || 0
         } });
       }, 0);
       return;
@@ -4124,17 +4124,17 @@ const Paladira = (() => {
        Em setTimeout porque os Paladira.on vêm DEPOIS do init no script
        do app — verificar antes disso acusaria "nenhum handler responde"
        em tudo, que é falha do relógio, não do protótipo. */
-    if (cfg.verificarAoAbrir !== false){
+    if (cfg.verifyOnOpen !== false){
       setTimeout(async () => {
-        const r = await verificar();
-        if (r && r.bad && !r.cancelada) mostrarFalha(true);
+        const r = await verify();
+        if (r && r.bad && !r.cancelada) showFailure(true);
       }, 0);
     }
   }
 
-  return { versao: VERSAO,
-    init, on, set, render, goto, gherkin, verifyAll, verificar, relatorio, api, rede,
-    get modoVerificacao(){ return modoVerificacao; }, reset, fit, esc, state, VIEWPORTS };
+  return { versao: VERSION,
+    init, on, set, render, goto, gherkin, verifyAll, verify, report, api, rede,
+    get verificationMode(){ return verificationMode; }, reset, fit, esc, state, VIEWPORTS };
 })();
 
 /* no console: Paladira.state, Paladira.goto("id", 2), Paladira.verifyAll() */
@@ -4287,7 +4287,7 @@ window.PALADIRA_UI = {
      deixar o fetch sair.
      ============================================================ -->
 <script>
-window.PALADIRA_DADOS = {
+window.PALADIRA_DATA = {
   produtos: {
     "1": {
       id:"1", nome:"Pizza margherita", categoria:"Pizzas",
@@ -4302,37 +4302,37 @@ window.PALADIRA_DADOS = {
   limitesPorPlano: { free:1, basic:3, pro:10, ultra:50 },
   /* liga o "cai na primeira, volta na segunda" — deixa o Tentar de novo
      ter um desfecho em vez de repetir o erro para sempre */
-  listaFalhaUmaVez: false
+  listFailsOnce: false
 };
 
-window.PALADIRA_ROTAS = [
+window.PALADIRA_ROUTES = [
   { metodo:"POST", caminho:"/api/produtos",
-    responde: ({ corpo, dados }) => {
-      const id = String(Object.keys(dados.produtos).length + 1);
+    responde: ({ corpo, data_ }) => {
+      const id = String(Object.keys(data_.produtos).length + 1);
       const novo = { id, nome:(corpo && corpo.nome) || "Produto sem nome",
                      categoria:(corpo && corpo.categoria) || "Sem categoria", variacoes:[] };
-      dados.produtos[id] = novo;
+      data_.produtos[id] = novo;
       return novo;
     } },
 
   { metodo:"GET", caminho:"/api/produtos",
-    responde: ({ dados }) => {
-      if (dados.listaFalhaUmaVez){ dados.listaFalhaUmaVez = false; throw new Error("Serviço indisponível"); }
-      return Object.values(dados.produtos).map(p => ({
+    responde: ({ data_ }) => {
+      if (data_.listFailsOnce){ data_.listFailsOnce = false; throw new Error("Serviço indisponível"); }
+      return Object.values(data_.produtos).map(p => ({
         id:p.id, nome:p.nome, categoria:p.categoria, variacoes:p.variacoes.length
       }));
     } },
 
   { metodo:"GET", caminho:"/api/produtos/:id",
-    responde: ({ params, dados }) => {
-      const p = dados.produtos[params.id];
+    responde: ({ params, data_ }) => {
+      const p = data_.produtos[params.id];
       if (!p) throw new Error("produto não encontrado");
       return JSON.parse(JSON.stringify(p));
     } },
 
   { metodo:"POST", caminho:"/api/produtos/:id/variacoes",
-    responde: ({ params, corpo, dados }) => {
-      const p = dados.produtos[params.id];
+    responde: ({ params, corpo, data_ }) => {
+      const p = data_.produtos[params.id];
       if (!p) throw new Error("produto não encontrado");
       const nova = { id:"v" + (p.variacoes.length + 1) + "-" + params.id,
                      nome:(corpo && corpo.nome) || "Nova",
@@ -4342,19 +4342,19 @@ window.PALADIRA_ROTAS = [
     } },
 
   { metodo:"PUT", caminho:"/api/produtos/:id",
-    responde: ({ params, corpo, dados }) => {
-      const p = dados.produtos[params.id];
+    responde: ({ params, corpo, data_ }) => {
+      const p = data_.produtos[params.id];
       if (!p) throw new Error("produto não encontrado");
       Object.assign(p, corpo || {}, { atualizadoEm:"2026-08-15T12:00:00Z" });
       return JSON.parse(JSON.stringify(p));
     } },
 
   { metodo:"POST", caminho:"/api/pagamentos",
-    responde: ({ corpo, dados }) => {
-      dados.pagamentos = dados.pagamentos || [];
-      const pg = { id:"pi_" + (dados.pagamentos.length + 1),
+    responde: ({ corpo, data_ }) => {
+      data_.pagamentos = data_.pagamentos || [];
+      const pg = { id:"pi_" + (data_.pagamentos.length + 1),
                    status:"aprovado", valor:(corpo && corpo.valor) || 0 };
-      dados.pagamentos.push(pg);
+      data_.pagamentos.push(pg);
       return pg;
     } },
 
@@ -4379,8 +4379,8 @@ Paladira.init({
 
   biblioteca: "@12-apps/ui",
 
-  dados: window.PALADIRA_DADOS,
-  rotas: window.PALADIRA_ROTAS,
+  data_: window.PALADIRA_DATA,
+  routes: window.PALADIRA_ROUTES,
   latencia: [250, 750],   /* faixa aleatória, só na tela; a verificação roda sem atraso */
 
   /* exige que toda marcação com texto ou interação esteja reivindicada
@@ -4425,7 +4425,7 @@ Paladira.init({
     /* herdado por todo cenário que não declarar o seu */
     impl: {
       componente:"ProdutoEditor",
-      rota:"/produtos/:id",
+      route:"/produtos/:id",
       modulo:"catalogo/produtos",
       notas:"Button, Alert e TextField de @12-apps/ui"
     }
@@ -4462,11 +4462,11 @@ Paladira.init({
     {
       id:"cardapio-navega",
       name:"Percorrer o cardápio e voltar",
-      pagina:"lista", tags:["@catálogo","@feliz"],
-      impl:{ componente:"CardapioLista", rota:"/produtos" },
+      page:"lista", tags:["@catálogo","@feliz"],
+      impl:{ componente:"CardapioLista", route:"/produtos" },
       given:{
         text:"que o lojista abriu o cardápio",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { then:"o cardápio lista os produtos com quantas variações cada um tem",
@@ -4485,11 +4485,11 @@ Paladira.init({
     {
       id:"produto-consulta",
       name:"Consultar dois produtos seguidos",
-      pagina:"produto", tags:["@catálogo","@feliz"],
-      impl:{ componente:"ProdutoEditor", rota:"/produtos/:id" },
+      page:"produto", tags:["@catálogo","@feliz"],
+      impl:{ componente:"ProdutoEditor", route:"/produtos/:id" },
       given:{
         text:"que o lojista abriu o cardápio",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4505,11 +4505,11 @@ Paladira.init({
     {
       id:"cardapio-larguras",
       name:"O cardápio em cada largura",
-      pagina:"lista", tags:["@catálogo","@retorno"],
+      page:"lista", tags:["@catálogo","@retorno"],
       impl:{ componente:"CardapioLista", notas:"grade por container query; ação fixa no rodapé até sm" },
       given:{
         text:"que o lojista abre o cardápio em <largura>",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { then:"a lista aparece em <colunas> coluna(s)",
@@ -4537,7 +4537,7 @@ Paladira.init({
           } }
       ],
       exemplos:{
-        colunas:["largura","colunas","onde"],
+        columns:["largura","colunas","onde"],
         linhas:[
           ["xxs", "1", "rodape"],
           ["md",  "2", "topo"],
@@ -4548,14 +4548,14 @@ Paladira.init({
     {
       id:"lista-carregando",
       name:"Abrir o cardápio e esperar ele chegar",
-      pagina:"lista", tags:["@catálogo","@carregando"],
-      impl:{ componente:"CardapioLista", rota:"/produtos", notas:"AsyncStateContainer + LoadingState" },
+      page:"lista", tags:["@catálogo","@carregando"],
+      impl:{ componente:"CardapioLista", route:"/produtos", notas:"AsyncStateContainer + LoadingState" },
       rede:{ "GET /api/produtos": "pendente" },
       given:{
         text:"que o lojista abriu o cardápio e a resposta ainda não chegou",
         state: async (ex, api) => {
           api.get("/api/produtos").catch(() => {});   /* fica pendurado de propósito */
-          return { pagina:"lista", carregando:true };
+          return { page:"lista", carregando:true };
         }
       },
       steps:[
@@ -4571,12 +4571,12 @@ Paladira.init({
     {
       id:"lista-vazia",
       name:"Loja nova: do cardápio vazio ao primeiro produto",
-      pagina:"lista", tags:["@catálogo","@vazio","@feliz","@pode:produto.editar"],
-      impl:{ componente:"CardapioLista", rota:"/produtos", notas:"EmptyState com a ação principal dentro" },
+      page:"lista", tags:["@catálogo","@vazio","@feliz","@pode:produto.editar"],
+      impl:{ componente:"CardapioLista", route:"/produtos", notas:"EmptyState com a ação principal dentro" },
       rede:{ "GET /api/produtos": { status:200, corpo:[] } },
       given:{
         text:"que a loja acabou de abrir e não cadastrou nada",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { then:"o cardápio convida a criar o primeiro produto",
@@ -4595,17 +4595,17 @@ Paladira.init({
     {
       id:"lista-erro",
       name:"Cardápio fora do ar e a tentativa de voltar",
-      pagina:"lista", tags:["@catálogo","@erro","@recuperacao"],
-      impl:{ componente:"CardapioLista", rota:"/produtos", notas:"ErrorState com recarregar" },
+      page:"lista", tags:["@catálogo","@erro","@recuperacao"],
+      impl:{ componente:"CardapioLista", route:"/produtos", notas:"ErrorState com recarregar" },
       /* a falha vem das fixtures (cai uma vez, volta na seguinte), não de
          rede: — é o que permite o Tentar de novo ter desfecho */
-      falhaNasFixtures:true,
+      fixtureFailure:true,
       given:{
         text:"que o lojista abriu o cardápio e a API caiu na primeira tentativa",
         state: async (ex, api) => {
-          api.dados.listaFalhaUmaVez = true;
-          try { return { pagina:"lista", produtos: await api.get("/api/produtos") }; }
-          catch (e){ return { pagina:"lista", erro:e.message }; }
+          api.data_.listFailsOnce = true;
+          try { return { page:"lista", produtos: await api.get("/api/produtos") }; }
+          catch (e){ return { page:"lista", error_:e.message }; }
         }
       },
       steps:[
@@ -4623,13 +4623,13 @@ Paladira.init({
     {
       id:"criar-produto-falha",
       name:"Criar produto e receber recusa do servidor",
-      pagina:"lista", tags:["@catálogo","@conflito"],
+      page:"lista", tags:["@catálogo","@conflito"],
       impl:{ componente:"CardapioLista", notas:"o erro fica dentro do EmptyState, sem trocar de tela" },
       rede:{ "GET /api/produtos": { status:200, corpo:[] },
-              "POST /api/produtos": { status:500, corpo:{ erro:"Não foi possível criar o produto" } } },
+              "POST /api/produtos": { status:500, corpo:{ error_:"Não foi possível criar o produto" } } },
       given:{
         text:"que o cardápio está vazio e o servidor vai recusar a criação",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista tenta criar o produto", clique:'[data-act="novo-produto"]' },
@@ -4644,14 +4644,14 @@ Paladira.init({
     {
       id:"produto-carregando",
       name:"Abrir um produto e esperar o detalhe",
-      pagina:"produto", tags:["@catálogo","@carregando","@retorno"],
+      page:"produto", tags:["@catálogo","@carregando","@retorno"],
       impl:{ componente:"AsyncStateContainer", notas:"LoadingState com esqueleto, sem spinner solto" },
       rede:{ "GET /api/produtos/:id": "pendente" },
       given:{
         text:"que o lojista tocou num produto e o detalhe ainda não chegou",
         state: async (ex, api) => {
           api.get("/api/produtos/1").catch(() => {});
-          return { pagina:"produto", carregando:true };
+          return { page:"produto", carregando:true };
         }
       },
       steps:[
@@ -4669,11 +4669,11 @@ Paladira.init({
     {
       id:"catalogo-vazio",
       name:"Produto sem variações: criar a primeira e salvar",
-      pagina:"produto", tags:["@catálogo","@vazio","@pode:produto.editar"],
+      page:"produto", tags:["@catálogo","@vazio","@pode:produto.editar"],
       impl:{ componente:"AsyncStateContainer", notas:"EmptyState com a ação principal dentro" },
       given:{
         text:"que o lojista está no cardápio e o produto 2 não tem variações",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Calabresa", clique:'[data-act="abrir-produto"][data-id="2"]' },
@@ -4690,14 +4690,14 @@ Paladira.init({
     {
       id:"produto-fora-do-ar",
       name:"Detalhe do produto fora do ar",
-      pagina:"produto", tags:["@catálogo","@erro","@recuperacao"],
+      page:"produto", tags:["@catálogo","@erro","@recuperacao"],
       impl:{ componente:"AsyncStateContainer", notas:"ErrorState com ação de tentar de novo" },
       rede:{ "GET /api/produtos/:id": 503 },
       given:{
         text:"que o lojista tocou num produto e a API do catálogo caiu",
         state: async (ex, api) => {
-          try { return { pagina:"produto", produto: await api.get("/api/produtos/1") }; }
-          catch (e){ return { pagina:"produto", erro:e.message }; }
+          try { return { page:"produto", produto: await api.get("/api/produtos/1") }; }
+          catch (e){ return { page:"produto", error_:e.message }; }
         }
       },
       steps:[
@@ -4714,11 +4714,11 @@ Paladira.init({
     {
       id:"primeira-variacao",
       name:"Do cardápio até criar e salvar a primeira variação",
-      pagina:"produto", tags:["@catálogo","@basic","@pode:produto.editar","@feliz"],
-      impl:{ componente:"ProdutoEditor", rota:"/produtos/:id", modulo:"catalogo/produtos" },
+      page:"produto", tags:["@catálogo","@basic","@pode:produto.editar","@feliz"],
+      impl:{ componente:"ProdutoEditor", route:"/produtos/:id", modulo:"catalogo/produtos" },
       given:{
         text:"que o lojista está no cardápio",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Calabresa", clique:'[data-act="abrir-produto"][data-id="2"]' },
@@ -4737,17 +4737,17 @@ Paladira.init({
     {
       id:"limite-por-plano",
       name:"Esbarrar no limite de variações do plano",
-      pagina:"produto", tags:["@catálogo","@pode:produto.editar"],
+      page:"produto", tags:["@catálogo","@pode:produto.editar"],
       impl:{ componente:"VariacoesLista", notas:"o limite vem do plano do tenant, não do formulário" },
       rede: ex => (ex.resultado === "bloqueio"
-        ? { "POST /api/produtos/:id/variacoes": { status:409, corpo:{ erro:"Limite do plano atingido" } } }
+        ? { "POST /api/produtos/:id/variacoes": { status:409, corpo:{ error_:"Limite do plano atingido" } } }
         : {}),
       given:{
         text:"que a loja está no plano <plano> e já usou <usadas> variações",
         state: async (ex, api) => {
           const p = await api.get("/api/produtos/1");
           p.variacoes = p.variacoes.slice(0, Number(ex.usadas));
-          return { pagina:"produto", produto:p, limite:Number(ex.limite) };
+          return { page:"produto", produto:p, limite:Number(ex.limite) };
         }
       },
       steps:[
@@ -4761,7 +4761,7 @@ Paladira.init({
           check:(a, el) => el.querySelectorAll(".linha").length >= 2 }
       ],
       exemplos:{
-        colunas:["plano","limite","usadas","resultado"],
+        columns:["plano","limite","usadas","resultado"],
         linhas:[
           ["Free",  "1", "1", "bloqueio"],
           ["Basic", "3", "2", "variação nova"],
@@ -4772,12 +4772,12 @@ Paladira.init({
     {
       id:"criar-variacao-falha",
       name:"Criação da variação recusada pelo servidor",
-      pagina:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
+      page:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
       impl:{ componente:"VariacoesLista", notas:"o erro fica na lista, sem derrubar a página inteira" },
-      rede:{ "POST /api/produtos/:id/variacoes": { status:500, corpo:{ erro:"Não foi possível criar a variação" } } },
+      rede:{ "POST /api/produtos/:id/variacoes": { status:500, corpo:{ error_:"Não foi possível criar a variação" } } },
       given:{
         text:"que o lojista está no cardápio e o servidor vai recusar a criação",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Calabresa", clique:'[data-act="abrir-produto"][data-id="2"]' },
@@ -4791,12 +4791,12 @@ Paladira.init({
     {
       id:"salvar-falha",
       name:"Salvar e receber recusa do servidor",
-      pagina:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
+      page:"produto", tags:["@catálogo","@pode:produto.editar","@conflito"],
       impl:{ componente:"ProdutoEditor", notas:"o erro fica junto do botão, sem perder o que foi digitado" },
-      rede:{ "PUT /api/produtos/:id": { status:422, corpo:{ erro:"Preço inválido para a variação Pequena" } } },
+      rede:{ "PUT /api/produtos/:id": { status:422, corpo:{ error_:"Preço inválido para a variação Pequena" } } },
       given:{
         text:"que o lojista está no cardápio e o servidor vai recusar o salvamento",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4812,14 +4812,14 @@ Paladira.init({
     {
       id:"resposta-do-provedor",
       name:"Pagar o pedido e ver a resposta do provedor",
-      pagina:"produto", tags:["@catálogo"],
-      impl:{ componente:"CheckoutPagamento", rota:"/pedidos/:id/pagamento",
+      page:"produto", tags:["@catálogo"],
+      impl:{ componente:"CheckoutPagamento", route:"/pedidos/:id/pagamento",
              notas:"Alert para recusa, ErrorState para indisponibilidade" },
       rede: ex => ({ "POST /api/pagamentos": ex.resposta === "sucesso" ? null : {
-        status: Number(ex.status), corpo: { erro: ex.mensagem } } }),
+        status: Number(ex.status), corpo: { error_: ex.mensagem } } }),
       given:{
         text:"que o lojista está no cardápio e o provedor vai responder <resposta>",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4834,7 +4834,7 @@ Paladira.init({
             : (el.querySelector('[data-pg="erro"]') || {}).textContent.indexOf(s.ex.mensagem) > -1 }
       ],
       exemplos:{
-        colunas:["resposta","status","mensagem","tela"],
+        columns:["resposta","status","mensagem","tela"],
         linhas:[
           ["sucesso",         "200", "—",                              "confirmação"],
           ["cartão recusado", "402", "Cartão recusado pelo banco",     "aviso recuperável"],
@@ -4845,11 +4845,11 @@ Paladira.init({
     {
       id:"garcom-nao-edita",
       name:"Garçom abre o produto e não consegue editar",
-      pagina:"produto", tags:["@garcom"],
+      page:"produto", tags:["@garcom"],
       impl:{ componente:"ProdutoEditor", notas:"somente leitura: sem campos, sem barra de ação" },
       given:{
         text:"que quem está no cardápio é um garçom",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o garçom abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4867,11 +4867,11 @@ Paladira.init({
     {
       id:"margem-por-variacao",
       name:"Acompanhar margem por variação",
-      pagina:"produto", tags:["@pro","@pode:relatorio.margem"],
+      page:"produto", tags:["@pro","@pode:relatorio.margem"],
       impl:{ componente:"MargemCard", modulo:"relatorios/margem" },
       given:{
         text:"que a loja acompanha margem e o lojista está no cardápio",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos"), margem:true })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos"), margem:true })
       },
       steps:[
         { when:"o lojista abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4886,11 +4886,11 @@ Paladira.init({
     {
       id:"preparo-cozinha",
       name:"Ajustar preparo e salvar com a cozinha ligada",
-      pagina:"produto", tags:["@cozinha","@pode:produto.editar"],
+      page:"produto", tags:["@cozinha","@pode:produto.editar"],
       impl:{ componente:"ProdutoEditor", notas:"bloco de preparo por variação" },
       given:{
         text:"que a loja prepara os pedidos na cozinha e o lojista está no cardápio",
-        state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") })
+        state: async (ex, api) => ({ page:"lista", produtos: await api.get("/api/produtos") })
       },
       steps:[
         { when:"o lojista abre Pizza margherita", clique:'[data-act="abrir-produto"][data-id="1"]' },
@@ -4905,41 +4905,41 @@ Paladira.init({
 
   render(s){
     /* a página vem do estado; na dúvida, quem tem lista é lista */
-    const pg = s.app.pagina || (s.app.produtos ? "lista" : "produto");
+    const pg = s.app.page || (s.app.produtos ? "lista" : "produto");
     return pg === "lista" ? telaLista(s) : telaProduto(s);
   },
 
-  paginaPadrao: "produto"
+  defaultPage: "produto"
 });
 
 function telaLista(s){
   const itens = s.app.produtos;
-  const estado = (s.app.carregando || s.esperando()) ? "carregando"
-               : s.app.erro       ? "erro"
+  const st_ = (s.app.carregando || s.esperando()) ? "carregando"
+               : s.app.error_       ? "erro"
                : (itens && !itens.length) ? "vazio"
                : "conteudo";
 
   const corpo =
-    estado === "carregando" ? `
+    st_ === "carregando" ? `
       <div class="estado" data-estado="carregando" aria-busy="true">
         <div class="esqueleto"><i></i><i></i><i></i><i></i></div>
         <p>Carregando o cardápio…</p>
       </div>` :
-    estado === "erro" ? `
+    st_ === "erro" ? `
       <div class="estado erro" data-estado="erro">
         <h2>Não deu para carregar o cardápio</h2>
-        <p>${Paladira.esc(s.app.erro || "")}</p>
+        <p>${Paladira.esc(s.app.error_ || "")}</p>
         <button class="btn" data-act="recarregar-lista">Tentar de novo</button>
       </div>` :
-    estado === "vazio" ? `
+    st_ === "vazio" ? `
       <div class="estado" data-estado="vazio">
-        ${s.app.erroLista ? `<div class="aviso" data-erro="lista">${Paladira.esc(s.app.erroLista)}</div>` : ``}
+        ${s.app.listError ? `<div class="aviso" data-erro="lista">${Paladira.esc(s.app.listError)}</div>` : ``}
         <h2>Nenhum produto no cardápio</h2>
         <p>Cadastre o primeiro item para a loja abrir.</p>
         <button class="btn" data-act="novo-produto">Criar produto</button>
       </div>` : `
-      <div data-estado="conteudo" data-colunas="${s.degrau === "xlg" ? 3 : (s.larguraPx >= 768 ? 2 : 1)}"
-           data-acao="${s.larguraPx >= 768 ? "topo" : "rodape"}">
+      <div data-estado="conteudo" data-colunas="${s.rung === "xlg" ? 3 : (s.widthPx >= 768 ? 2 : 1)}"
+           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
         <div class="grade">
         ${(itens || []).map(p => `
           <button class="linha" data-act="abrir-produto" data-id="${Paladira.esc(p.id)}">
@@ -4960,7 +4960,7 @@ function telaLista(s){
         <p>${itens ? itens.length + (itens.length === 1 ? " produto" : " produtos") : "—"}</p>
         <button class="voltar" data-act="recarregar-lista">Recarregar</button>
       </header>
-      <div class="app-bd" data-async data-estado-atual="${estado}">${corpo}</div>
+      <div class="app-bd" data-async data-estado-atual="${st_}">${corpo}</div>
     </div>`;
 }
 
@@ -4972,8 +4972,8 @@ function telaProduto(s){
 
     /* AsyncStateContainer: os quatro caminhos ficam num lugar só, e cada
        um marca data-estado — é isso que o harness assere sozinho. */
-    const estado = (s.app.carregando || s.esperando()) ? "carregando"
-                 : s.app.erro       ? "erro"
+    const st_ = (s.app.carregando || s.esperando()) ? "carregando"
+                 : s.app.error_       ? "erro"
                  : (!vars.length && !s.app.pagamento) ? "vazio"
                  : "conteudo";
 
@@ -4983,29 +4983,29 @@ function telaProduto(s){
         <p>Carregando o produto…</p>
       </div>`;
 
-    const erro = `
+    const error_ = `
       <div class="estado erro" data-estado="erro">
         <h2>Não deu para carregar</h2>
-        <p>${Paladira.esc(s.app.erro || "")}</p>
+        <p>${Paladira.esc(s.app.error_ || "")}</p>
         <button class="btn" data-act="tentar">Tentar de novo</button>
       </div>`;
 
     const vazio = `
       <div class="estado" data-estado="vazio">
-        ${s.app.erroVariacao ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.erroVariacao)}</div>` : ``}
+        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.variantError)}</div>` : ``}
         <h2>Nenhuma variação ainda</h2>
         <p>Crie tamanhos ou sabores sem duplicar o produto.</p>
         ${podeEditar ? `<button class="btn" data-act="add">Adicionar variação</button>` : ``}
       </div>`;
 
     const conteudo = `
-      <div data-estado="conteudo" data-colunas="${s.larguraPx >= 768 ? 2 : 1}"
-           data-acao="${s.larguraPx >= 768 ? "topo" : "rodape"}">
-        ${s.app.erroVariacao ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.erroVariacao)}</div>` : ``}
+      <div data-estado="conteudo" data-colunas="${s.widthPx >= 768 ? 2 : 1}"
+           data-acao="${s.widthPx >= 768 ? "topo" : "rodape"}">
+        ${s.app.variantError ? `<div class="aviso" data-erro="variacao">${Paladira.esc(s.app.variantError)}</div>` : ``}
         ${s.app.salvo ? `<span class="tag">Produto salvo</span>` : ``}
-        ${s.app.erroSalvar ? `<div class="aviso" data-erro="salvar">${Paladira.esc(s.app.erroSalvar)}</div>` : ``}
+        ${s.app.saveError ? `<div class="aviso" data-erro="salvar">${Paladira.esc(s.app.saveError)}</div>` : ``}
         ${s.app.pagamento ? `<span class="tag" data-pg="ok">Pagamento aprovado · ${Paladira.esc(s.app.pagamento.id)}</span>` : ``}
-        ${s.app.erroPagamento ? `<div class="aviso" data-pg="erro">${Paladira.esc(s.app.erroPagamento)}</div>` : ``}
+        ${s.app.paymentError ? `<div class="aviso" data-pg="erro">${Paladira.esc(s.app.paymentError)}</div>` : ``}
 
         ${!podeEditar ? `<div class="aviso">
           Você pode consultar este produto, mas quem edita preço é o gerente ou o dono.
@@ -5050,9 +5050,9 @@ function telaProduto(s){
         </div>
       </div>`;
 
-    const corpo = estado === "carregando" ? carregando
-                : estado === "erro"       ? erro
-                : estado === "vazio"      ? vazio
+    const corpo = st_ === "carregando" ? carregando
+                : st_ === "erro"       ? error_
+                : st_ === "vazio"      ? vazio
                 : conteudo;
 
     return `
@@ -5063,9 +5063,9 @@ function telaProduto(s){
           <p>${vars.length ? vars.length + (vars.length === 1 ? " variação" : " variações") : "Sem variações"}</p>
         </header>
 
-        <div class="app-bd" data-async data-estado-atual="${estado}">${corpo}</div>
+        <div class="app-bd" data-async data-estado-atual="${st_}">${corpo}</div>
 
-        ${podeEditar && estado === "conteudo" ? `<div class="actions acao-fixa">
+        ${podeEditar && st_ === "conteudo" ? `<div class="actions acao-fixa">
           <button class="btn" data-act="salvar" ${incompleto || !vars.length ? "disabled" : ""}>Salvar</button>
         </div>` : ``}
       </div>`;
@@ -5075,25 +5075,25 @@ function telaProduto(s){
 Paladira.on("click", '[data-act="abrir-produto"]', async (e, el) => {
   try {
     const p = await Paladira.api.get(`/api/produtos/${el.dataset.id}`);
-    Paladira.set({ pagina:"produto", produto:p, erro:null, salvo:false });
-  } catch (err){ Paladira.set({ pagina:"produto", erro:err.message }); }
+    Paladira.set({ page:"produto", produto:p, error_:null, salvo:false });
+  } catch (err){ Paladira.set({ page:"produto", error_:err.message }); }
 });
 
 Paladira.on("click", '[data-act="novo-produto"]', async () => {
   try {
     const novo = await Paladira.api.post("/api/produtos", { nome:"Novo produto", categoria:"Sem categoria" });
-    Paladira.set({ pagina:"produto", produto:novo, erroLista:null });
-  } catch (err){ Paladira.set({ erroLista: err.message }); }
+    Paladira.set({ page:"produto", produto:novo, listError:null });
+  } catch (err){ Paladira.set({ listError: err.message }); }
 });
 
 Paladira.on("click", '[data-act="voltar"]', async () => {
-  try { Paladira.set({ pagina:"lista", produtos: await Paladira.api.get("/api/produtos"), erro:null }); }
-  catch (err){ Paladira.set({ pagina:"lista", erro:err.message }); }
+  try { Paladira.set({ page:"lista", produtos: await Paladira.api.get("/api/produtos"), error_:null }); }
+  catch (err){ Paladira.set({ page:"lista", error_:err.message }); }
 });
 
 Paladira.on("click", '[data-act="recarregar-lista"]', async () => {
-  try { Paladira.set({ produtos: await Paladira.api.get("/api/produtos"), erro:null }); }
-  catch (err){ Paladira.set({ erro:err.message }); }
+  try { Paladira.set({ produtos: await Paladira.api.get("/api/produtos"), error_:null }); }
+  catch (err){ Paladira.set({ error_:err.message }); }
 });
 
 /* pede à API e só então atualiza a tela — nada de inventar o registro */
@@ -5104,11 +5104,11 @@ Paladira.on("click", '[data-act="add"]', async (e, el, s) => {
   try {
     const nova = await Paladira.api.post(`/api/produtos/${prod.id}/variacoes`,
       { nome:nomes[vars.length] || "Nova", preco:"18,00" });
-    Paladira.set({ produto:{ ...prod, variacoes:vars.concat(nova) }, salvo:false, erroVariacao:null });
+    Paladira.set({ produto:{ ...prod, variacoes:vars.concat(nova) }, salvo:false, variantError:null });
   } catch (err){
     /* falha de item não derruba a página: o AsyncStateContainer segue
        no estado que estava e o aviso fica junto da lista */
-    Paladira.set({ erroVariacao: err.message });
+    Paladira.set({ variantError: err.message });
   }
 });
 
@@ -5124,24 +5124,24 @@ Paladira.on("input", '[data-campo="preco"]', (e, el, s) => {
 Paladira.on("click", '[data-act="pagar"]', async (e, el, s) => {
   try {
     const pg = await Paladira.api.post("/api/pagamentos", { valor:4200 });
-    Paladira.set({ pagamento:pg, erroPagamento:null });
+    Paladira.set({ pagamento:pg, paymentError:null });
   } catch (err){
-    Paladira.set({ erroPagamento:err.message, statusPagamento:err.status });
+    Paladira.set({ paymentError:err.message, statusPagamento:err.status });
   }
 });
 
 Paladira.on("click", '[data-act="tentar"]', async () => {
-  try { Paladira.set({ produto: await Paladira.api.get("/api/produtos/1"), erro:null }); }
-  catch (e){ Paladira.set({ erro:e.message }); }
+  try { Paladira.set({ produto: await Paladira.api.get("/api/produtos/1"), error_:null }); }
+  catch (e){ Paladira.set({ error_:e.message }); }
 });
 
 Paladira.on("click", '[data-act="salvar"]', async (e, el, s) => {
   const prod = s.app.produto;
   try {
     const salvo = await Paladira.api.put(`/api/produtos/${prod.id}`, { variacoes: prod.variacoes });
-    Paladira.set({ produto:salvo, salvo:true, erroSalvar:null });
+    Paladira.set({ produto:salvo, salvo:true, saveError:null });
   } catch (err){
-    Paladira.set({ erroSalvar: err.message, salvo:false });
+    Paladira.set({ saveError: err.message, salvo:false });
   }
 });
 </script>

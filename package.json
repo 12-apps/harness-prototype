@@ -1,12 +1,12 @@
 {
   "name": "paladira-harness",
   "version": "3.7.0",
-  "description": "Bancada de prototipagem do Paladira: o protótipo é a especificação, e o portão a cobra.",
-  "bin": { "paladira-verificar": "./paladira-verificar.js" },
+  "description": "Paladira prototyping bench: the prototype is the specification, and the gate enforces it.",
+  "bin": { "paladira-verify": "./paladira-verify.js" },
   "scripts": {
-    "verificar": "node paladira-verificar.js paladira-harness.html",
-    "verificar:exemplos": "node paladira-verificar.js exemplos/paladira-editor-produto.html",
-    "catalogo": "node scripts/gerar-catalogo.js"
+    "verify": "node paladira-verify.js paladira-harness.html",
+    "verify:examples": "node paladira-verify.js examples/paladira-product-editor.html",
+    "catalog": "node scripts/generate-catalog.js"
   },
   "devDependencies": { "jsdom": "^24.0.0" },
   "private": true
