@@ -8,10 +8,11 @@
    ============================================================ */
 const fs = require("fs");
 const path = require("path");
-const { lint, loadCatalog } = require("./lint-prototype.js");
+const { lint, loadCatalog, loadWiring } = require("./lint-prototype.js");
 
 const repo = path.join(__dirname, "..");
 const catalog = loadCatalog(repo);
+const wiring  = loadWiring(repo);
 const fixture = f => path.join(__dirname, "fixtures", f);
 
 let failed = 0;
@@ -20,7 +21,7 @@ const check = (label, cond, detail) => {
   if (!cond) failed++;
 };
 
-const bad = lint(fixture("violates.jsx"), catalog);
+const bad = lint(fixture("violates.jsx"), catalog, wiring);
 const kinds = bad.map(p => p.kind);
 const has = k => kinds.includes(k);
 
@@ -32,7 +33,16 @@ check("rejects a name not in the catalog", has("not-in-catalog"), "not reported"
 check("rejects the right name, wrong path", has("wrong-path"), "not reported");
 check("rejects a component never imported", has("unknown-component"), "not reported");
 
-const good = lint(fixture("complies.jsx"), catalog);
+/* Using the component is not the end of it: one that exists to be operated
+   has to be wired to a step, and the wiring has to join up at both ends. */
+check("rejects an `exige` component with no step hook",
+      has("unwired-component") && bad.some(p => /<CollapsibleTrigger>/.test(p.msg)), "not reported");
+check("rejects a hook no handler answers",
+      has("hook-without-handler") && bad.some(p => /"pay"/.test(p.msg)), "not reported");
+check("rejects a handler for a hook nothing carries",
+      has("handler-without-hook") && bad.some(p => /nobody/.test(p.msg)), "not reported");
+
+const good = lint(fixture("complies.jsx"), catalog, wiring);
 check("passes a compliant prototype", good.length === 0,
       good.map(p => p.kind + ": " + p.msg).join(" | "));
 
@@ -46,14 +56,14 @@ check("passes a compliant prototype", good.length === 0,
    component that no longer exists. Regenerate the catalog, add the
    missing judgments, or this goes red.
    ------------------------------------------------------------ */
-const wiring = {};
-new Function("window", fs.readFileSync(path.join(repo, "catalog", "ui-interactions.js"), "utf8"))(wiring);
+const maps = {};
+new Function("window", fs.readFileSync(path.join(repo, "catalog", "ui-interactions.js"), "utf8"))(maps);
 const names = Object.keys(catalog);
 const missing = level => names.filter(n => !(n in level));
 const orphan  = level => Object.keys(level).filter(n => !(n in catalog));
 const list = a => a.length + ": " + a.slice(0, 8).join(", ") + (a.length > 8 ? " …" : "");
 
-for (const [label, level] of [["wiring", wiring.PROTO_UI_WIRING], ["action", wiring.PROTO_UI_ACTION]]){
+for (const [label, level] of [["wiring", maps.PROTO_UI_WIRING], ["action", maps.PROTO_UI_ACTION]]){
   check(`every catalog component has a ${label} level`, missing(level).length === 0, list(missing(level)));
   check(`no ${label} level for a component that is gone`, orphan(level).length === 0, list(orphan(level)));
 }
@@ -61,8 +71,8 @@ for (const [label, level] of [["wiring", wiring.PROTO_UI_WIRING], ["action", wir
 /* `nunca` means there is nothing to operate, so it cannot carry a step
    that operates something. `efemero` is allowed: a skeleton or a loading
    state appears and goes away without ever being touched. */
-const inert = names.filter(n => wiring.PROTO_UI_WIRING[n] === "nunca"
-                             && !["passivo", "efemero"].includes(wiring.PROTO_UI_ACTION[n]));
+const inert = names.filter(n => maps.PROTO_UI_WIRING[n] === "nunca"
+                             && !["passivo", "efemero"].includes(maps.PROTO_UI_ACTION[n]));
 check("no component is inert and operable at once", inert.length === 0, list(inert));
 
 console.log(failed ? `\n✕ the component rule is not enforcing what it claims (${failed})`

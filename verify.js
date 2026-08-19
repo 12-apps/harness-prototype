@@ -81,15 +81,16 @@ if (isApp){
 
   if (jsxEntry){
     /* 1. the component rule, before a browser is even started */
-    const { lint, loadCatalog, designSystemImports } = require("./scripts/lint-prototype.js");
+    const { lint, loadCatalog, loadWiring, designSystemImports } = require("./scripts/lint-prototype.js");
     const entry = path.join(file, "app.jsx");
     let problems;
-    try { problems = lint(entry, loadCatalog(__dirname)); }
+    try { problems = lint(entry, loadCatalog(__dirname), loadWiring(__dirname)); }
     catch (e){ console.error("✕ could not check the component rule: " + e.message); process.exit(3); }
     if (problems.length){
       problems.forEach(p => console.error(`  ${entry}:${p.line}  ${p.msg}`));
       console.error(`\n✕ DO NOT SHIP. ${problems.length} violation(s) of the component rule — `
-                  + `a prototype uses ${"@12-apps/ui"}, never raw HTML.`);
+                  + `a prototype uses ${"@12-apps/ui"}, never raw HTML, and every component `
+                  + `that exists to be operated is wired to a step.`);
       process.exit(1);
     }
 
