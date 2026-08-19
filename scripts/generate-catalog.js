@@ -156,4 +156,18 @@ console.log(`catalog generated from ${PKG}@${pkg.version}`);
 console.log(`  components ${nComp} · hooks ${Object.keys(hooks).length}`
           + ` · helpers ${Object.keys(helpers).length} · constants ${Object.keys(constants).length}`);
 if (empty.length) console.log(`  ${empty.length} export entr${empty.length === 1 ? "y" : "ies"} export nothing importable`);
-console.log("note: ui-interactions.* is a curated classification — review it by hand when the lib changes.");
+/* ui-interactions.* is curated by hand and cannot follow along, so say
+   plainly which of the names just written have no judgment yet. Silence
+   here is how the classification fell 94 components behind the catalog.
+   scripts/test-enforcement.js turns the same gap into a red build. */
+const wiring = {};
+try {
+  new Function("window", fs.readFileSync(path.join(outDir, "ui-interactions.js"), "utf8"))(wiring);
+} catch { /* first run, or the file was removed — the note below covers it */ }
+const unclassified = Object.keys(components)
+  .filter(n => !wiring.PROTO_UI_WIRING || !(n in wiring.PROTO_UI_WIRING));
+console.log(unclassified.length
+  ? `note: ${unclassified.length} component(s) have no level in ui-interactions.js — `
+    + `classify them by reading each declaration in the package source:\n  `
+    + unclassified.join(", ")
+  : "note: ui-interactions.* covers every component here — review it by hand when the lib changes.");

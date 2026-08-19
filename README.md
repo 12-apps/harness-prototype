@@ -155,8 +155,17 @@ your app!"*) and mis-named 3 that do.
 
 The gate checks every component a prototype imports against this catalog: a name that is not in it, or the right name from the wrong path, fails the build.
 
-Note `catalog/ui-interactions.*` is curated by hand, not generated: it currently
-classifies 116 of the 210 components. Regenerating the catalog does not update it.
+Note `catalog/ui-interactions.*` is curated by hand, not generated: it says, per
+component, whether the screen owes it a step (`exige` = always operable, `pode` =
+operable if given a handler, `nunca` = inert). Every level was read off the
+component's own declaration in the package source rather than guessed from its
+name — `CardContent` is a container, `CollapsibleTrigger` renders a button.
+
+Regenerating the catalog does not update it. Two things keep the gap visible:
+the generator prints the names it wrote that still have no level, and
+`scripts/test-enforcement.js` fails the build on any component the
+classification misses (or any level left behind for a component that is gone).
+All 210 are covered today.
 
 ## License
 
