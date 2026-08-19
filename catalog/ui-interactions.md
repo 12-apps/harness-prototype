@@ -8,8 +8,17 @@ takes a handler is `pode`; a container, a context provider or an icon is
 
 A component is not passive by nature, but by use: an Avatar opens a menu, a
 whole Card becomes a click target, a Badge gets dismissed. Hence three levels,
-and the harness audit decides from what the screen offers (role, tabindex,
-onclick, cursor:pointer, data-act), not from the component's name.
+and only the first is decided here.
+
+**`exige` is enforced.** The gate reads `ui-interactions.js` and rejects a
+prototype that renders an `exige` component with nothing to operate — no
+`data-act`, no `data-campo`, no `on…` prop, no `href` — before a browser
+starts. Moving a component in or out of `exige` changes what the gate accepts.
+
+`pode` and `nunca` are not checked in the source. `pode` depends on what the
+screen actually offers, which the runtime audit decides from the rendered DOM
+(role, tabindex, onclick, cursor:pointer, data-act) rather than from the
+component's name; `nunca` has nothing to demand.
 
 The three level names stay Portuguese, matching the values in
 `ui-interactions.js`: `exige` = always operable, `pode` = operable if

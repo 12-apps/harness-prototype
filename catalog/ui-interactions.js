@@ -6,9 +6,16 @@
    catalog/ui-catalog.js does NOT update this file — new components land here
    unclassified and must be judged the same way.
 
-   The harness decides from the affordance on screen (role, tabindex, onclick,
-   cursor:pointer, data-act), not from this map. This is a reference for the
-   agent writing the prototype and for reviewing what the spec left out. */
+   `exige` is ENFORCED, not advisory: scripts/lint-prototype.js reads this map
+   and fails the gate when a prototype renders an `exige` component with no
+   data-act, no data-campo, no on… prop and no href. Edit a level here and you
+   change what the gate accepts — this file is not documentation about the
+   rule, it is the rule's input.
+
+   `pode` and `nunca` are not checked statically. `pode` depends on what the
+   screen actually offers, which the runtime audit decides from the rendered
+   DOM (role, tabindex, onclick, cursor:pointer, data-act); `nunca` has
+   nothing to demand. */
 window.PROTO_UI_WIRING = {
  "Button": "exige",
  "HeaderButton": "exige",

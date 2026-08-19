@@ -17,7 +17,8 @@ harness.js     the engine — you never open it
 harness.css    the chrome
 proto.html     the bench: a loader, and it never changes
 apps/
-  _template/   copy this to start
+  _react-template/  copy this to start
+  _template/        vanilla; the source rules only apply to app.jsx
   product-editor/
     styles.css   the prototype's styles
     data.js      fixtures and routes
@@ -33,11 +34,11 @@ a folder now, and folders lose files in transit.
 
 ## How it is used
 
-1. `cp -r apps/_template apps/<area>-<thing>`
+1. `cp -r apps/_react-template apps/<area>-<thing>`
 2. Fill its three files:
    - `data.js` — fixtures and routes
    - `styles.css` — the prototype's styles
-   - `app.jsx` — context, scenarios and render (React; `app.js` for a vanilla one)
+   - `app.jsx` — context, scenarios and render (React, real components)
 3. Open `proto.html?app=<area>-<thing>`. The suite runs on its own and blocks the
    screen if it fails.
 4. Before shipping, run the gate. It has to exit `0`:

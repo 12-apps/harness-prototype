@@ -18,6 +18,41 @@ prototype itself — when, and only when, the run passes.
 | `2` | passed with warnings and `--strict` was on | cover it or accept the debt |
 | `3` | the file did not load | a syntax error, or it is not a harness prototype |
 
+## What it rejects in the source, before a browser starts
+
+A React prototype (`app.jsx`) is read as source first. These fail at exit `1`
+without the suite ever running, because by the time the screen exists it is too
+late to tell: once `<Button>` renders, the design system emits a real `<button>`
+and nothing downstream can distinguish it from one an agent typed.
+
+| kind | what it catches |
+|---|---|
+| `raw-html` | **any** lowercase JSX element — `<div>`, `<span>`, `<button>`, `<marquee>`, a web component. Not a blocklist: the check is "does the tag start lowercase". Fragments (`<>…</>`) are fine, they are not elements |
+| `foreign-import` | a component from anywhere but `@12-apps/ui` |
+| `not-in-catalog` | a name that is not in `catalog/ui-catalog.md` |
+| `wrong-path` | the right name imported from the wrong subpath |
+| `unknown-component` | `<Foo>` used but never imported |
+| `unwired-component` | an `exige` component with no `data-act`, no `data-campo`, no `on…` prop and no `href` — an affordance that does nothing |
+| `hook-without-handler` | a `data-act` / `data-campo` no `Proto.on` answers |
+| `handler-without-hook` | a `Proto.on` for a hook no element carries |
+
+The last three come from `catalog/ui-interactions.js`, which classifies every
+component as `exige` (always operable), `pode` (operable if given a handler) or
+`nunca` (inert). Only `exige` is enforced here; `pode` is left to the runtime
+audit, which decides from the rendered DOM, and `nunca` has nothing to demand.
+
+Components you define yourself are fine — composing design-system parts into a
+screen is the job. Two things the source cannot see are deliberately not
+accused: a hook built at runtime (`data-act={id}`) and one arriving through a
+spread. The runtime audit covers both.
+
+`docs/project-instructions.md` has the agent-facing version of all of this, with
+the fixes rather than just the failures.
+
+> **These checks apply to `app.jsx` only.** A vanilla `app.js` prototype builds
+> its screen from template strings, and none of the above runs against it — raw
+> HTML in an `app.js` passes the gate. Write prototypes as `app.jsx`.
+
 ## Two engines
 
 The output says which one ran:

@@ -27,7 +27,7 @@ because the scenario text and the screen are checked against each other.
 **Do not rebuild the harness, and do not open it.** A prototype is three files:
 
 ```
-cp -r apps/_template apps/<area>-<thing>
+cp -r apps/_react-template apps/<area>-<thing>
 ```
 
 ```
@@ -39,6 +39,13 @@ apps/<area>-<thing>/
 
 Open it with `proto.html?app=<area>-<thing>`. The bench loads those three, in that
 order, so `app.jsx` can count on the fixtures already existing.
+
+Copy `_react-template`, not `_template`. Both are starters, but the rules below —
+no raw HTML, every component from the catalog, every `exige` component wired —
+are read out of the JSX source, so they apply to `app.jsx` and to nothing else. A
+vanilla `app.js` builds its screen from template strings, and raw HTML in one
+passes the gate unchallenged. `_template` is kept for the vanilla path; a new
+prototype should not start there.
 
 The harness is never copied: one `harness.js` and one `harness.css` serve every
 prototype, and neither appears in the files you edit. The chrome also sits in a
