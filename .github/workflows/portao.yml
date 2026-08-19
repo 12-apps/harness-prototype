@@ -1,0 +1,48 @@
+name: portão
+
+# O portão sai diferente de zero quando o protótipo não cumpre a própria
+# especificação. Rodar no CI é o que impede um protótipo quebrado de virar
+# a fonte de verdade de quem for implementar.
+#
+# O runner do GitHub já traz Chromium, então aqui valem TAMBÉM as regras
+# que precisam medir caixa: arranjo por degrau, transbordo, alvo de toque,
+# tamanho de texto e comprimento de linha. Localmente, sem navegador, essas
+# se declaram não verificáveis — a saída marca `[navegador]` quando valeram.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: instalar jsdom (fallback do portão)
+        run: npm install --no-save jsdom
+
+      - name: localizar o Chromium do runner
+        id: chrome
+        run: |
+          for c in "$CHROME_BIN" /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -n "$c" ] && [ -x "$c" ]; then echo "caminho=$c" >> "$GITHUB_OUTPUT"; exit 0; fi
+          done
+          echo "caminho=" >> "$GITHUB_OUTPUT"
+
+      - name: verificar o harness e os exemplos
+        env:
+          PALADIRA_CHROME: ${{ steps.chrome.outputs.caminho }}
+        run: |
+          falhou=0
+          for f in paladira-harness.html exemplos/*.html; do
+            [ -e "$f" ] || continue
+            echo "── $f"
+            node paladira-verificar.js "$f" || falhou=1
+          done
+          exit $falhou
