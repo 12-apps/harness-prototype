@@ -1,64 +1,45 @@
-# Portão de verificação — regra de entrega
+# Verification gate — the shipping rule
 
-**Nenhum protótipo é entregue sem passar por isto.** Vale para mim, para você e para qualquer agente que editar o arquivo.
+**No prototype ships without passing this.** It applies to me, to you, and to any agent that edits the file.
 
 ```bash
-npm install jsdom                                   # uma vez por sessão
-node paladira-verificar.js paladira-<coisa>.html
-node paladira-verificar.js paladira-<coisa>.html --estrito
+npm install jsdom                              # once per session
+node paladira-verify.js paladira-<thing>.html
+node paladira-verify.js paladira-<thing>.html --strict
 ```
 
-| saída | significa | o que fazer |
+| exit | means | what to do |
 |---|---|---|
-| `0` | passou | pode entregar |
-| `1` | há falhas | **não entregue** — o relatório sai no stderr, corrija e rode de novo |
-| `2` | passou com avisos e `--estrito` estava ligado | cobrir ou aceitar a dívida |
-| `3` | o arquivo não carregou | erro de sintaxe, ou não é um protótipo do harness |
+| `0` | passed | you can ship |
+| `1` | there are failures | **do not ship** — the report goes to stderr, fix it and run again |
+| `2` | passed with warnings and `--strict` was on | cover it or accept the debt |
+| `3` | the file did not load | a syntax error, or it is not a harness prototype |
 
-## Dois motores
+## Two engines
 
-A saída diz qual rodou:
+The output says which one ran:
 
 ```
-✓ paladira-editor-produto.html — 68 ok · 0 falhando · 0 aviso(s) · handlers 9/9  [navegador]
+✓ paladira-product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
 
-**Com `[navegador]`** — achou um Chromium e rodou a suíte lá dentro. Só assim valem as regras que dependem de medir caixa: arranjo por degrau, transbordo, alvo de toque, tamanho de texto, comprimento de linha. Procura nesta ordem: `PALADIRA_CHROME`, o cache do Puppeteer, `/opt/pw-browsers`, `/usr/bin/chromium`. **Precisa também do puppeteer instalado** para dirigir o navegador — achar o Chromium não basta.
+**With `[browser]`** — it found a Chromium and ran the suite inside it. Only then do the rules that depend on measuring boxes apply: per-rung arrangement, overflow, touch target, text size, line length. It looks in this order: `PALADIRA_CHROME`, the Puppeteer cache, `/opt/pw-browsers`, `/usr/bin/chromium`. **It also needs puppeteer installed** to drive the browser — finding the Chromium is not enough on its own.
 
-**Sem a marca** — caiu no jsdom, que resolve DOM mas não faz layout: `@container` nunca casa. As regras de medida se declaram não verificáveis em vez de aprovar no escuro. Tudo o mais (jornadas, rotas, estados, permissões, sumiço de conteúdo) continua valendo.
+**Without the marker** — it fell back to jsdom, which resolves the DOM but does no layout: `@container` never matches. The measurement rules declare themselves unverifiable instead of approving in the dark. Everything else (journeys, routes, states, permissions, disappearing content) still applies.
 
-Para forçar um navegador específico:
+To force a specific browser:
 
 ```bash
-PALADIRA_CHROME=/caminho/para/chrome node paladira-verificar.js arquivo.html
+PALADIRA_CHROME=/path/to/chrome node paladira-verify.js file.html
 ```
 
-## Por que existe
+## In CI
 
-O harness verifica sozinho ao abrir, mas isso só protege quem já recebeu o arquivo. O portão protege antes: quem editou descobre que quebrou com as mãos ainda no código.
+`.github/workflows/gate.yml` runs the gate on every pull request and on pushes to `main`. The runner ships a Chromium and the workflow installs puppeteer alongside jsdom, so CI runs in `[browser]` mode and the measurement rules count there.
 
-O que ele pega e uma revisão de olho não pega:
+Two failure modes are worth knowing about, because both once made this gate approve anything:
 
-- **Cenário que ninguém abriu nesta sessão.** A suíte roda todos, sempre, cada um no contexto que as tags dele pedem.
-- **Contrato rompido.** Renomear `data-act`, apagar um handler, desabilitar um botão — o passo deixa de agir e a falha diz qual elemento sumiu.
-- **Fachada.** Rota de escrita que responde 200 sem alterar as fixtures; botão que diz *Salvar* e não pede nada.
-- **"Algo que cabe".** Mesma disposição em toda a escada de larguras, alvo de 43px, linha de 217 caracteres.
+- `verifyAll()` is async. Calling it without `await` yields the pending Promise, whose `bad` is `undefined` — a falsy value that reads as "no failures".
+- The browser path needs a Chromium **and** puppeteer. With only one of the two, the gate silently drops to jsdom and the measurement rules stop applying.
 
-## Antes de entregar, na ordem
-
-1. `node --check` no bloco `<script>` — erro de sintaxe deixa a página em branco, e o portão não distingue isso de tela vazia.
-2. `node paladira-verificar.js arquivo.html` — precisa sair `0`.
-3. Ler os avisos mesmo quando passa. `handlers 2/5` quer dizer que três comportamentos não têm cenário nenhum. Verde não é o mesmo que coberto.
-4. Só então apresentar o arquivo.
-
-## Avisos que não bloqueiam mas contam dívida
-
-- `afordância sem ação` — a tela convida a clicar e nada responde. Costuma ser bug de verdade.
-- `existe e casa com a tela, mas nenhum passo o dispara` — comportamento sem cobertura.
-- `só aparece dando certo` / `rota morta` — cobertura de rota pela metade.
-- `não é jornada` / `só tem caminho feliz` — especificação rasa.
-- `marcação crua` (modo `estrito`) — elemento com texto ou interação fora do mapa de componentes.
-- `desenha o MESMO arranjo em toda a escada` — não respondeu a largura nenhuma.
-- `alvo … menor que 44px` / `texto abaixo de 12px` / `linha acima de 75 caracteres`.
-
-Use `--estrito` quando o protótipo for virar implementação: aí aviso vira falha.
+A green run that prints `undefined ok · undefined failing`, or that is missing the `[browser]` marker where you expected it, is not a pass. Read the counters, not just the checkmark.

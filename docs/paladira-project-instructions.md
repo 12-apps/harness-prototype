@@ -1,110 +1,116 @@
 # Paladira — Project Instructions
 
-*(Cole no campo de instruções do projeto. Os arquivos citados vivem no conhecimento do projeto.)*
+*(Paste this into the project instructions field. The files it mentions live in the project knowledge.)*
 
 ---
 
-## O que é
+## What it is
 
-Paladira é uma plataforma para lojas brasileiras de alimentação e varejo: cardápio, catálogo, mesas e comandas, cozinha, estoque, entregas, pagamentos, equipe e relatórios. Este projeto serve para desenhar e pressionar a UI antes de virar código.
+Paladira is a platform for Brazilian food and retail shops: menu, catalog, tables and tabs, kitchen, stock, deliveries, payments, team and reports. This project exists to design and stress-test the UI before it becomes code.
 
-**Toda string de interface é português do Brasil.** Nunca escreva UI em inglês, nem como rascunho. Termos de domínio ficam em português: mesa, comanda, pedido, cardápio, ficha técnica, estoque, entrega, garçom.
+**Every interface string is Brazilian Portuguese.** Never write UI in English, not even as a draft. Domain terms stay in Portuguese: mesa, comanda, pedido, cardápio, ficha técnica, estoque, entrega, garçom.
 
-## Ponto de partida
+Everything that is not user-facing content — identifiers, comments, filenames, tooling, these docs — is English.
 
-**Não recrie o harness. Copie `paladira-harness.html`** e edite **somente** as zonas marcadas:
+## Starting point
 
-- `▼ DADOS ▼` — fixtures e rotas
-- `▼ APP ▼ (1 de 2)` — estilos do protótipo
-- `▼ APP ▼ (2 de 2)` — contexto, cenários e render
+**Do not rebuild the harness. Copy `paladira-harness.html`** and edit **only** the marked zones:
 
-Tudo fora dessas zonas é o harness. Renomeie para `paladira-<área>-<coisa>.html`.
+- `▼ DATA ▼` — fixtures and routes
+- `▼ APP ▼ (1 of 2)` — the prototype's styles
+- `▼ APP ▼ (2 of 2)` — context, scenarios and render
 
-O harness entrega: escada de larguras, barra de cenários redimensionável com busca, permalink no hash, preferências salvas, monitor de rede no palco, painel de Dados, exportação Gherkin, verificação isolada em iframe (com retomada automática) e tela de falha bloqueante.
+Everything outside those zones is the harness. Rename the file to `paladira-<area>-<thing>.html`.
 
-## O protótipo é a especificação
+The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume) and a blocking failure screen.
 
-Cenários são Gherkin de verdade (`# language: pt`) com passos clicáveis: clicar no passo N reproduz 1..N a partir do `Dado`.
+## The prototype is the specification
+
+Scenarios are real Gherkin (`# language: pt`) with clickable steps: clicking step N replays 1..N from the `Dado`.
 
 ```js
 {
   id:"criar-variacao", name:"Do cardápio até criar a primeira variação",
-  pagina:"produto", tags:["@catálogo","@feliz","@pode:produto.editar"],
-  impl:{ componente:"ProdutoEditor", rota:"/produtos/:id", modulo:"catalogo/produtos" },
+  page:"produto", tags:["@catálogo","@feliz","@pode:produto.editar"],
+  impl:{ component:"ProdutoEditor", route:"/produtos/:id", moduleName:"catalogo/produtos" },
   given:{ text:"que o lojista está no cardápio",
-          state: async (ex, api) => ({ pagina:"lista", produtos: await api.get("/api/produtos") }) },
+          state: async (ex, api) => ({ page:"lista", products: await api.get("/api/produtos") }) },
   steps:[
-    { when:"o lojista abre Calabresa", clique:'[data-act="abrir-produto"][data-id="2"]' },
+    { when:"o lojista abre Calabresa", click:'[data-act="abrir-produto"][data-id="2"]' },
     { then:"o editor abre", check:(a, el) => !!el.querySelector('[data-act="voltar"]') },
-    { when:"toca em Adicionar variação", clique:'[data-act="add"]' },
+    { when:"toca em Adicionar variação", click:'[data-act="add"]' },
     { then:"a variação aparece", check:(a, el) => el.querySelectorAll(".var").length === 1 }
   ]
 }
 ```
 
-- `Dado` = o mundo antes da ação; busca pela API.
-- `Quando` = ação real: `clique`, `preenche`, `escolhe`, `alterna`, `aguarda`. Roda os handlers de `Paladira.on` e falha se o elemento não existir. `apply` só para estado puro.
-- `Então` = `check(estado, dom)` contra o DOM renderizado.
-- `E` **herda a palavra anterior**: `E` depois de `Então` é asserção. Ação escrita ali é acusada.
-- **Passo que muda o estado é `Quando`, sempre** — venha de clique, de `apply` ou da resposta que chegou.
+The scenario text stays Portuguese; the keys around it are English.
 
-## Jornada, não asserção solta
+- `Dado` = the world before the action; fetched from the API.
+- `Quando` = a real action: `click`, `fill`, `choose`, `toggleCtl`, `waitFor`. It runs the `Paladira.on` handlers and fails if the element does not exist. `applyState` is for pure state only.
+- `Então` = `check(state, dom)` against the rendered DOM.
+- `E` **inherits the previous keyword**: an `E` after `Então` is an assertion. An action written there is called out.
+- **A step that changes state is a `Quando`, always** — whether it comes from a click, from `applyState` or from the response that arrived.
 
-`Dado … Então` sem ação no meio não é cenário, é legenda de print. A verificação cobra:
+## A journey, not a loose assertion
 
-- pelo menos **2 ações** por cenário (`minAcoes`), e ao menos uma jornada de **3+ ações** por página;
-- um `Então` **depois** da última ação;
-- ações em **alvos diferentes** — clicar três vezes no mesmo botão não é percurso;
-- cada página precisa de uma jornada que **chegue nela vindo de outra tela**;
-- dois cenários que percorrem os mesmos controles na mesma ordem são acusados como clone.
+`Dado … Então` with no action in between is not a scenario, it is a screenshot caption. Verification demands:
 
-**Tipos de jornada** (o rótulo é conferido contra a tela):
+- at least **2 actions** per scenario (`minActions`), and at least one **3+ action** journey per page;
+- a `Então` **after** the last action;
+- actions on **different targets** — clicking the same button three times is not a path;
+- every page needs a journey that **reaches it from another screen**;
+- two scenarios walking the same controls in the same order are called out as clones.
 
-| tag | é | conferido por |
+**Journey types** (the label is checked against the screen):
+
+| tag | is | checked by |
 |---|---|---|
-| `@feliz` | funciona de ponta a ponta | nenhum erro em nenhum passo |
-| `@conflito` | o servidor recusa (e-mail existe, limite, 422) | termina **com** erro visível |
-| `@recuperacao` | quebra no meio e a pessoa se recupera | erro aparece **e** some no fim |
-| `@retorno` | quem já usou volta | sai da página e volta |
+| `@feliz` | works end to end | no error in any step |
+| `@conflito` | the server refuses (email exists, limit, 422) | ends **with** a visible error |
+| `@recuperacao` | breaks midway and the person recovers | the error appears **and** is gone at the end |
+| `@retorno` | someone who already used it comes back | leaves the page and returns |
 
-Cada página precisa de `@feliz` **e** de pelo menos um dos outros três.
+Every page needs `@feliz` **and** at least one of the other three.
 
-## Três estados por página
+## Three states per page
 
-Toda página usa `AsyncStateContainer` e marca `[data-estado="…"]`. Precisa de cenário `@carregando`, `@vazio` e `@erro`, agrupados por `pagina`. O harness assere sozinho que o estado apareceu **em algum ponto da jornada** — estado é etapa, não destino. `@erro` sem falha forçada (`rede` ou `falhaNasFixtures`) é caminho feliz de rótulo errado.
+Every page uses `AsyncStateContainer` and marks `[data-estado="…"]`. It needs a `@carregando`, `@vazio` and `@erro` scenario, grouped by `page`. The harness asserts on its own that the state appeared **at some point in the journey** — a state is a step, not a destination. `@erro` without a forced failure (`network` or `fixtureFailure`) is a happy path with the wrong label.
 
-Para carregando virar etapa: `rede:{ "GET /api/x": "pendente" }` segura a resposta e um passo a solta:
+For loading to become a step: `network:{ "GET /api/x": "pendente" }` holds the response and a step releases it:
 
 ```js
-{ when:"a resposta chega", aguarda:"GET /api/produtos",
-  aplica:(a, corpo) => ({ ...a, produtos:corpo, carregando:false }) }
+{ when:"a resposta chega", waitFor:"GET /api/produtos",
+  applyState:(a, payload) => ({ ...a, products:payload, loading:false }) }
 ```
 
-## Dados: a tela nunca inventa, ela pede
+## Data: the screen never invents, it asks
 
-Fixtures e rotas ficam na zona `DADOS`; o harness intercepta `fetch`. As fixtures voltam ao estado inicial a cada cenário.
+Fixtures and routes live in the `DATA` zone; the harness intercepts `fetch`. Fixtures reset to their initial state for each scenario.
 
-- **Rota de escrita precisa alterar as fixtures.** Responder 200 sem gravar é fachada — o recarregar desmente e a auditoria acusa.
-- **Toda rota nas duas pontas**: cenário de sucesso e de erro (`rede:{ "POST /api/…": 500 }`). Rota nunca chamada é rota morta.
-- **Toda chamada nasce de um passo.** Só no `Dado` = carregamento de tela: marque `naCarga:true` na rota.
-- **Mutação sai do navegador.** Passo que muda a tela sem pedido é acusado. `local: true` isenta ação de interface — mas **não** vale para controle cujo rótulo promete gravar (*Salvar*, *Confirmar*, *Excluir*…), nem quando altera dado do servidor sem ninguém persistir depois.
-- Latência sorteada de 250–750ms na tela; a verificação roda sem atraso.
+- **A write route has to change the fixtures.** Answering 200 without storing is a facade — a reload contradicts it and the audit calls it out.
+- **Every route from both ends**: a success and an error scenario (`network:{ "POST /api/…": 500 }`). A route never called is a dead route.
+- **Every call is born from a step.** Only in the `Dado` = screen load: mark `onLoad:true` on the route.
+- **A mutation leaves the browser.** A step that changes the screen with no request is called out. `local: true` exempts an interface-only action — but **not** a control whose label promises to store (*Salvar*, *Confirmar*, *Excluir*…), and not when it changes server data with nobody persisting it afterwards.
+- Latency is randomised between 250–750ms on screen; verification runs with no delay.
 
-## Contexto da loja
+## Shop context
 
-Três tipos de dimensão em `contexto`:
+Three kinds of dimension in `context`:
 
-- `kind:"escala"` — plano (free → ultra). `@pro` vale de Pro para cima.
-- `kind:"opcao"` — papel do usuário. `@garcom` vale só no garçom.
-- `kind:"flags"` — funcionalidades ligáveis. `@cozinha` exige ligada.
+- `kind:"escala"` — plan (free → ultra). `@pro` applies from Pro upwards.
+- `kind:"opcao"` — the user's role. `@garcom` applies only to the waiter.
+- `kind:"flags"` — switchable features. `@cozinha` requires it on.
 
-Opções concedem permissões (`permite:[…]`, `"*"` = todas); um cenário exige com `@pode:produto.editar`. Permissão é **E entre dimensões**: o plano habilita, o papel autoriza. **Cada cenário é verificado no contexto que as tags dele pedem** — o resultado não depende dos chips marcados na tela.
+These three `kind` values stay Portuguese: they are authoring vocabulary, the same family as the tags.
 
-## Largura é dimensão, não detalhe
+Options grant permissions (`allows:[…]`, `"*"` = all); a scenario demands one with `@pode:produto.editar`. Permission is **AND across dimensions**: the plan enables, the role authorises. **Every scenario is verified in the context its own tags ask for** — the result does not depend on the chips ticked on screen.
 
-A escada padrão é `xxs 320 · xs 380 · sm 480 · md 768 · lg 1024 · xlg 1440` (troque em `larguras`). Aparelhos aparecem como `~xs`: caem entre degraus e herdam o de baixo.
+## Width is a dimension, not a detail
 
-**Não entregue "algo que cabe".** Declare o arranjo de cada largura num `Esquema do Cenário` com coluna `largura` — o harness põe o quadro naquela largura antes de desenhar e de conferir:
+The default ladder is `xxs 320 · xs 380 · sm 480 · md 768 · lg 1024 · xlg 1440` (change it in `widths`). Devices show up as `~xs`: they fall between rungs and inherit the one below.
+
+**Do not ship "something that fits".** Declare the arrangement of each width in an `Esquema do Cenário` with a `largura` column — the harness sets the frame to that width before drawing and before checking:
 
 ```
 Exemplos:
@@ -114,42 +120,44 @@ Exemplos:
   | xlg     | 3       | topo   |
 ```
 
-Escolher um degrau no seletor troca a linha do exemplo, e vice-versa.
+The Examples headers are Gherkin content and stay Portuguese; the row values are read back by those same names.
 
-Além disso a verificação mede, degrau a degrau:
+Picking a rung in the selector switches the example row, and vice versa.
 
-- **arranjo igual na escada inteira** = coube, não respondeu;
-- **transbordo horizontal**;
-- **alvo de toque < 44px** em xxs/xs/sm;
-- **texto < 12px**;
-- **linha > 75 caracteres** em lg/xlg;
-- **conteúdo que existe no largo e some no estreito** — decisão ou falta de espaço?
+On top of that, verification measures, rung by rung:
 
-Prefira `@container` a `@media`: o quadro é o container.
+- **the same arrangement across the whole ladder** = it fit, it did not respond;
+- **horizontal overflow**;
+- **touch target < 44px** on xxs/xs/sm;
+- **text < 12px**;
+- **line > 75 characters** on lg/xlg;
+- **content that exists when wide and vanishes when narrow** — a decision, or a lack of room?
 
-## Componentes
+Prefer `@container` over `@media`: the frame is the container.
 
-Use `@12-apps/ui` — 128 componentes em `paladira-ui-catalogo.md`, com o que exige fiação em `paladira-ui-interacoes.md` (60 exigem, 37 podem, 31 nunca). O mapa `primitivas` liga seletor a componente **pelo nome**; o caminho do import sai do catálogo, e nome fora dele é acusado sem gerar import inventado. `estrito: true` exige que toda marcação com texto ou interação esteja reivindicada. Nunca escreva hex quando existe token.
+## Components
 
-## Antes de entregar — obrigatório
+Use `@12-apps/ui` — 128 components in `paladira-ui-catalog.md`, with what needs wiring in `paladira-ui-interactions.md` (60 require it, 37 may, 31 never). The `primitives` map links a selector to a component **by name**; the import path comes from the catalog, and a name outside it is called out instead of generating an invented import. `strictMode: true` demands that every piece of markup with text or interaction is claimed. Never write a hex value when a token exists.
+
+## Before shipping — mandatory
 
 ```bash
-npm install jsdom                                  # uma vez por sessão
-node paladira-verificar.js paladira-<coisa>.html   # precisa sair 0
+npm install jsdom                                # once per session
+node paladira-verify.js paladira-<thing>.html    # has to exit 0
 ```
 
-O portão usa **Chromium quando encontra um** (marca `[navegador]` na saída) e só aí as regras de layout e as medidas físicas valem. Sem navegador cai no jsdom e essas regras se declaram não verificáveis — o resto continua valendo.
+The gate uses **Chromium when it finds one and has puppeteer to drive it** (marked `[browser]` in the output) and only then do the layout rules and the physical measurements apply. Without a browser it falls back to jsdom and those rules declare themselves unverifiable — everything else still applies.
 
-Antes disso, `node --check` no bloco `<script>`: erro de sintaxe deixa a página em branco. Leia os avisos mesmo quando passa: `handlers 2/5` quer dizer que três comportamentos não têm cenário. Verde não é o mesmo que coberto. Detalhes em `paladira-portao.md`.
+Before that, `node --check` on the `<script>` block: a syntax error leaves the page blank. Read the warnings even when it passes: `handlers 2/5` means three behaviours have no scenario. Green is not the same as covered. Details in `paladira-gate.md`.
 
 ## Escapes
 
-Existem e devem ser exceção declarada, nunca o jeito de calar um aviso: `local`, `semRede`, `naCarga`, `jornada:false`, `estados:false`, `rotasCobertas:false`, `jornadas:false`, `responsivo:false`.
+They exist and must be a declared exception, never the way to silence a warning: `local`, `noNetwork`, `onLoad`, `journey:false`, `states:false`, `coveredRoutes:false`, `journeys:false`, `responsive:false`.
 
-## Como trabalhamos
+## How we work
 
-Retorno curto e direto — *"UI is not good"*, *"needs a remover conexao flow"*. **Infira o escopo e execute**; não peça especificação antes de tentar. Uma pergunta só quando o *o quê* estiver ambíguo, nunca sobre o *como*. Espere de cinco a quinze rodadas no mesmo arquivo.
+Short, direct feedback — *"UI is not good"*, *"needs a remover conexao flow"*. **Infer the scope and execute**; do not ask for a specification before trying. A question only when the *what* is ambiguous, never about the *how*. Expect five to fifteen rounds on the same file.
 
-Depois de construir: mudança em prosa curta, com o raciocínio onde houve decisão real, e o que vale cutucar. Não cole o código de volta nem repita a lista de funcionalidades.
+After building: the change in short prose, with the reasoning where there was a real decision, and what is worth poking at. Do not paste the code back or repeat the feature list.
 
-Se encontrar um bug no que eu mandei, diga na hora e conserte no mesmo passo.
+If you find a bug in what I sent, say so immediately and fix it in the same step.
