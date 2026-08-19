@@ -1030,8 +1030,9 @@ const Paladira = (() => {
      exist the step fails — the specification now demands the button
      exists. */
   let sandbox = null;
-  /* uma reprodução por vez. Sem isto, o replay disparado pela navegação e a
-     verificação automática correm juntos e um limpa o sandbox do outro. */
+  /* one replay at a time. Without this, the replay triggered by navigation
+     and the automatic verification run together and each wipes the other's
+     sandbox. */
   let queue = Promise.resolve();
   function enqueue(fn){
     const p = queue.then(fn, fn);
@@ -1042,26 +1043,27 @@ const Paladira = (() => {
   const silentChanges = [];
   const suspectLocal = [];
   const arrivals = new Set();
-  /* passos que efetivamente mudaram o estado: `${cenario}|${indice}` */
+  /* steps that actually changed the state: `${scenario}|${index}` */
   const stateChanged = new Set();
   const lyingLabels = [];
-  const exercised = new Set();   /* "tipo seletor" de handler que já disparou de verdade */
+  const exercised = new Set();   /* the "type selector" of a handler that has really fired */
 
-  /* Nem toda interação é um clique. Um campo se preenche, um select se
-     escolhe, um switch se alterna — e cada um dispara eventos diferentes.
-     Um passo declara o que a pessoa faz e o harness executa contra o DOM
-     real, chamando os handlers registrados com Paladira.on. */
-  /* Como saber que ESTE botão devia chamar o servidor? Três sinais
-     independentes, e nenhum depende de alguém declarar a intenção:
+  /* Not every interaction is a click. A field gets filled, a select gets
+     chosen, a switch gets toggled — and each fires different events. A step
+     declares what the person does and the harness runs it against the real
+     DOM, calling the handlers registered with Paladira.on. */
+  /* How do we know THIS button should have called the server? Three
+     independent signals, none of which relies on anyone declaring intent:
 
-       rótulo      "Salvar" promete gravar. Um controle com verbo de
-                   persistência que não faz pedido está mentindo, e
-                   marcar local: true não desmente o próprio texto.
-       proveniência  mexeu em dado que veio de resposta da API? então
-                   alguém precisa devolver isso para lá.
-       durabilidade  a escrita mudou as fixtures? senão recarregar desfaz.
+       label        "Salvar" promises to store. A control with a
+                    persistence verb that makes no request is lying, and
+                    marking local: true does not contradict its own text.
+       provenance   did it touch data that came from an API response? then
+                    somebody has to send it back there.
+       durability   did the write change the fixtures? otherwise a reload
+                    undoes it.
 
-     Nenhum é infalível sozinho; juntos cobrem o caso do "Salvar" falso. */
+     None is infallible alone; together they cover the false "Salvar". */
   const PERSISTENT_VERBS = /\b(salvar|guardar|gravar|confirmar|enviar|publicar|excluir|remover|apagar|criar|cadastrar|adicionar|atualizar|editar|pagar|finalizar|aplicar|convidar|aprovar|recusar|cancelar pedido)\b/i;
 
   const ACTIONS = {
@@ -1071,7 +1073,7 @@ const Paladira = (() => {
     toggleCtl:  { evs:["change","click"],  caption:"alterna"     }
   };
 
-  /* solta os pedidos parados: o servidor respondeu */
+  /* releases the stalled requests: the server answered */
   async function releaseStalled(filterText){
     const aim = network.stalled.filter(p => !filterText || p.routeId.indexOf(filterText) > -1);
     network.stalled = network.stalled.filter(p => aim.indexOf(p) < 0);
@@ -1115,7 +1117,7 @@ const Paladira = (() => {
     if (!el){ probe.remove(); return { app, error_:"não há " + sel + " nesta tela" }; }
     if (el.disabled){ probe.remove(); return { app, error_:sel + " está desabilitado" }; }
 
-    /* preencher um botão ou clicar num campo é erro de roteiro, não de código */
+    /* filling a button or clicking a field is a script error, not a code one */
     const tag = el.tagName.toLowerCase();
     const isField = tag === "input" || tag === "textarea" || tag === "select";
     if (kindName !== "click" && !isField){
@@ -1149,8 +1151,8 @@ const Paladira = (() => {
       });
     });
 
-    /* o handler pode ter disparado pedido: o sandbox só fecha depois
-       que a rede sossega, senão o set() da resposta cairia na tela */
+    /* the handler may have fired a request: the sandbox only closes once the
+       network settles, otherwise the response's set() would land on screen */
     await awaitNetwork();
     const out = sandbox.app;
     sandbox = previousSandbox;
@@ -1161,9 +1163,10 @@ const Paladira = (() => {
     return { app: out, caption };
   }
 
-  /* Por que este cenário está fora. "Tudo ligado" não existe quando uma
-     dimensão é exclusiva: estar em Dono já tira os cenários de @garcom.
-     Então cada tag insatisfeita explica o que exige e o que está valendo. */
+  /* Why this scenario is out. "Everything on" does not exist when a
+     dimension is exclusive: being on Dono already removes the @garcom
+     scenarios. So every unsatisfied tag explains what it demands and what
+     is currently in force. */
   function reasons(s){
     return (s.tags || []).filter(t => !tagSatisfied(t)).map(tag => {
       if (tag.indexOf("@pode:") === 0){
@@ -1195,10 +1198,10 @@ const Paladira = (() => {
     });
   }
 
-  /* O contexto que ESTE cenário exige. A verificação não pode depender
-     dos chips que estão marcados na barra: um cenário de garçom tem de
-     rodar como garçom, um @pro como Pro. Senão a suíte diz "rota morta"
-     só porque quem está olhando a tela é outro papel. */
+  /* The context THIS scenario demands. Verification cannot depend on the
+     chips ticked in the bar: a waiter scenario has to run as the waiter, a
+     @pro one as Pro. Otherwise the suite cries "dead route" only because
+     whoever is looking at the screen is in another role. */
   function contextOf(s){
     const ctx = clone(initial ? initial.ctx : state.ctx);
     const stored = state.ctx;
@@ -1232,13 +1235,13 @@ const Paladira = (() => {
 
 
 
-  /* ---------- camada de dados ----------
-     A tela nunca inventa dado: ela pede. O harness intercepta fetch e
-     responde a partir das fixtures. Service Worker seria o ideal, mas
-     exige contexto seguro — não roda em file:// nem no preview dentro
-     de iframe, que é onde estes arquivos abrem. Interceptar fetch dá a
-     mesma disciplina: trocar por um backend de verdade é apagar o
-     interceptador, não reescrever a tela. */
+  /* ---------- data layer ----------
+     The screen never invents data: it asks. The harness intercepts fetch
+     and answers from the fixtures. A Service Worker would be ideal, but it
+     needs a secure context — it does not run on file:// nor in the preview
+     inside an iframe, which is where these files open. Intercepting fetch
+     gives the same discipline: swapping in a real backend means deleting
+     the interceptor, not rewriting the screen. */
   const network = { inFlight:0, log:[], tela:[], failures:{}, counter:0, seq:0, origin:null, stalled:[], seenRoutes:{}, inFlightScreen:0 };
 
   function paraRegex(pathStr){
@@ -1268,13 +1271,13 @@ const Paladira = (() => {
       const found = findRoute(httpMethod, pathStr);
       const t0 = Date.now();
 
-      /* rota que o cenário mandou falhar: é assim que se testa ErrorState */
+      /* a route the scenario forced to fail: this is how ErrorState is tested */
       const forced = network.failures[httpMethod + " " + pathStr] || (found && network.failures[httpMethod + " " + found.route.pathStr]);
 
       const register = (status, obs, submission, back) => {
-        /* contador à parte: o log é uma janela de 60 e descarta os antigos,
-           então medir "quantos pedidos este cenário fez" pelo tamanho dele
-           dá zero assim que a janela enche */
+        /* a separate counter: the log is a 60-entry window that drops the old
+           ones, so measuring "how many requests this scenario made" by its
+           size gives zero as soon as the window fills */
         network.counter++;
         const reg = { id:++network.seq, httpMethod, pathStr, status, ms: Date.now() - t0,
                       obs: obs || "", verifyState: verifying,
@@ -1284,9 +1287,10 @@ const Paladira = (() => {
                       back: back === undefined ? null : back };
         network.log.push(reg);
         if (network.log.length > 60) network.log.shift();
-        /* o que ESTA tela pediu: a verificação roda fora da tela e não conta */
-        /* cobertura de rota vive fora do log: o log é uma janela de 60 e,
-           com a varredura passo a passo, chamadas reais saem dela */
+        /* what THIS screen asked for: verification runs off screen and does not
+         count */
+        /* route coverage lives outside the log: the log is a 60-entry window
+           and, with the step-by-step scan, real calls fall out of it */
         if (reg.routeId && reg.origin){
           const v = network.seenRoutes[reg.routeId] = network.seenRoutes[reg.routeId]
             || { ok:new Set(), error_:new Set(), origins:new Set() };
@@ -1308,17 +1312,19 @@ const Paladira = (() => {
       const payload = opts.body ? tryJson(opts.body) : null;
 
       network.inFlight++;
-      /* decide AQUI se este pedido conta como espera visível: a resposta
-         chega depois, quando `reproduzindo` já pode ter mudado, e usar a
-         flag na volta fazia o contador descer sem nunca ter subido */
+      /* decide HERE whether this request counts as a visible wait: the
+         response arrives later, when `replaying` may already have changed,
+         and using the flag on the way back made the counter go down without
+         ever having gone up */
       const countsOnScreen = !verifying && !replaying;
       if (countsOnScreen){ network.inFlightScreen++; warnNetwork(); }
       const ctx = { params: found.params, payload, data_: cfg.data_, query:{} };
 
       const run = () => {
         if (forced && forced !== "pendente"){
-          /* o cenário manda: número vira status seco, objeto leva corpo —
-             é assim que se reproduz "o provedor devolveu cartão recusado" */
+          /* the scenario rules: a number becomes a bare status, an object
+             carries a body — this is how "the provider returned card
+             declined" gets reproduced */
           const st = typeof forced === "object" ? (forced.status || 500) : forced;
           const errorBody = typeof forced === "object"
             ? (forced.payload || { error_: forced.error_ || "falha simulada" })
@@ -1327,9 +1333,10 @@ const Paladira = (() => {
           return resposta(st, errorBody);
         }
         try {
-          /* uma rota de escrita que responde 200 sem alterar as fixtures é
-             fachada: a tela diz "salvo", nada foi salvo, e o recarregar
-             desmente. Comparar o antes e o depois é objetivo. */
+          /* a write route that answers 200 without changing the fixtures is a
+             facade: the screen says "salvo", nothing was saved, and a
+             reload contradicts it. Comparing before and after is
+             objective. */
           const writes = httpMethod === "POST" || httpMethod === "PUT" || httpMethod === "PATCH" || httpMethod === "DELETE";
           const before = writes ? JSON.stringify(cfg.data_) : null;
           const r = found.route.responds(ctx);
@@ -1342,15 +1349,16 @@ const Paladira = (() => {
         }
       };
 
-      /* rede:{ "GET /api/x": "pendente" } segura a resposta. Não conta como
-         em voo — senão a suíte esperaria para sempre — e só sai do lugar
-         quando um passo `aguarda` soltar. É assim que "carregando" vira
-         etapa de jornada em vez de retrato parado. */
+      /* network:{ "GET /api/x": "pendente" } holds the response. It does not
+         count as in flight — otherwise the suite would wait forever — and
+         only moves when a `waitFor` step releases it. This is how loading
+         becomes a step of the journey instead of a still photo. */
       if (forced === "pendente"){
-        /* Sai da contagem de "em voo": o pedido está parado de propósito,
-           esperando um passo soltar. Deixá-lo em emVoo travava TODA espera
-           seguinte — aguardarRede nunca via a rede parada e queimava o
-           limite de tentativas em cada ação, até a suíte parecer morta. */
+        /* Out of the "in flight" count: the request is stalled on purpose,
+           waiting for a step to release it. Leaving it in inFlight froze
+           EVERY subsequent wait — awaitNetwork never saw the network idle
+           and burned the retry limit on each action, until the suite looked
+           dead. */
         network.inFlight--;
         register(0, "parado até o passo aguarda", payload, null);
         return new Promise(res => {
@@ -1360,19 +1368,19 @@ const Paladira = (() => {
             network.inFlight--;
             if (countsOnScreen){ network.inFlightScreen = Math.max(0, network.inFlightScreen - 1); warnNetwork(); }
             res(r);
-            return r;   /* o passo `aguarda` precisa do corpo que chegou */
+            return r;   /* the `waitFor` step needs the payload that arrived */
           } });
         });
       }
 
-      /* latência só na tela: na verificação atrasar não acrescenta nada
-         e tornaria a suíte lenta e instável */
-      /* o atraso existe para a pessoa sentir a espera na tela. Refazer os
-         passos anteriores de uma jornada não é espera de ninguém: pagar
-         140ms por passo faz navegar parecer travado. */
-      /* servidor não responde sempre no mesmo tempo. Faixa aleatória para
-         a tela ser desenhada com espera de verdade — e para o estado de
-         carregando não ser um detalhe teórico. */
+      /* latency on screen only: delaying during verification adds nothing and
+         would make the suite slow and flaky */
+      /* the delay exists so the person feels the wait on screen. Redoing the
+         earlier steps of a journey is nobody's wait: paying 140ms per step
+         makes navigation feel stuck. */
+      /* a server does not always answer in the same time. A random range so
+         the screen is drawn with a real wait — and so the loading state is
+         not a theoretical detail. */
       const range = cfg.latency || [250, 750];
       const randomPick = () => Array.isArray(range)
         ? Math.round(range[0] + Math.random() * (range[1] - range[0]))
@@ -1392,8 +1400,8 @@ const Paladira = (() => {
     window.fetch.__original = originalFetch;
   }
 
-  /* redesenha quando um pedido começa ou termina: é o que faz o
-     esqueleto aparecer enquanto a resposta não chega */
+  /* redraws when a request starts or ends: this is what makes the skeleton
+     appear while the response has not arrived */
   let networkTimer = null;
   function warnNetwork(){
     clearTimeout(networkTimer);
@@ -1411,19 +1419,19 @@ const Paladira = (() => {
 
   function tryJson(v){ try { return JSON.parse(v); } catch { return v; } }
 
-  /* espera a rede sossegar: sem isto uma asserção rodaria antes da
-     resposta chegar e falharia por corrida, não por bug */
+  /* waits for the network to settle: without this an assertion would run
+     before the response arrived and fail on a race, not on a bug */
   async function awaitNetwork(){
-    /* nada foi pedido: drena as microtarefas e sai. Cobrar um setTimeout
-       aqui multiplicava por passo em toda navegação. */
+    /* nothing was requested: drain the microtasks and leave. Charging a
+       setTimeout here multiplied per step across every navigation. */
     if (!network.inFlight){
       for (let k = 0; k < 8; k++) await Promise.resolve();
       if (!network.inFlight) return;
     }
     for (let i = 0; i < 200; i++){
       if (network.inFlight){ await new Promise(r => setTimeout(r, 0)); continue; }
-      /* rede parada não quer dizer tela pronta: a resposta ainda precisa
-         atravessar json() e o await do handler até chegar no set() */
+      /* an idle network does not mean a ready screen: the response still has
+         to cross json() and the handler's await before reaching set() */
       for (let k = 0; k < 8; k++) await Promise.resolve();
       await new Promise(r => setTimeout(r, 0));
       if (!network.inFlight) return;
@@ -1431,8 +1439,8 @@ const Paladira = (() => {
   }
 
   const api = {
-    /* as fixtures VIVAS desta reprodução — cada cenário recebe uma cópia
-       nova, então mexer aqui não vaza para o cenário seguinte */
+    /* the LIVE fixtures of this replay — every scenario gets a fresh copy,
+       so touching them here does not leak into the next scenario */
     get data_(){ return cfg.data_; },
     async get(pathStr){ return request("GET", pathStr); },
     async post(pathStr, payload){ return request("POST", pathStr, payload); },
@@ -1455,9 +1463,9 @@ const Paladira = (() => {
     return data_;
   }
 
-  /* Preferências de contexto e layout sobrevivem ao recarregar. Em
-     about:srcdoc o localStorage estoura (origem nula), então tudo aqui é
-     try/catch: sem armazenamento o harness só deixa de lembrar. */
+  /* Context and layout preferences survive a reload. On about:srcdoc
+     localStorage throws (null origin), so everything here is try/catch:
+     with no storage the harness simply stops remembering. */
   function prefsKey(){ return "paladira:" + (cfg.title || "proto"); }
 
   function readPrefs(){
@@ -1486,18 +1494,18 @@ const Paladira = (() => {
     try { localStorage.removeItem(prefsKey()); } catch {}
   }
 
-  let started = false;   /* enquanto false, ninguém escreve no hash */
+  let started = false;   /* while false, nobody writes to the hash */
   let pendingFlag = null;
   let verifying = false;
-  let replaying = false;   /* refazendo passos passados: sem atraso simulado */
+  let replaying = false;   /* redoing past steps: no simulated delay */
   let baseData = null;
   const primCache = {};
 
-  /* ---------- estados obrigatórios da página ----------
-     Toda página passa por carregando, vazio e erro antes de mostrar
-     conteúdo. A tag do cenário diz qual estado ele cobre, e o harness
-     assere sozinho que a tela marcou aquele estado — sem depender de
-     alguém lembrar de escrever o Então. */
+  /* ---------- the page's mandatory states ----------
+     Every page passes through loading, empty and error before showing
+     content. The scenario's tag says which state it covers, and the
+     harness asserts on its own that the screen marked that state — without
+     relying on somebody remembering to write the Então. */
   const STATES = ["carregando", "vazio", "erro"];
 
   function stateOf(s){
@@ -1510,10 +1518,10 @@ const Paladira = (() => {
     return app.page || (app.products ? "lista" : (app.product ? "produto" : null));
   }
 
-  /* Jornada primeiro, verificação de estado depois. Carregando, vazio e
-     erro são obrigatórios, mas são a conferência do container — quem abre
-     a barra quer ver o que a pessoa faz, não o esqueleto de carregamento.
-     A ordem de declaração é preservada dentro de cada bloco. */
+  /* Journey first, state checks after. Loading, empty and error are
+     mandatory, but they are the container's checks — whoever opens the bar
+     wants to see what the person does, not the loading skeleton. The
+     declaration order is preserved inside each block. */
   function readingOrder(listEl){
     const weight = s => {
       const e = stateOf(s);
@@ -1525,11 +1533,12 @@ const Paladira = (() => {
                 .map(x => x.s);
   }
 
-  /* ---------- largura como coluna de exemplo ----------
-     Uma linha de Exemplos pode dizer em que largura aquele caso vale.
-     O harness põe o quadro naquela largura antes de desenhar e de rodar
-     o Então — é o que transforma "é responsivo" em algo conferível:
-     cada linha declara o arranjo e é medida naquela largura. */
+  /* ---------- width as an example column ----------
+     An Examples row can say at which width that case applies. The harness
+     sets the frame to that width before drawing and before running the
+     Então — this is what turns "it is responsive" into something
+     checkable: each row declares the arrangement and is measured at that
+     width. */
   const COLUMN_WIDTH = "largura";
 
   function sampleWidth(s, exIndex){
@@ -1545,7 +1554,8 @@ const Paladira = (() => {
     return null;
   }
 
-  /* largura que vale AGORA: a do exemplo, se ele declarar; senão a da tela */
+  /* the width in force NOW: the example's, if it declares one; otherwise
+     the screen's */
   let forcedWidth = null;
   function currentWidth(){ return forcedWidth || vp(); }
 
@@ -1564,7 +1574,7 @@ const Paladira = (() => {
     }
   }
 
-  /* ---------- esquema do cenário ---------- */
+  /* ---------- scenario outline ---------- */
   function isOutline(s){ return !!(s.examples && s.examples.tableRows && s.examples.tableRows.length); }
 
   function exampleRow(s, i){
@@ -1588,13 +1598,14 @@ const Paladira = (() => {
   }
 
   /* ---------- gherkin ---------- */
-  /* Em Gherkin o "E" herda a palavra do passo anterior: um "E" depois de
-     um "Então" é continuação de asserção. Escrever ação ali diz que a
-     tela DEVE fazer aquilo sozinha, que é outra coisa. Então a palavra
-     não vem do que o autor digitou, e sim do que o passo faz:
-       age (clique/preenche/escolhe/alterna/aguarda) → Quando
-       verifica (check)                              → Então
-     e "E" só quando repete a natureza do passo anterior. */
+  /* In Gherkin the "E" inherits the keyword of the previous step: an "E"
+     after a "Então" continues an assertion. Writing an action there says
+     the screen MUST do that on its own, which is a different claim. So the
+     keyword does not come from what the author typed, but from what the
+     step does:
+       acts (click/fill/choose/toggleCtl/waitFor) → Quando
+       checks (check)                             → Então
+     and "E" only when it repeats the nature of the previous step. */
   function nature(st){
     if (specOf(st) || st.waitFor) return "acao";
     if (typeof st.check === "function") return "verificacao";
@@ -1667,8 +1678,8 @@ const Paladira = (() => {
         if (line)      out += `  # impl: ${line}\n`;
         if (im.notes)  out += `  # impl: ${im.notes}\n`;
       }
-      /* o mapa de primitivas vem do cache que a verificação preenche —
-         gherkin() é síncrono porque é chamado no clique do botão */
+      /* the primitives map comes from the cache verification fills —
+         gherkin() is synchronous because it is called from a button click */
       const prim = primCache[s.id] || [];
       if (prim.length){
         out += `  # ui: ${primLine(prim)}\n`;
@@ -1691,17 +1702,18 @@ const Paladira = (() => {
     return out;
   }
 
-  /* ---------- reprodução ---------- */
-  /* Memo de prefixos da reprodução.
-     buildState(s, k) refazia os passos 0..k do zero, então verificar um
-     cenário de 6 passos custava 1+2+3+4+5+6 execuções — e a auditoria,
-     as checagens de estado e as de jornada percorrem os mesmos passos de
-     novo. Guardando o estado ao fim de cada passo, o passo k continua de
-     onde k-1 parou: quadrático vira linear.
+  /* ---------- replay ---------- */
+  /* Memo of replay prefixes.
+     buildState(s, k) redid steps 0..k from scratch, so verifying a 6-step
+     scenario cost 1+2+3+4+5+6 runs — and the audit, the state checks and
+     the journey checks walk the same steps again. By storing the state at
+     the end of each step, step k continues where k-1 stopped: quadratic
+     becomes linear.
 
-     O estado não é só `app`: as rotas de escrita alteram as fixtures, então
-     retomar sem restaurar `dados` desalinharia o servidor falso do que a
-     tela acha que aconteceu. Por isso cada instantâneo leva os dois. */
+     The state is not just `app`: write routes change the fixtures, so
+     resuming without restoring the data would put the fake server out of
+     step with what the screen thinks happened. That is why every snapshot
+     carries both. */
   let memo = new Map();
 
   async function buildState(s, upTo, exIndex, liveNow){
@@ -1717,23 +1729,24 @@ const Paladira = (() => {
     const axis = exIndex || 0;
     const previousWidth = forcedWidth;
     forcedWidth = sampleWidth(s, axis);
-    /* a chave carrega o contexto: o mesmo passo rende telas diferentes
-       para dono e para garçom */
+    /* the key carries the context: the same step yields different screens for
+       the owner and for the waiter */
     const ctxSig = JSON.stringify(state.ctx);
     const wid = forcedWidth ? forcedWidth.id : "tela";
     const keyName = k => s.id + "|" + axis + "|" + k + "|" + ctxSig + "|" + wid;
 
-    /* Cenário com `aguarda` não entra no cache: o pedido pendurado é uma
-       promessa viva, e o instantâneo guarda só estado e fixtures. Retomar
-       de um prefixo salvo deixaria o passo sem nada para soltar. */
+    /* A scenario with `waitFor` does not enter the cache: the stalled request
+       is a live promise, and the snapshot only stores state and fixtures.
+       Resuming from a saved prefix would leave the step with nothing to
+       release. */
     const usesStalled = (s.steps || []).some(st => st.waitFor);
     const cache = usesStalled ? null : memo;
 
     const stps = (s.steps || []).slice(0, upTo + 1);
-    /* Ao vivo, o que precisa acontecer de verdade é a ÚLTIMA AÇÃO até
-       aqui — não o último passo. Parar num Então depois de "recarrega a
-       lista" tem de disparar o recarregar; senão a tela aparece pronta
-       sem pedido nenhum, que é o que fazia parecer quebrado. */
+    /* Live, what really has to happen is the LAST ACTION up to here — not
+       the last step. Stopping on a Então after "recarrega a lista" has to
+       fire the reload; otherwise the screen shows up ready with no request
+       at all, which is what made it look broken. */
     let idxAcao = -1;
     if (liveNow){
       for (let i = stps.length - 1; i >= 0; i--){
@@ -1746,23 +1759,24 @@ const Paladira = (() => {
       return { app: clone(c.app), errors_: c.errors_.slice(), orders: c.orders };
     };
 
-    /* Na navegação, o passo que está sendo olhado roda de verdade: é ele
-       que dispara o pedido, acende o carregando e aparece no monitor.
-       Servir esse passo do cache dava a tela pronta sem nunca ter havido
-       requisição — parecia que o clique não fez nada. O histórico antes
-       dele continua vindo do cache. */
+    /* When navigating, the step being looked at really runs: it is the one
+       that fires the request, lights up the loading state and shows in the
+       monitor. Serving that step from the cache gave a ready screen with no
+       request ever made — it looked as if the click did nothing. The
+       history before it still comes from the cache. */
     if (cache && (!liveNow || idxAcao < 0) && cache.has(keyName(upTo))){
       const c = cache.get(keyName(upTo));
       const r = restore(c);
-      /* devolver cedo não pode pular a restauração: sem isto a largura
-         forçada pelo degrau some e quem desenha depois usa a da tela */
+      /* returning early must not skip the restore: without this the width
+         forced by the rung disappears and whoever draws next uses the
+         screen's */
       forcedWidth = previousWidth;
       return { app:r.app, ex, errors_:r.errors_, orders:r.orders, alreadySeen:true };
     }
 
     let app, errors_, baseOrders, start;
 
-    /* maior prefixo já conhecido */
+    /* the longest prefix already known */
     let deK = -2;
     if (cache){
       const ceiling = (liveNow && idxAcao >= 0) ? idxAcao - 1 : upTo - 1;
@@ -1775,9 +1789,10 @@ const Paladira = (() => {
       start = deK + 1;
       network.origin = { scn:s.id, nameStr:s.name, stp:start, kw:"Quando" };
     } else {
-      /* cada reprodução começa com as fixtures como estavam no arquivo e
-         sem pedidos pendurados de reproduções anteriores — senão um
-         `aguarda` acha o parado de outra rodada, ou não acha o seu */
+      /* every replay starts with the fixtures as they were in the file and
+         with no requests left stalled from earlier replays — otherwise a
+         `waitFor` finds another run's stalled request, or fails to find
+         its own */
       if (baseData) cfg.data_ = JSON.parse(baseData);
       network.stalled.length = 0;
       network.failures = typeof s.network === "function" ? (s.network(ex) || {}) : (s.network || {});
