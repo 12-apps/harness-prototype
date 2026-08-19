@@ -157,7 +157,7 @@ w.addEventListener("error", e => erros.push(e.message));
 w.addEventListener("load", () => {
   /* os Paladira.on são registrados depois do init, então a suíte só vale
      depois que o script do app terminou — mesma razão do setTimeout lá */
-  setTimeout(() => {
+  setTimeout(async () => {
     const P = w.Paladira;
     if (!P || typeof P.verifyAll !== "function"){
       console.error("✕ " + arquivo + " não expõe o harness Paladira — é um protótipo do harness?");
@@ -165,7 +165,7 @@ w.addEventListener("load", () => {
     }
 
     let r;
-    try { r = P.verifyAll(); }
+    try { r = await P.verifyAll(); }
     catch (e){
       console.error("✕ a verificação estourou: " + e.message);
       process.exit(3);

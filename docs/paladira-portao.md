@@ -23,7 +23,7 @@ A saída diz qual rodou:
 ✓ paladira-editor-produto.html — 68 ok · 0 falhando · 0 aviso(s) · handlers 9/9  [navegador]
 ```
 
-**Com `[navegador]`** — achou um Chromium e rodou a suíte lá dentro. Só assim valem as regras que dependem de medir caixa: arranjo por degrau, transbordo, alvo de toque, tamanho de texto, comprimento de linha. Procura nesta ordem: `PALADIRA_CHROME`, o cache do Puppeteer, `/opt/pw-browsers`, `/usr/bin/chromium`.
+**Com `[navegador]`** — achou um Chromium e rodou a suíte lá dentro. Só assim valem as regras que dependem de medir caixa: arranjo por degrau, transbordo, alvo de toque, tamanho de texto, comprimento de linha. Procura nesta ordem: `PALADIRA_CHROME`, o cache do Puppeteer, `/opt/pw-browsers`, `/usr/bin/chromium`. **Precisa também do puppeteer instalado** para dirigir o navegador — achar o Chromium não basta.
 
 **Sem a marca** — caiu no jsdom, que resolve DOM mas não faz layout: `@container` nunca casa. As regras de medida se declaram não verificáveis em vez de aprovar no escuro. Tudo o mais (jornadas, rotas, estados, permissões, sumiço de conteúdo) continua valendo.
 

@@ -30,8 +30,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: instalar jsdom (fallback do portão)
-        run: npm install --no-save jsdom
+      # O portão só entra no navegador quando acha um Chromium E o puppeteer
+      # para dirigi-lo; sem o puppeteer ele cai no jsdom em silêncio, e as
+      # regras de medida deixam de valer sem que a saída reclame.
+      - name: instalar as dependências do portão
+        run: npm install --no-save jsdom puppeteer
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'   # o runner já traz o Chrome achado abaixo
 
       - name: localizar o Chromium do runner
         id: chrome

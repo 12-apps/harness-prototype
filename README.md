@@ -39,11 +39,16 @@ Detalhes em [`docs/paladira-project-instructions.md`](docs/paladira-project-inst
 
 ## Dois motores
 
-O portão usa **Chromium quando encontra um** (marca `[navegador]` na saída) — só assim valem as regras que precisam medir caixa. Sem navegador cai no jsdom, e essas regras se declaram não verificáveis em vez de aprovar no escuro. Todo o resto continua valendo.
+O portão usa **Chromium quando encontra um e tem o puppeteer para dirigi-lo** (marca `[navegador]` na saída) — só assim valem as regras que precisam medir caixa. Sem navegador cai no jsdom, e essas regras se declaram não verificáveis em vez de aprovar no escuro. Todo o resto continua valendo.
 
 ```bash
+npm install --no-save puppeteer            # PUPPETEER_SKIP_DOWNLOAD=1 se já tem um Chrome
 PALADIRA_CHROME=/caminho/para/chrome node paladira-verificar.js arquivo.html
 ```
+
+Sem o puppeteer não adianta ter Chromium: o portão cai no jsdom. A marca
+`[navegador]` na saída é o que diz qual motor valeu — confira antes de confiar
+no verde.
 
 ## Mapa
 
