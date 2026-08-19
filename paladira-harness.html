@@ -2636,10 +2636,10 @@ const Paladira = (() => {
     if (cfg.journeys !== false){
       const MIN_ACTIONS = cfg.minAcoes || 2;
 
-      /* E herda a palavra anterior: um E depois de Então É um Então.
-         Então ação escrita como E-de-Então mente sobre o que o passo faz.
-         Ação é Quando (ou E dentro do bloco do Quando); verificação é
-         Então (ou E dentro do bloco do Então). */
+      /* E inherits the previous keyword: an E after a Então IS a Então. So
+         an action written as an E-of-Então lies about what the step does.
+         An action is a Quando (or an E inside the Quando block); a check is
+         a Então (or an E inside the Então block). */
       cfg.scenarios.forEach(s => {
         let inherited = null;
         (s.steps || []).forEach((st, i) => {
@@ -2649,9 +2649,10 @@ const Paladira = (() => {
           const acted = !!(specOf(st) || st.waitFor);
           const verified = typeof st.check === "function";
 
-          /* mudou o estado? então é Quando, sempre. Não importa se veio de
-             clique, de apply ou da resposta que chegou: passo que altera o
-             mundo é ação, e ação em Gherkin se escreve Quando. */
+          /* did it change the state? then it is a Quando, always. It does not
+             matter whether it came from a click, from applyState or from
+             the response that arrived: a step that changes the world is an
+             action, and an action in Gherkin is written as a Quando. */
           if (stateChanged.has(s.id + "|" + i) && efetivo !== "Quando"){
             warnings.push(`${s.name}: passo ${i + 1} ("${k.text.slice(0, 40)}") muda o estado, `
               + `então é Quando — está escrito como ${k.kw}`
@@ -2681,8 +2682,8 @@ const Paladira = (() => {
             + `não só o estado final`);
         }
 
-        /* asserção que só existe ANTES de qualquer ação descreve a tela
-           parada; o que interessa é o que mudou depois de agir */
+        /* an assertion that only exists BEFORE any action describes the screen
+           standing still; what matters is what changed after acting */
         const firstAction = actions.length ? actions[0].i : Infinity;
         const hasThenAfter = steps.some((st, i) => i > firstAction && typeof st.check === "function");
         if (actions.length && !hasThenAfter){
@@ -2690,7 +2691,7 @@ const Paladira = (() => {
             + `o cenário age e não verifica o que aconteceu`);
         }
 
-        /* clicar três vezes no mesmo botão não é percurso */
+        /* clicking the same button three times is not a path */
         const aims = new Set(actions.map(a => a.spec.sel));
         if (actions.length >= MIN_ACTIONS && aims.size < 2){
           warnings.push(`${nameStr}: todas as ações são no mesmo alvo (${[...aims][0]}) — `
@@ -2698,8 +2699,8 @@ const Paladira = (() => {
         }
       });
 
-      /* toda página precisa de pelo menos um cenário que CHEGUE nela
-         vindo de outra: senão ninguém especificou como se entra ali */
+      /* every page needs at least one scenario that REACHES it from another:
+         otherwise nobody specified how you get in there */
       const pages = {};
       visible().forEach(s => {
         const pg = s.page || cfg.defaultPage || "única";
@@ -2715,10 +2716,10 @@ const Paladira = (() => {
       });
     }
 
-    /* Cada rota declarada tem de aparecer na especificação nas duas
-       pontas: dando certo e dando errado. Uma rota só exercitada no
-       sucesso é metade do comportamento — o tratamento de erro fica
-       para alguém descobrir em produção. */
+    /* Every declared route has to appear in the specification from both
+       ends: succeeding and failing. A route exercised only on success is
+       half the behaviour — the error handling is left for somebody to
+       discover in production. */
     if (cfg.routes && cfg.routes.length && cfg.coveredRoutes !== false){
       const byRoute = {};
       cfg.routes.forEach(r => {
@@ -2742,9 +2743,9 @@ const Paladira = (() => {
         if (!r.ok.size)   warnings.push(`${id} só aparece falhando — falta o cenário de sucesso`);
         if (!r.error_.size) warnings.push(`${id} só aparece dando certo — falta o cenário de erro `
           + `(rede:{ "${id}": 500 })`);
-        /* atribuição: toda chamada nasce de um passo. Só no Dado é
-           carregamento de tela — legítimo, mas tem de ser declarado com
-           naCarga:true, senão ninguém sabe quem dispara aquilo. */
+        /* attribution: every call is born from a step. Only in the Dado is it
+           a screen load — legitimate, but it has to be declared with
+           onLoad:true, otherwise nobody knows what fires it. */
         if (!r.origins.has("passo") && !r.onLoad){
           warnings.push(`${id} só é chamada pelo Dado — se ela carrega junto com a tela, `
             + `marque naCarga:true na rota; se não, falta o Quando que a dispara`);
@@ -2752,12 +2753,12 @@ const Paladira = (() => {
       });
     }
 
-    /* a página precisa dos três estados. Faltar um não é estilo: é um
-       caminho que ninguém desenhou e que o usuário vai encontrar. */
+    /* the page needs all three states. Missing one is not a matter of style:
+       it is a path nobody designed and the user will meet. */
     if (cfg.states !== false){
-      /* cada página tem o seu AsyncStateContainer, então a exigência é
-         por página: uma lista sem estado vazio é tão furada quanto um
-         detalhe sem estado de erro */
+      /* each page has its own AsyncStateContainer, so the demand is per
+         page: a list with no empty state is as holed as a detail view with
+         no error state */
       const pages = {};
       cfg.scenarios.forEach(x => {
         const pg = x.page || cfg.defaultPage || "única";
@@ -2779,8 +2780,8 @@ const Paladira = (() => {
         }
       });
 
-      /* AsyncStateContainer precisa estar no mapa, senão o de-para some
-         justo no componente que carrega os três estados */
+      /* AsyncStateContainer has to be in the map, otherwise the mapping
+         disappears precisely at the component that carries the three states */
       const hasASC = Object.values(cfg.primitives || {}).some(v =>
         (typeof v === "string" ? v : v && v.nameStr) === "AsyncStateContainer");
       if (cfg.primitives && !hasASC){
@@ -2833,11 +2834,11 @@ const Paladira = (() => {
       warnings.push(`${sel} parece operável na tela mas nenhum handler responde — afordância sem ação`);
     });
 
-    /* Cada Paladira.on é um onClick/onChange. Três estados diferentes, três
-       problemas diferentes:
-         não casa com nada        → código morto
-         casa, mas nunca disparou → comportamento sem cobertura
-         disparou                 → coberto */
+    /* Every Paladira.on is an onClick/onChange. Three different states, three
+       different problems:
+         matches nothing        → dead code
+         matches, never fired   → uncovered behaviour
+         fired                  → covered */
     handlers.forEach(h => {
       const keyName = h.type + " " + h.selector;
       if (!usedHandlers.has(h.selector)){
@@ -2854,16 +2855,16 @@ const Paladira = (() => {
     };
   }
 
-  /* ---------- verificação isolada ----------
-     A suíte roda dentro de um iframe que carrega uma cópia deste mesmo
-     documento. Isso dá um realm inteiro só dela: outras fixtures, outro
-     contexto, outro sandbox, outra fila, outro interceptador de fetch.
-     Nada é compartilhado, então navegar na tela não corrompe a rodada e
-     a rodada não precisa ser cancelada.
+  /* ---------- isolated verification ----------
+     The suite runs inside an iframe that loads a copy of this very
+     document. That gives it a whole realm of its own: other fixtures,
+     another context, another sandbox, another queue, another fetch
+     interceptor. Nothing is shared, so navigating the screen does not
+     corrupt the run and the run does not need to be cancelled.
 
-     Worker não serve: a verificação DESENHA o render de verdade e
-     pergunta ao DOM se a tela cumpriu o Então. Worker não tem DOM.
-     O iframe tem — e ainda é o mesmo código, sem simulação. */
+     A Worker will not do: verification really DRAWS the render and asks
+     the DOM whether the screen met the Então. A Worker has no DOM. The
+     iframe has one — and it is still the same code, with no simulation. */
   let verifyIframe = null;
 
   function verifyIsolated(){
@@ -2881,9 +2882,10 @@ const Paladira = (() => {
                           + "width:" + Math.max(1000, v.w) + "px;height:" + Math.max(800, v.h) + "px";
         verifyIframe = ifr;
 
-        /* Se o iframe não der sinal de vida, a suíte roda no mesmo mundo,
-           como antes. Ambiente que bloqueia iframe (ou srcdoc sem script)
-           degrada para o caminho antigo em vez de nunca verificar. */
+        /* If the iframe gives no sign of life, the suite runs in the same
+           world, as before. An environment that blocks iframes (or srcdoc
+           without script) degrades to the old path instead of never
+           verifying at all. */
         let alive = false;
         const giveUp = setTimeout(() => {
           if (alive) return;
@@ -2909,7 +2911,7 @@ const Paladira = (() => {
         ifr.srcdoc = copy;
         document.body.appendChild(ifr);
       } catch (e){
-        /* sem iframe (ambiente restrito), cai no modo antigo */
+        /* no iframe (restricted environment), falls back to the old mode */
         resolve(null);
       }
     });
@@ -2919,8 +2921,9 @@ const Paladira = (() => {
   let running = false, runningDone = 0;
   let verificationMode = "—";
 
-  /* Roda a suíte isolada e adota o resultado. Como nada é compartilhado,
-     não há o que cancelar: a pessoa continua navegando enquanto roda. */
+  /* Runs the suite in isolation and adopts the result. Since nothing is
+     shared there is nothing to cancel: the person keeps navigating while it
+     runs. */
   async function verify(){
     const btn = $("h-verify");
     const total = cfg.scenarios.length;
@@ -2942,7 +2945,7 @@ const Paladira = (() => {
     if (btn){ btn.removeAttribute("aria-busy"); btn.textContent = "Verificar"; }
 
     if (!r){
-      /* ambiente sem iframe: roda no mesmo mundo, como antes */
+      /* environment with no iframe: runs in the same world, as before */
       verificationMode = "mesmo mundo (sem iframe)";
       return verifyAll();
     }
@@ -2954,7 +2957,7 @@ const Paladira = (() => {
     return r;
   }
 
-  /* ---------- verificação completa ---------- */
+  /* ---------- full verification ---------- */
   async function verifyAll(){
     return enqueue(async () => {
     const probe = document.createElement("div");
@@ -2972,13 +2975,13 @@ const Paladira = (() => {
     interrupted = false;
     network.seenRoutes = {};
 
-    /* 20 segundos sem sinal de vida parece travado: a pílula vira contador
-       e o botão fica ocupado enquanto a suíte anda */
+    /* 20 seconds with no sign of life feels frozen: the pill becomes a
+       counter and the button stays busy while the suite runs */
     const btn = $("h-verify");
     userCtx = userCtx || clone(state.ctx);
     const all = cfg.scenarios;
     const total = all.length;
-    /* retoma de onde parou */
+    /* resumes where it stopped */
     let startIdx = partial ? partial.idx : 0;
     let doneCount = startIdx;
     const progressFn = () => {
@@ -2990,9 +2993,9 @@ const Paladira = (() => {
     };
     if (btn){ btn.setAttribute("aria-busy", "true"); btn.textContent = "Verificando…"; }
     progressFn();
-    await new Promise(r => setTimeout(r, 0));   /* deixa a tela pintar antes de travar */
-    exercised.clear();   /* evidência vale por rodada inteira */
-    memo = new Map();      /* rodada nova começa com o cache limpo */
+    await new Promise(r => setTimeout(r, 0));   /* lets the screen paint before blocking */
+    exercised.clear();   /* evidence holds for a whole run */
+    memo = new Map();      /* a new run starts with a clean cache */
     let idxAtual = startIdx;
     for (const s of all.slice(startIdx)){
       if (cancelVerification) break;
@@ -3008,14 +3011,15 @@ const Paladira = (() => {
         for (let i = 0; i < stps.length; i++){
           const st = stps[i];
           if (typeof st.check !== "function") continue;
-          /* a largura da linha vale também na hora de desenhar e conferir,
-             não só durante a reprodução — senão o Então mede a tela errada */
+          /* the row's width applies when drawing and checking too, not only
+             during the replay — otherwise the Então measures the wrong
+             screen */
           forcedWidth = sampleWidth(s, ri);
           adjustProbe(probe);
           const built = await buildState(s, i, ri);
           const probeState = { ...state, app:built.app, ex:built.ex, scenario:s.id, step:i, example:ri };
-          /* se um passo anterior não conseguiu agir, o motivo real é aquele,
-             não a asserção que veio depois */
+          /* if an earlier step could not act, that is the real reason, not the
+             assertion that came after it */
           const stepError = (built.errors_ || []).map(e => e.error_)[0];
 
           let passed, reason = null;
@@ -3047,11 +3051,12 @@ const Paladira = (() => {
       }
     }
 
-    /* Cada cenário de estado ganha uma asserção que o autor não escreve.
-       Numa jornada o estado é ETAPA, não destino: a tela passa por
-       carregando e sai dele. Então basta que o estado apareça em algum
-       ponto do caminho — exigir no último passo obrigaria o cenário a
-       terminar parado no erro, que é justamente o que não queremos. */
+    /* Every state scenario gets an assertion the author does not write. In a
+       journey a state is a STEP, not a destination: the screen passes
+       through loading and leaves it. So it is enough for the state to show
+       up somewhere along the path — demanding it on the last step would
+       force the scenario to end sitting in the error, which is exactly what
+       we do not want. */
     for (const s of all){
       if (cancelVerification) break;
       state.ctx = contextOf(s);
@@ -3092,8 +3097,8 @@ const Paladira = (() => {
     probe.remove();
 
     if (cancelVerification){
-      /* guarda o que já foi apurado para continuar depois, em vez de
-         jogar fora e refazer tudo */
+      /* keeps what has already been established so it can continue later,
+         instead of throwing it away and redoing everything */
       partial = { idx: idxAtual, by, ok, bad, failures };
       verifying = false;
       state.ctx = clone(userCtx);
@@ -3113,9 +3118,9 @@ const Paladira = (() => {
     const aud = await audit();
     partial = null;
     verifying = false;
-    /* NÃO limpar: o que a suíte acabou de calcular é exatamente o que a
-       pessoa vai navegar em seguida. Descartar aqui obrigaria a refazer
-       cada jornada do zero no primeiro clique. */
+    /* do NOT clear: what the suite just computed is exactly what the person
+       is about to navigate. Discarding it here would force every journey to
+       be redone from scratch on the first click. */
     if (btn){ btn.removeAttribute("aria-busy"); btn.textContent = "Verificar"; }
     state.ctx = clone(userCtx);
     suite = { by, ok, bad, failures, skipped: cfg.scenarios.length - visible().length,
@@ -3125,7 +3130,7 @@ const Paladira = (() => {
     });
   }
 
-  /* Relatório de uma tela só, para colar de volta em quem editou. */
+  /* A one-screen report, to paste back to whoever edited the file. */
   function report(){
     if (!suite) return "";
     const ctx = cfg.context.map(d => {
@@ -3191,8 +3196,8 @@ const Paladira = (() => {
   function updatePill(){
     const pill = $("h-checks");
     if (!pill) return;
-    /* rodada em andamento manda na pílula: sem isto, navegar durante a
-       verificação apagava o contador e parecia que ela tinha morrido */
+    /* a run in progress owns the pill: without this, navigating during
+       verification wiped the counter and it looked as if it had died */
     if (running){ externalProgress(runningDone, cfg.scenarios.length); return; }
     if (suite){
       const warn = (suite.warnings || []).length;
@@ -3228,12 +3233,12 @@ const Paladira = (() => {
     results[s.id] = results[s.id] || {};
     (s.steps || []).forEach((st, i) => {
       if (typeof st.check !== "function") return;
-      /* Só o passo ATUAL pode ser julgado pela tela atual. Rodar as
-         asserções anteriores contra o que está desenhado agora as reprova
-         por motivo errado: "a lista vazia convida a criar" é verdade no
-         passo 1 e falsa no passo 3, quando a tela já é outra. Os passos
-         anteriores ficam com o resultado da suíte, que os avaliou cada um
-         no seu próprio momento. */
+      /* Only the CURRENT step can be judged by the current screen. Running
+         the earlier assertions against what is drawn now fails them for the
+         wrong reason: "the empty list invites you to create" is true at
+         step 1 and false at step 3, when the screen is already another one.
+         The earlier steps keep the suite's result, which judged each of
+         them at its own moment. */
       if (i !== state.step){ delete results[s.id][i]; return; }
       try { results[s.id][i] = !!st.check(state.app, el, state); }
       catch { results[s.id][i] = false; }
@@ -3247,8 +3252,9 @@ const Paladira = (() => {
   function vp(){
     const v = VIEWPORTS.find(x => x.id === state.viewport) || VIEWPORTS[1];
     if (v.freeForm){
-      /* mede o palco na hora: redimensionar a janela muda o viewport,
-         que é o ponto desta opção. Girar não se aplica. */
+      /* measures the stage right then: resizing the window changes the
+         viewport, which is the point of this option. Rotating does not
+         apply. */
       const stage = $("h-stage");
       return { ...v,
         w: Math.max(320, Math.round(((stage && stage.clientWidth)  || 1280) - STAGE_PAD)),
@@ -3258,8 +3264,8 @@ const Paladira = (() => {
   }
   function bpLabel(w){
     const d = rungOf(w);
-    /* largura exata do degrau aparece limpa; entre degraus mostra o de
-       baixo com ~, para não fingir precisão que não existe */
+    /* an exact rung width shows clean; between rungs it shows the one below
+       with a ~, so as not to fake precision that does not exist */
     return (w === d.w ? "" : "~") + d.id;
   }
 
@@ -3272,7 +3278,7 @@ const Paladira = (() => {
 
     let scale;
     if (v.freeForm){
-      scale = 1;                       /* o quadro já é do tamanho do palco */
+      scale = 1;                       /* the frame is already the size of the stage */
     } else if (state.zoom === "fit"){
       scale = Math.min(1, (stage.clientWidth - STAGE_PAD) / v.w, (stage.clientHeight - STAGE_PAD) / v.h);
     } else scale = Number(state.zoom) / 100;
@@ -3282,8 +3288,9 @@ const Paladira = (() => {
     box.style.height = Math.round(v.h * scale) + "px";
 
     $("h-dims").innerHTML = `<b>${v.w}</b> × <b>${v.h}</b> · ${bpLabel(v.w)}`;
-    /* o seletor é espelho do estado, nunca uma segunda fonte de verdade:
-       link, cenário e clique podem mudar a largura, e todos passam aqui */
+    /* the selector mirrors the state, never a second source of truth: a link,
+       a scenario and a click can all change the width, and all pass through
+       here */
     const selVp = $("h-vp");
     if (selVp && selVp.value !== state.viewport) selVp.value = state.viewport;
     const fitOpt = $("h-zoomfit");
@@ -3306,18 +3313,19 @@ const Paladira = (() => {
     }
     html += `</div>`;
 
-    /* contexto antes da lista: é ele que define o escopo dela */
+    /* context before the list: it is what defines the list's scope */
     if (cfg.context.length){
       html += `<div class="h-ctx">`;
       cfg.context.forEach(d => {
         const v = state.ctx[d.id];
-        /* escolha única vira dropdown e multisseleção vira dropdown com
-           painel: só a escala fica em chips, porque ali os níveis
-           incluídos são a informação. Dá para forçar com ui:"chips". */
-        /* Três opções ou menos cabem numa linha de trilho segmentado, e
-           ali tudo fica visível de uma vez — melhor que um dropdown que
-           esconde duas opções atrás de um clique. Acima disso, dropdown.
-           Escala é sempre trilho: o trecho incluído é a informação. */
+        /* a single choice becomes a dropdown and a multiselect becomes a
+           dropdown with a panel: only the scale stays as chips, because
+           there the included levels are the information. It can be forced
+           with ui:"chips". */
+        /* Three options or fewer fit on one segmented track, and there
+           everything is visible at once — better than a dropdown hiding two
+           options behind a click. Above that, a dropdown. A scale is always
+           a track: the included stretch is the information. */
         const compact = d.options.length <= 3;
         const mode = d.ui || (d.kind === "escala" || compact ? "seg" : "select");
         const activeIdx = d.kind === "escala" ? d.options.findIndex(o => o.id === v) : -1;
@@ -3427,9 +3435,9 @@ const Paladira = (() => {
         : "Nenhum cenário com esse filtro."}</p>`;
     }
 
-    /* agrupado por página: com dezesseis cenários a lista corrida vira
-       um paredão, e o que a pessoa procura é "os da lista" ou "os do
-       editor" antes de procurar um cenário específico */
+    /* grouped by page: with sixteen scenarios a flat list becomes a wall,
+       and what the person looks for is "the list ones" or "the editor ones"
+       before looking for a specific scenario */
     if (!seededStates){
       seededStates = true;
       cfg.scenarios.forEach(x => {
@@ -3455,9 +3463,10 @@ const Paladira = (() => {
            +  `</button>`;
       if (closed) return;
 
-      /* os cenários de estado ficam num bloco próprio, fechado ao abrir:
-         são obrigatórios e conferidos sozinhos, então não precisam ocupar
-         a barra o tempo todo — quem abre quer ver as jornadas */
+      /* the state scenarios live in their own block, collapsed on open: they
+         are mandatory and checked on their own, so they do not need to take
+         up the bar all the time — whoever opens it wants to see the
+         journeys */
       const journeys = items.filter(x => !stateOf(x));
       const states  = items.filter(x => stateOf(x));
       let inStates = false;
@@ -3653,7 +3662,7 @@ const Paladira = (() => {
       .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
-  /* ---------- eventos delegados (sobrevivem ao re-render) ---------- */
+  /* ---------- delegated events (they survive a re-render) ---------- */
   const handlers = [];
   function on(type, selector, fn){ handlers.push({ type, selector, fn }); }
 
@@ -3672,8 +3681,9 @@ const Paladira = (() => {
   }
 
   function set(patch){
-    /* durante um passo com `clique` o handler escreve no sandbox, não na
-       tela — assim o mesmo código roda na reprodução e no uso real */
+    /* during a step with `click` the handler writes to the sandbox, not to
+       the screen — that way the same code runs in the replay and in real
+       use */
     if (sandbox){ Object.assign(sandbox.app, patch); return; }
     appDirty = true;
     Object.assign(state.app, patch);
@@ -3681,7 +3691,7 @@ const Paladira = (() => {
   }
 
   function reset(){
-    forgetPrefs();          /* Resetar é "volte ao que o arquivo declara" */
+    forgetPrefs();          /* Reset means "go back to what the file declares" */
     state.ctx = clone(initial.ctx);
     userCtx = clone(state.ctx);
     state.viewport = initial.viewport;
@@ -3700,7 +3710,7 @@ const Paladira = (() => {
   function init(options){
     cfg = { ...cfg, ...options };
 
-    /* compat: toggles antigos viram uma dimensão de funcionalidades */
+    /* compat: old toggles become a features dimension */
     if (cfg.toggles && cfg.toggles.length && !cfg.context.length){
       cfg.context = [{
         id:"flags", label:"Funcionalidades", kind:"flags",
@@ -3734,8 +3744,8 @@ const Paladira = (() => {
       zoom: state.zoom
     };
 
-    /* o link compartilhado vem depois e vence: quem manda um link espera
-       ver aquilo, não o contexto salvo de quem abriu */
+    /* the shared link comes later and wins: whoever sends a link expects that
+       to be seen, not the saved context of whoever opened it */
     const prefs = readPrefs();
     if (prefs){
       if (prefs.ctx) cfg.context.forEach(d => {
@@ -3765,9 +3775,9 @@ const Paladira = (() => {
 
     $("h-vp").addEventListener("change", e => {
       state.viewport = e.target.value;
-      /* Num Esquema com coluna `largura`, trocar de degrau é trocar de
-         linha: a pessoa pediu para ver aquele tamanho, então mostra o
-         caso daquele tamanho em vez de forçar a largura de volta. */
+      /* In an Outline with a `largura` column, switching rung means switching
+         row: the person asked to see that size, so it shows the case for
+         that size instead of forcing the width back. */
       const s = scnById(state.scenario);
       if (s && isOutline(s)){
         const i = s.examples.tableRows.findIndex((_, ri) => {
@@ -3781,9 +3791,10 @@ const Paladira = (() => {
     $("h-zoomsel").addEventListener("change", e => { state.zoom = e.target.value; fit(); });
     $("h-rotate").addEventListener("click", () => { state.landscape = !state.landscape; fit(); });
     $("h-reset").addEventListener("click", reset);
-    /* "Ver assim mesmo" dispensa ESTE conjunto de falhas. Reaparecer a
-       cada verificação com o mesmo relatório é castigo, não aviso — mas
-       se as falhas mudarem, a tela volta, porque aí é notícia nova. */
+    /* "View anyway" dismisses THIS set of failures. Reappearing on every
+       verification with the same report is punishment, not a warning — but
+       if the failures change the screen comes back, because then it is
+       news. */
     let dismissedFailure = null;
 
     function failureSignature(){
@@ -3795,7 +3806,7 @@ const Paladira = (() => {
 
     function showFailure(openScen){
       const panelEl = $("h-falha");
-      if (openScen && failureSignature() === dismissedFailure) return;   /* já dispensado */
+      if (openScen && failureSignature() === dismissedFailure) return;   /* already dismissed */
       panelEl.hidden = !openScen;
       if (openScen){
         const ta = $("h-falha-txt");
@@ -3823,7 +3834,8 @@ const Paladira = (() => {
     });
 
     $("h-checks").addEventListener("click", e => {
-      /* com Alt, reabre o relatório mesmo dispensado; sem Alt, pula para a falha */
+      /* with Alt, reopens the report even when dismissed; without Alt, jumps to
+       the failure */
       if (e.altKey && suite && suite.bad){ dismissedFailure = null; showFailure(true); return; }
       const f = firstFailure();
       if (f) goto(f.id, f.step);
@@ -3837,7 +3849,7 @@ const Paladira = (() => {
       requestAnimationFrame(fit);
     });
 
-    /* campo de link: seleciona tudo ao focar (copiar), Enter para ir */
+    /* link field: selects everything on focus (to copy), Enter to go */
     const inp = $("h-linkin");
     inp.addEventListener("focus", () => inp.select());
     inp.addEventListener("input", () => inp.classList.remove("bad"));
@@ -3864,8 +3876,8 @@ const Paladira = (() => {
       const routes = (cfg.routes || []).map(r =>
         `<div class="rota"><b>${(r.httpMethod || "GET").toUpperCase()}</b> ${esc(r.pathStr)}</div>`).join("");
 
-      /* a suíte dispara centenas de pedidos de 0ms; misturados com os da
-         tela viram ruído, então por padrão ficam escondidos */
+      /* the suite fires hundreds of 0ms requests; mixed with the screen's they
+         become noise, so they are hidden by default */
       const fromSuite = network.log.filter(l => l.verifyState).length;
       const listEl = network.log.filter(l => runSuite || !l.verifyState);
 
@@ -3915,7 +3927,7 @@ const Paladira = (() => {
       const b = e.target.closest("[data-req]");
       if (!b) return;
       const id = Number(b.dataset.req);
-      monitorSel = (monitorSel === id ? null : id);   /* clicar de novo fecha o detalhe */
+      monitorSel = (monitorSel === id ? null : id);   /* clicking again closes the detail */
       paintMonitor();
     });
 
@@ -3952,7 +3964,7 @@ const Paladira = (() => {
       } else {
         state.ctx[d.id] = optId;
       }
-      suite = null;              /* muda o escopo: a suíte anterior não vale */
+      suite = null;              /* the scope changed: the previous suite no longer applies */
       userCtx = clone(state.ctx);
       ensureVisibleScenario();
       replay().then(render);
@@ -4012,14 +4024,14 @@ const Paladira = (() => {
     });
 
     document.addEventListener("click", e => {
-      /* clicar fora fecha o painel — dentro do próprio .h-dim, não */
+      /* clicking outside closes the panel — inside .h-dim itself, it does not */
       if (openDim && !e.target.closest(".h-dim")){ openDim = null; render(); }
     });
 
-    /* ---------- navegação por setas ----------
-       ↑↓ troca de cenário, ←→ anda nos passos. Não sequestra as setas
-       quando o foco está num campo (busca, link, textarea) nem com um
-       painel aberto — ali as setas são do texto, não da navegação. */
+    /* ---------- arrow-key navigation ----------
+       ↑↓ switches scenario, ←→ walks the steps. It does not hijack the
+       arrows when focus is in a field (search, link, textarea) nor with a
+       panel open — there the arrows belong to the text, not to navigation. */
     function typing(aim){
       if (!aim) return false;
       const tag = (aim.tagName || "").toLowerCase();
@@ -4031,8 +4043,8 @@ const Paladira = (() => {
       if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (!$("h-spec").hidden || !$("h-falha").hidden || !$("h-dados").hidden) return;
 
-      /* as setas percorrem o que está à mostra: pular para um cenário
-         dentro de um bloco fechado seria navegar às cegas */
+      /* the arrows walk what is on show: jumping to a scenario inside a
+         collapsed block would be navigating blind */
       const listEl = readingOrder(visible()).filter(x => {
         const pg = x.page || cfg.defaultPage || "única";
         if (closedGroups.has(pg)) return false;
@@ -4053,8 +4065,8 @@ const Paladira = (() => {
         return;
       }
 
-      /* ←→ dentro do cenário; no fim, atravessa para o vizinho, porque
-         percorrer uma jornada não devia esbarrar numa parede */
+      /* ←→ within the scenario; at the end it crosses into the neighbour,
+         because walking a journey should not hit a wall */
       const s = listEl[current];
       const n = (s.steps || []).length;
       e.preventDefault();
@@ -4078,8 +4090,8 @@ const Paladira = (() => {
       else if (openDim){ openDim = null; render(); }
     });
 
-    /* largura da barra: mínimo é a largura atual — encolher além disso
-       espremeria os passos do Gherkin, que é o que se lê aqui */
+    /* sidebar width: the minimum is the current width — shrinking past that
+       would squeeze the Gherkin steps, which are what you read here */
     const setBarra = applySidebar;
 
     const grip = $("h-resize");
@@ -4115,22 +4127,23 @@ const Paladira = (() => {
     installNetwork();
     bindDelegation();
 
-    /* Pinta a casca já, antes de reproduzir cenário ou verificar nada.
-       Qualquer coisa que demore depois disto — replay, suíte, rede — vai
-       encontrar uma tela montada em vez de deixar o usuário no branco.
-       A regressão anterior (tela vazia até a suíte acabar) só foi possível
-       porque a primeira pintura dependia de um caminho assíncrono. */
+    /* Paints the shell right away, before replaying a scenario or verifying
+       anything. Whatever takes time after this — the replay, the suite, the
+       network — meets an assembled screen instead of leaving the user on a
+       blank one. The earlier regression (a blank screen until the suite
+       finished) was only possible because the first paint depended on an
+       async path. */
     buildSidebar();
     fit();
-    const cameFromLink = applyHash();   /* lê ANTES de qualquer escrita */
+    const cameFromLink = applyHash();   /* reads BEFORE any write */
     started = true;
     if (cameFromLink) (pendingFlag || Promise.resolve()).then(render);
     else goto(state.scenario, -1, 0);
     fit();
 
     if (window.__PALADIRA_CHILD){
-      /* modo verificador: sem barra, sem link, sem preferências — só roda
-         a suíte no seu próprio mundo e devolve o relatório */
+      /* verifier mode: no sidebar, no link, no preferences — it just runs the
+         suite in its own world and returns the report */
       const send = (kindName, extra) => {
         try { parent.postMessage(Object.assign({ paladira:1, kindName }, extra), "*"); } catch {}
       };
@@ -4147,11 +4160,12 @@ const Paladira = (() => {
       return;
     }
 
-    /* Roda sozinha ao abrir: o arquivo é reaberto a cada edição, então
-       toda alteração passa pela suíte sem ninguém precisar lembrar.
-       Em setTimeout porque os Paladira.on vêm DEPOIS do init no script
-       do app — verificar antes disso acusaria "nenhum handler responde"
-       em tudo, que é falha do relógio, não do protótipo. */
+    /* Runs on its own when the file opens: the file is reopened on every
+       edit, so every change goes through the suite without anyone having to
+       remember. In a setTimeout because the Paladira.on calls come AFTER
+       init in the app script — verifying before that would report "no
+       handler responds" for everything, which is a fault of the clock, not
+       of the prototype. */
     if (cfg.verifyOnOpen !== false){
       setTimeout(async () => {
         const r = await verify();
@@ -4165,17 +4179,17 @@ const Paladira = (() => {
     get verificationMode(){ return verificationMode; }, reset, fit, esc, state, VIEWPORTS };
 })();
 
-/* no console: Paladira.state, Paladira.goto("id", 2), Paladira.verifyAll() */
+/* in the console: Paladira.state, Paladira.goto("id", 2), Paladira.verifyAll() */
 window.Paladira = Paladira;
 </script>
 
 <!-- catálogo de @12-apps/ui — gerado do package.json.
      Mantenha como arquivo do projeto e atualize quando a lib subir de versão. -->
 <script>
-/* Catálogo de @12-apps/ui@5.0.0 — gerado do package.json.
-   128 componentes. Cole no protótipo ou carregue do
-   conhecimento do projeto. O harness valida os nomes usados em
-   primitivas contra este catálogo. */
+/* Catalog of @12-apps/ui@5.0.0 — generated from package.json.
+   128 components. Paste it into the prototype or load it from the
+   project knowledge. The harness validates the names used in
+   `primitives` against this catalog. */
 window.PALADIRA_UI = {
   "button": "@12-apps/ui/button",
   "charts": "@12-apps/ui/charts",
@@ -4328,8 +4342,8 @@ window.PALADIRA_DATA = {
     "2": { id:"2", nameStr:"Calabresa", category:"Pizzas", variants:[] }
   },
   planLimits: { free:1, basic:3, pro:10, ultra:50 },
-  /* liga o "cai na primeira, volta na segunda" — deixa o Tentar de novo
-     ter um desfecho em vez de repetir o erro para sempre */
+  /* switches on "fails the first time, works the second" — lets Tentar de
+     novo reach an outcome instead of repeating the error forever */
   listFailsOnce: false
 };
 
@@ -4365,7 +4379,7 @@ window.PALADIRA_ROUTES = [
       const fresh = { id:"v" + (p.variants.length + 1) + "-" + params.id,
                      nameStr:(payload && payload.nameStr) || "Nova",
                      price:(payload && payload.price) || "18,00" };
-      p.variants.push(fresh);        /* grava mesmo: recarregar tem de manter */
+      p.variants.push(fresh);        /* really stores it: a reload has to keep it */
       return fresh;
     } },
 
@@ -4409,15 +4423,16 @@ Paladira.init({
 
   data_: window.PALADIRA_DATA,
   routes: window.PALADIRA_ROUTES,
-  latency: [250, 750],   /* faixa aleatória, só na tela; a verificação roda sem atraso */
+  latency: [250, 750],   /* a random range, on screen only; verification runs with no delay */
 
-  /* exige que toda marcação com texto ou interação esteja reivindicada
-     por um componente do mapa abaixo */
+  /* demands that every piece of markup with text or interaction is claimed
+     by a component from the map below */
   strictMode: true,
 
-  /* De-para entre a marcação do protótipo e o que a biblioteca já tem.
-     Prototipar à mão é rápido; o mapa evita que a versão caseira vire
-     componente novo em produção. Vai para o .feature como "# ui:". */
+  /* The mapping between the prototype's markup and what the library already
+     has. Prototyping by hand is fast; the map keeps the home-made version
+     from becoming a new component in production. It goes into the .feature
+     as "# ui:". */
   primitives: {
     ".btn":               "Button",
     ".card":              "Card",
@@ -4433,8 +4448,8 @@ Paladira.init({
     "[data-estado=erro]":       "ErrorState",
     "[data-estado=carregando]": "LoadingState",
     "[data-card=margem]": "StatCard",
-    /* texto e campos também são componentes — sem isto o modo estrito
-       acusa marcação crua, que é exatamente o ponto */
+    /* text and fields are components too — without this, strict mode reports
+       raw markup, which is exactly the point */
     "h1, h2":             "Heading",
     ".linha":             "Button",
     ".linha b, .linha .cat, .linha .qtd, .linha .nome, .var span": "Text",
@@ -4450,7 +4465,7 @@ Paladira.init({
     as:   "lojista",
     want: "cadastrar tamanhos diferentes do mesmo produto",
     so:   "o cliente escolha no cardápio sem eu duplicar o item",
-    /* herdado por todo cenário que não declarar o seu */
+    /* inherited by every scenario that does not declare its own */
     impl: {
       component:"ProdutoEditor",
       route:"/produtos/:id",
@@ -4542,8 +4557,9 @@ Paladira.init({
       steps:[
         { then:"a lista aparece em <colunas> coluna(s)",
           check:(a, el, s) => {
-            /* mede as colunas de verdade quando há motor de layout; sem
-               ele (portão sem navegador) cai no que a tela declara */
+            /* measures the real columns when there is a layout engine; without
+               one (the gate with no browser) it falls back to what the
+               screen declares */
             const g = el.querySelector(".grade");
             let measured = 0;
             try {
@@ -4582,7 +4598,7 @@ Paladira.init({
       given:{
         text:"que o lojista abriu o cardápio e a resposta ainda não chegou",
         state: async (ex, api) => {
-          api.get("/api/produtos").catch(() => {});   /* fica pendurado de propósito */
+          api.get("/api/produtos").catch(() => {});   /* left stalled on purpose */
           return { page:"lista", loading:true };
         }
       },
@@ -4625,8 +4641,8 @@ Paladira.init({
       name:"Cardápio fora do ar e a tentativa de voltar",
       page:"lista", tags:["@catálogo","@erro","@recuperacao"],
       impl:{ component:"CardapioLista", route:"/produtos", notes:"ErrorState com recarregar" },
-      /* a falha vem das fixtures (cai uma vez, volta na seguinte), não de
-         rede: — é o que permite o Tentar de novo ter desfecho */
+      /* the failure comes from the fixtures (fails once, works next time), not
+         from network: — that is what lets Tentar de novo reach an outcome */
       fixtureFailure:true,
       given:{
         text:"que o lojista abriu o cardápio e a API caiu na primeira tentativa",
@@ -4932,7 +4948,8 @@ Paladira.init({
   ],
 
   render(s){
-    /* a página vem do estado; na dúvida, quem tem lista é lista */
+    /* the page comes from the state; when in doubt, whatever has a list is
+     the list */
     const pg = s.app.page || (s.app.products ? "lista" : "produto");
     return pg === "lista" ? listScreen(s) : productScreen(s);
   },
@@ -4998,8 +5015,8 @@ function productScreen(s){
     const canEdit = s.can("produto.editar");
     const incomplete = vars.some(v => !v.price);
 
-    /* AsyncStateContainer: os quatro caminhos ficam num lugar só, e cada
-       um marca data-estado — é isso que o harness assere sozinho. */
+    /* AsyncStateContainer: the four paths live in one place, and each marks
+       data-estado — that is what the harness asserts on its own. */
     const st_ = (s.app.loading || s.waitingFor()) ? "carregando"
                  : s.app.error_       ? "erro"
                  : (!vars.length && !s.app.payment) ? "vazio"
@@ -5099,7 +5116,8 @@ function productScreen(s){
       </div>`;
 }
 
-/* navegar é um pedido: abrir o produto busca o detalhe, voltar rebusca a lista */
+/* navigating is a request: opening the product fetches the detail, going
+       back refetches the list */
 Paladira.on("click", '[data-act="abrir-produto"]', async (e, el) => {
   try {
     const p = await Paladira.api.get(`/api/produtos/${el.dataset.id}`);
@@ -5124,7 +5142,7 @@ Paladira.on("click", '[data-act="recarregar-lista"]', async () => {
   catch (err){ Paladira.set({ error_:err.message }); }
 });
 
-/* pede à API e só então atualiza a tela — nada de inventar o registro */
+/* asks the API and only then updates the screen — no inventing the record */
 Paladira.on("click", '[data-act="add"]', async (e, el, s) => {
   const prod = s.app.product;
   const vars = (prod && prod.variants) || [];
@@ -5134,8 +5152,8 @@ Paladira.on("click", '[data-act="add"]', async (e, el, s) => {
       { nameStr:names[vars.length] || "Nova", price:"18,00" });
     Paladira.set({ product:{ ...prod, variants:vars.concat(fresh) }, saved:false, variantError:null });
   } catch (err){
-    /* falha de item não derruba a página: o AsyncStateContainer segue
-       no estado que estava e o aviso fica junto da lista */
+    /* an item failure does not bring the page down: the AsyncStateContainer
+       stays in the state it was in and the warning sits next to the list */
     Paladira.set({ variantError: err.message });
   }
 });
