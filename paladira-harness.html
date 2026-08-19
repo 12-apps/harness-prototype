@@ -2843,7 +2843,7 @@ const Paladira = (() => {
       try {
         if (verifyIframe) verifyIframe.remove();
         const v = vp();
-        const mark = "<scr" + "ipt>window.__PALADIRA_FILHO=1;</scr" + "ipt>";
+        const mark = "<scr" + "ipt>window.__PALADIRA_CHILD=1;</scr" + "ipt>";
         const copy = "<!DOCTYPE html>" +
           document.documentElement.outerHTML.replace("<head>", "<head>" + mark);
 
@@ -2868,7 +2868,7 @@ const Paladira = (() => {
           const m = ev.data;
           if (!m || m.paladira !== 1) return;
           alive = true;
-          if (m.kindName === "progresso"){ externalProgress(m.doneCount, m.total); return; }
+          if (m.kindName === "progress"){ externalProgress(m.doneCount, m.total); return; }
           if (m.kindName === "resultado"){
             clearTimeout(giveUp);
             window.removeEventListener("message", onReceive);
@@ -4100,14 +4100,14 @@ const Paladira = (() => {
     else goto(state.scenario, -1, 0);
     fit();
 
-    if (window.__PALADIRA_FILHO){
+    if (window.__PALADIRA_CHILD){
       /* modo verificador: sem barra, sem link, sem preferências — só roda
          a suíte no seu próprio mundo e devolve o relatório */
       const send = (kindName, extra) => {
         try { parent.postMessage(Object.assign({ paladira:1, kindName }, extra), "*"); } catch {}
       };
       externalProgress = () => {};
-      const sendProgress = (doneCount, total) => send("progresso", { doneCount, total });
+      const sendProgress = (doneCount, total) => send("progress", { doneCount, total });
       window.__paladiraProgresso = sendProgress;
       setTimeout(async () => {
         const r = await verifyAll();

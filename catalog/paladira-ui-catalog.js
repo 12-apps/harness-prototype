@@ -1,7 +1,7 @@
-/* Catálogo de @12-apps/ui@5.0.0 — gerado do package.json.
-   128 componentes. Cole no protótipo ou carregue do
-   conhecimento do projeto. O harness valida os nomes usados em
-   primitivas contra este catálogo. */
+/* Catalog of @12-apps/ui@5.0.0 — generated from package.json.
+   128 components. Paste it into the prototype or load it from the
+   project knowledge. The harness validates the names used in
+   `primitives` against this catalog. */
 window.PALADIRA_UI = {
   "button": "@12-apps/ui/button",
   "charts": "@12-apps/ui/charts",

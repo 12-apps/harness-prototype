@@ -1,7 +1,7 @@
-# @12-apps/ui@5.0.0 — catálogo
+# @12-apps/ui@5.0.0 — catalog
 
-Gerado do package.json. 128 entradas.
-Importe pelo caminho exato; o pacote exporta `./src/*.ts`, então precisa de bundler que transpile TS de node_modules.
+Generated from package.json. 128 entries.
+Import by the exact path; the package exports `./src/*.ts`, so it needs a bundler that transpiles TS from node_modules.
 
 ## form
 

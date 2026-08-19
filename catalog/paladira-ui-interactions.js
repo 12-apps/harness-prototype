@@ -1,7 +1,7 @@
-/* Nível de fiação por componente de @12-apps/ui.
-   exige = sempre operável · pode = operável se receber handler · nunca = inerte.
-   O harness decide pela afordância na tela; este mapa serve de referência. */
-window.PALADIRA_UI_FIACAO = {
+/* Wiring level per @12-apps/ui component.
+   exige = always operable · pode = operable if given a handler · nunca = inert.
+   The harness decides from the affordance on screen; this map is a reference. */
+window.PALADIRA_UI_WIRING = {
  "Button": "exige",
  "HeaderButton": "exige",
  "UploadButton": "exige",
