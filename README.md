@@ -4,45 +4,51 @@ A bench for designing and **stress-testing** UI before it becomes code. The prot
 
 ```bash
 npm install jsdom
-node verify.js examples/product-editor.html
-# ✓ product-editor.html — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
+node verify.js apps/product-editor
+# ✓ product-editor — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
 
-## The harness is not in your file
+## One harness, many prototypes
 
-A prototype **includes** the harness; it never contains it.
+The harness exists once. A prototype is three small files that it loads by name:
 
 ```
-harness.js    the engine — 3.5k lines you never open
-harness.css   the chrome around the stage
-proto.html    the template you copy: ~130 lines, all of it yours
+harness.js     the engine — you never open it
+harness.css    the chrome
+proto.html     the bench: a loader, and it never changes
+apps/
+  _template/   copy this to start
+  product-editor/
+    styles.css   the prototype's styles
+    data.js      fixtures and routes
+    app.js       context, scenarios and render
 ```
 
-A prototype is a small file: two includes and the three ▼ zones. That is the whole
-point — editing a prototype cannot reach the harness, because the harness is not
-there to edit. Nothing to skim past, nothing to break by accident, and a diff on a
-prototype shows only the prototype.
+Open `proto.html?app=product-editor`. Ten prototypes still means one harness —
+nothing is copied per prototype, and an agent writing one never opens the engine,
+because the engine is not in any of the files it touches.
 
-It used to be one 5,200-line file per prototype, harness and all, copied each time.
-
-`proto.html` is the empty template; it reports `0 ok` because it has no prototype in
-it yet. `examples/product-editor.html` is the filled-in reference to read when you
-want to see what real scenarios, routes and states look like.
+A missing sidecar says which file is missing, by name. That matters: a prototype is
+a folder now, and folders lose files in transit.
 
 ## How it is used
 
-1. Copy `proto.html` and rename it to `<area>-<thing>.html`. Keep it next to
-   `harness.js`, or fix the two `src`/`href` paths if you put it deeper.
-2. Fill the three marked zones — they are the whole file:
-   - `▼ DATA ▼` — fixtures and routes
-   - `▼ APP ▼ (1 of 2)` — the prototype's styles
-   - `▼ APP ▼ (2 of 2)` — context, scenarios and render
-3. Open it in a browser. The suite runs on its own and blocks the screen if it fails.
-4. Before shipping, run the gate. It has to exit `0`.
+1. `cp -r apps/_template apps/<area>-<thing>`
+2. Fill its three files:
+   - `data.js` — fixtures and routes
+   - `styles.css` — the prototype's styles
+   - `app.js` — context, scenarios and render
+3. Open `proto.html?app=<area>-<thing>`. The suite runs on its own and blocks the
+   screen if it fails.
+4. Before shipping, run the gate. It has to exit `0`:
 
-CI verifies every prototype it finds — the examples, and anything you copy to the repo
-root. It skips `proto.html` on purpose: an empty bench passes with `0 ok`, and that
-green would mean nothing.
+```bash
+node verify.js apps/<area>-<thing>
+```
+
+CI verifies every app under `apps/`, and fails if it finds none. It skips folders
+starting with `_`: the starter is empty and would only ever report `0 ok`, which is a
+green that counts nothing.
 
 Nothing outside the zones gets touched — that is the harness, and it is the same in every prototype.
 
@@ -55,8 +61,8 @@ since the scenario text and the screen are checked against each other.
 
 Anything specific to a product — its domain vocabulary, its interface language, its
 context dimensions, its settled UX decisions — belongs in that product's own
-instructions, not here. `examples/` carries a worked set of those for a real product,
-written in Brazilian Portuguese, next to the demo prototype they describe.
+instructions, not here. `apps/product-editor/` carries a worked set of those for a
+real product, written in Brazilian Portuguese, beside the prototype they describe.
 
 ## Handing it to whoever implements it
 
@@ -64,7 +70,7 @@ The prototype is the specification, so handing it over should not mean handing o
 folder to reverse-engineer. Three files come out of the run the gate already does:
 
 ```bash
-node verify.js my-screen.html --export handoff/
+node verify.js apps/my-screen --export handoff/
 # → handoff/: my-screen.feature, api.md, my-screen.html
 ```
 
@@ -72,11 +78,14 @@ node verify.js my-screen.html --export handoff/
 |---|---|
 | `<name>.feature` | the scenarios as Gherkin, with the component and route hints |
 | `api.md` | every declared route, with a request and response **actually observed** while the scenarios ran — not an example someone wrote and never checked |
-| `<name>.html` | the prototype itself, harness chrome stripped, still runnable |
+| `<name>.html` | **one self-contained file** — bench, catalog and app inlined. Nothing travels with it, so nothing can be dropped on the way |
 
-The same three are a click away in the browser: open **Gherkin** and use *Baixar tudo*,
-or take them one at a time. `--export` only writes when the gate passes — handing over
-a specification that failed its own checks is worse than handing over nothing.
+The `.feature` and `api.md` are a click away in the browser too, under **Gherkin**. The
+single-file bundle comes from the command line: a page cannot read the sidecars it was
+loaded from. `--export` only writes when the gate passes — handing over a specification
+that failed its own checks is worse than handing over nothing.
+
+The folder is the working format; the bundle is the deliverable.
 
 They are on the API too (`Proto.gherkin()`, `Proto.apiContract()`, `Proto.source()`),
 so an agent can produce them without a browser.
@@ -113,14 +122,15 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 
 | path | what it is |
 |---|---|
-| `harness.js` | the engine. Included by every prototype, edited by none |
-| `harness.css` | the chrome the harness draws around the stage |
-| `proto.html` | the empty template; copy it per prototype |
+| `harness.js` | the engine. Loaded by every prototype, edited by none |
+| `harness.css` | the chrome, loaded inside a shadow root |
+| `proto.html` | the bench: a loader, `?app=<name>`. Never changes |
+| `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.js` |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
 | `catalog/` | the 128 components of `@12-apps/ui` and what each one demands in wiring |
 | `scripts/generate-catalog.js` | regenerates the catalog from the installed package |
-| `examples/` | a filled-in prototype to read, plus the product instructions and context it was built from |
+| `apps/product-editor/` | a filled-in prototype to read, with the product instructions and context it came from |
 
 ## Component catalog
 

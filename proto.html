@@ -3,126 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Proto · protótipo</title>
+<title>Proto</title>
 
 <!-- ============================================================
-     PROTO — a prototype.  The harness is NOT in this file.
+     PROTO — the bench.  This file never changes.
      ============================================================
 
-     The bench lives in harness.js and harness.css and is included
-     below. Everything you write goes in the three ▼ zones of this
-     file, and nothing else here is yours to change — which is the
-     point: you cannot edit the harness from inside a prototype.
+     It is a loader, not a prototype. Open it with the name of an app:
 
-     1. Copy proto.html. Rename it to <area>-<thing>.html
-     2. Fill the three ▼ zones.
-     3. Open it in a browser: the suite runs on its own.
-     4. node verify.js <this file>   — has to exit 0
+         proto.html?app=product-editor
 
-     The prototype is the specification: the scenarios are real
-     Gherkin and every Then is checked against the DOM. The rules
-     the gate enforces are in docs/project-instructions.md, and
-     examples/product-editor.html is a filled-in reference.
+     and it pulls in that app's three files, in this order:
+
+         apps/<name>/styles.css   the prototype's styles
+         apps/<name>/data.js      fixtures and routes
+         apps/<name>/app.js       context, scenarios and render
+
+     A prototype is those three files. Nothing of the harness is in
+     them, and nothing of them is in here — so an agent writing a
+     prototype never opens this file, and never opens the engine.
+
+     To start one: copy apps/_template/ to apps/<your-name>/ and open
+     proto.html?app=<your-name>. The rules the gate enforces are in
+     docs/project-instructions.md.
      ============================================================ -->
 
 <link rel="stylesheet" href="harness.css">
-
-<!-- ============================================================
-     ▼ APP ▼  1 of 2 — the prototype's styles
-     Use @container, not @media: the frame is the container, so a rule
-     keyed to the window would ignore the width ladder entirely.
-     With a component library, take the tokens from it — do not repeat
-     hex values by hand.
-     ============================================================ -->
-<style>
-/* The prototype's styles go here. Nothing in this file is shared with the
-   harness chrome above, so you can start from an empty sheet.
-
-   examples/product-editor.html is the same harness with a full prototype
-   in these three zones — copy from there when you want a worked reference. */
-</style>
-<!-- ▲ APP ▲ -->
 </head>
 
 <body>
-<!-- the harness: engine first, then the component catalog it validates
-     names against. Neither is yours to edit. -->
 <script src="harness.js"></script>
 <script src="catalog/ui-catalog.js"></script>
-
-<!-- ============================================================
-     ▼ DATA ▼ — fixtures and routes
-     Every value the screen shows lives here. The screen never writes a
-     record by hand: it asks. Swapping in a real backend means deleting
-     the routes and letting fetch out.
-
-     A write route has to change the fixtures. Answering 200 without
-     storing is a facade — a reload contradicts it and the gate says so.
-     ============================================================ -->
-<script>
-/* Fixtures: the world the prototype starts from. They reset for every
-   scenario, so a scenario can never leak state into the next one. */
-window.PROTO_DATA = {};
-
-/* Routes the screen may call. Shape:
-     { httpMethod:"GET", pathStr:"/api/things", onLoad:true,
-       responds: ({ params, payload, data_ }) => … }
-   onLoad marks a call that belongs to loading the screen rather than to a
-   step. Throw from `responds` to produce a failure the prototype has to
-   handle. */
-window.PROTO_ROUTES = [];
-</script>
-
-<!-- ============================================================
-     ▼ APP ▼  2 of 2 — context, scenarios and render
-     Replace everything from here to ▲ APP ▲ with the prototype.
-
-     Steps:
-     · Given = the world before the action. Carries `state`.
-     · When  = what the person does. `click` / `fill` / `choose` /
-               `toggleCtl` / `waitFor`, or a pure `applyState`.
-     · Then  = what they now see. Carries `check(state, dom)`.
-     · With `examples` it becomes a Scenario Outline: use <column> in the
-       step text and the harness fills it per row.
-     · Write from the side of whoever uses the screen, not the component.
-
-     The gate demands a journey, not a loose assertion: at least two
-     actions on different targets, a Then after the last one, every page
-     reachable from another screen, and @carregando / @vazio / @erro per
-     page. docs/project-instructions.md has the full list.
-     ============================================================ -->
-<script>
-/* An empty bench: it opens, and the suite reports nothing to check.
-   Fill the three zones and the gate starts having something to say.
-
-   For a worked reference — routes, scenarios, the three states per page
-   and a width ladder that actually changes arrangement — open
-   examples/product-editor.html, which is this same harness with a
-   complete prototype in these zones. */
-Proto.init({
-  title: "prototype",
-
-  /* Axes that change what the screen offers. Each entry is
-     { id, label, kind:"escala"|"opcao"|"flags", value, options:[…] }. */
-  context: [],
-
-  data_:  window.PROTO_DATA,
-  routes: window.PROTO_ROUTES,
-
-  /* Gherkin scenarios. This is the specification — see the zone header. */
-  scenarios: [],
-
-  render: () => `
-    <div class="empty-bench">
-      <h1>Empty bench</h1>
-      <p>Write the prototype in the three ▼ zones of this file.</p>
-    </div>`
-});
-
-/* Delegated handlers survive a re-render, and the steps that say `click`
-   run these very functions:
-     Proto.on("click", '[data-act="save"]', async (e, el, s) => { … }); */
-</script>
-<!-- ▲ APP ▲ -->
 </body>
 </html>

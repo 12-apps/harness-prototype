@@ -48,28 +48,24 @@ jobs:
           done
           echo "path=" >> "$GITHUB_OUTPUT"
 
-      # proto.html is the empty bench, not a prototype: it has no scenarios,
-      # so the gate would pass it with "0 ok" and that green would mean
-      # nothing. Every other prototype — the examples, and anything copied
-      # to the repo root per the documented workflow — is verified.
+      # A prototype is a folder under apps/. The bench itself is not one, so
+      # there is nothing to verify in it; _template is the empty starter and
+      # would only ever report "0 ok", which is a green that counts nothing.
       - name: verify every prototype
         env:
           PROTO_CHROME: ${{ steps.chrome.outputs.path }}
         run: |
           failed=0
           found=0
-          for f in *.html examples/*.html; do
-            [ -e "$f" ] || continue
-            if [ "$f" = "proto.html" ]; then
-              echo "── $f (the bench itself, nothing to verify)"
-              continue
-            fi
+          for d in apps/*/; do
+            name=$(basename "$d")
+            case "$name" in _*) echo "── $name (starter template, nothing to verify)"; continue;; esac
             found=$((found + 1))
-            echo "── $f"
-            node verify.js "$f" || failed=1
+            echo "── $name"
+            node verify.js "$d" || failed=1
           done
           if [ "$found" -eq 0 ]; then
-            echo "no prototype found to verify"
+            echo "no prototype found under apps/"
             exit 1
           fi
           exit $failed

@@ -1,0 +1,11 @@
+/* The prototype's styles.
+
+   Use @container, not @media: the frame is the container, so a rule keyed to
+   the window ignores the width ladder entirely. The harness chrome lives in a
+   shadow root, so nothing you write here can reach it — and nothing it
+   defines can reach you. Start from an empty sheet.
+
+   The frame is a named container, so query it directly:
+
+     @container frame (min-width: 768px){ .list{ grid-template-columns:1fr 1fr } }
+*/

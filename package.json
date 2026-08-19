@@ -5,7 +5,7 @@
   "bin": { "proto-verify": "./verify.js" },
   "scripts": {
     "verify": "node verify.js",
-    "verify:example": "node verify.js examples/product-editor.html",
+    "verify:example": "node verify.js apps/product-editor",
     "catalog": "node scripts/generate-catalog.js"
   },
   "devDependencies": { "jsdom": "^24.0.0" },

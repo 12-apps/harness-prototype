@@ -44,13 +44,36 @@ else {
 const file = args.find((a, i) => !a.startsWith("--") && i !== exportValueAt);
 
 if (!file){
-  console.error("usage: node verify.js <file.html> [--strict] [--export <dir>]");
+  console.error("usage: node verify.js <apps/<name> | file.html> [--strict] [--export <dir>]");
   process.exit(3);
 }
 if (!fs.existsSync(file)){
-  console.error("file not found: " + file);
+  console.error("not found: " + file);
   process.exit(3);
 }
+
+/* A prototype is a folder of sidecars the bench loads by name, so the thing
+   under test is proto.html?app=<name> rather than a file of its own. A plain
+   .html still works: a self-contained prototype is a legitimate thing to
+   check, and that is what the bundle export produces. */
+const isApp = fs.statSync(file).isDirectory();
+const appName = isApp ? path.basename(path.resolve(file)) : null;
+const pageFile = isApp ? path.join(__dirname, "proto.html") : file;
+const label = isApp ? appName : path.basename(file);
+
+if (isApp){
+  for (const need of ["styles.css", "data.js", "app.js"]){
+    if (!fs.existsSync(path.join(file, need))){
+      console.error("✕ " + file + " is missing " + need + " — a prototype is all three files.");
+      process.exit(3);
+    }
+  }
+  if (!fs.existsSync(pageFile)){
+    console.error("✕ proto.html not found next to verify.js");
+    process.exit(3);
+  }
+}
+const pageUrl = pathToFileURL(path.resolve(pageFile)).href + (isApp ? "?app=" + appName : "");
 
 /* ------------------------------------------------------------------
    The gate's layout engine
@@ -89,7 +112,7 @@ function findPuppeteer(){
   return null;
 }
 
-async function runInBrowser(file, chrome, pptr){
+async function runInBrowser(pageUrl, chrome, pptr){
   const b = await pptr.launch({
     headless: "new", executablePath: chrome,
     args:["--no-sandbox","--disable-dev-shm-usage","--font-render-hinting=none"]
@@ -99,8 +122,14 @@ async function runInBrowser(file, chrome, pptr){
     await pg.setViewport({ width:1400, height:1000 });
     const errors = [];
     pg.on("pageerror", e => errors.push(String(e.message).split("\n")[0]));
-    await pg.goto("file://" + path.resolve(file), { waitUntil:"load" });
+    await pg.goto(pageUrl, { waitUntil:"load" });
     await pg.waitForFunction("window.Proto && typeof window.Proto.verifyAll === 'function'", { timeout:20000 });
+    const loadError = await pg.evaluate(() => window.PROTO_LOAD_ERROR || null);
+    if (loadError){
+      console.error("✕ the app did not load: " + loadError);
+      await b.close();
+      process.exit(3);
+    }
     const r = await pg.evaluate(async (wantArtifacts) => {
       const s = await window.Proto.verifyAll();
       const out = { ok:s.ok, bad:s.bad, warnings:s.warnings || [], infos:s.infos || [],
@@ -117,11 +146,57 @@ async function runInBrowser(file, chrome, pptr){
   } finally { await b.close(); }
 }
 
+/* One file that opens anywhere: the bench, the catalog and the app's three
+   sidecars inlined into a single document. The folder is the working format;
+   this is the deliverable, because a folder emailed to someone arrives with
+   a file missing sooner or later. */
+function bundle(appDir, appName){
+  /* inlined script must not carry a sequence that closes its own block —
+     the engine builds one deliberately, to inject a marker into the
+     verification iframe */
+  const read = f => fs.readFileSync(f, "utf8").replace(/<\/(script)/gi, "<\\/$1");
+  const here = f => path.join(__dirname, f);
+  const app  = f => path.join(appDir, f);
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${appName}</title>
+<!-- Self-contained prototype: bench, catalog and app in one file.
+     Open it in a browser — nothing to install, nothing else to keep
+     alongside it. The editable form is the apps/${appName}/ folder. -->
+<style data-harness-css>
+${read(here("harness.css"))}
+</style>
+<style>
+${read(app("styles.css"))}
+</style>
+</head>
+<body>
+<script>window.PROTO_BUNDLED = true;</script>
+<script>
+${read(here("harness.js"))}
+</script>
+<script>
+${read(here("catalog/ui-catalog.js"))}
+</script>
+<script>
+${read(app("data.js"))}
+</script>
+<script>
+${read(app("app.js"))}
+</script>
+</body>
+</html>
+`;
+}
+
 /* The three things whoever implements this needs: the scenarios as Gherkin,
    the routes with a request and response actually observed, and the
    prototype itself. Same artefacts the browser's "Baixar tudo" produces. */
 function writeArtifacts(dir, arts){
-  const base = path.basename(file).replace(/\.html?$/i, "");
+  const base = label.replace(/\.html?$/i, "");
   fs.mkdirSync(dir, { recursive: true });
   const wrote = [];
   const put = (nameStr, text) => {
@@ -132,7 +207,7 @@ function writeArtifacts(dir, arts){
   };
   put(base + ".feature", arts.feature);
   put("api.md", arts.api);
-  put(base + ".html", arts.html);
+  put(base + ".html", isApp ? bundle(file, appName) : arts.html);
   console.log("→ " + dir + ": " + (wrote.length ? wrote.join(", ") : "nothing to write"));
 }
 
@@ -143,7 +218,7 @@ const chrome = findChromium();
 const pptr = chrome ? findPuppeteer() : null;
 
 if (chrome && pptr){
-  runInBrowser(file, chrome, pptr).then(r => {
+  runInBrowser(pageUrl, chrome, pptr).then(r => {
     const warnings = r.warnings || [];
     const cov = r.coverage;
     const line = `${r.ok} ok · ${r.bad} failing · ${warnings.length} warning(s)`
@@ -154,7 +229,7 @@ if (chrome && pptr){
       console.error(`\n✕ DO NOT SHIP. ${line}`);
       process.exit(1);
     }
-    console.log(`✓ ${path.basename(file)} — ${line}`);
+    console.log(`✓ ${label} — ${line}`);
     if (exportDir && r.artifacts) writeArtifacts(exportDir, r.artifacts);
     warnings.forEach(a => console.log("  ! " + a));
     (r.infos || []).forEach(i => console.log("  · " + i));
@@ -181,7 +256,7 @@ try {
   console.error("jsdom is not installed. Run:  npm install jsdom");
   process.exit(3);
 }
-const html = fs.readFileSync(file, "utf8");
+const html = fs.readFileSync(pageFile, "utf8");
 /* A prototype includes the harness rather than containing it, so jsdom has
    to fetch harness.js and the catalog: `resources: "usable"` turns that on,
    and a real file:// url is what makes the relative paths resolve. The
@@ -191,7 +266,7 @@ const dom = new JSDOM(html, {
   runScripts: "dangerously",
   resources: "usable",
   pretendToBeVisual: true,
-  url: pathToFileURL(path.resolve(file)).href
+  url: pageUrl
 });
 const w = dom.window;
 
@@ -212,9 +287,13 @@ w.addEventListener("load", () => {
      only valid once the app script has finished — same reason as the
      setTimeout there */
   setTimeout(async () => {
+    if (w.PROTO_LOAD_ERROR){
+      console.error("✕ the app did not load: " + w.PROTO_LOAD_ERROR);
+      process.exit(3);
+    }
     const P = w.Proto;
     if (!P || typeof P.verifyAll !== "function"){
-      console.error("✕ " + file + " does not expose the Proto harness — is it a harness prototype?");
+      console.error("✕ " + label + " does not expose the Proto harness — did its app.js run?");
       process.exit(3);
     }
 
@@ -238,7 +317,7 @@ w.addEventListener("load", () => {
       process.exit(1);
     }
 
-    console.log(`✓ ${path.basename(file)} — ${line}`);
+    console.log(`✓ ${label} — ${line}`);
 
     if (exportDir){
       writeArtifacts(exportDir, { feature: P.gherkin(), api: P.apiContract(), html: P.source() });

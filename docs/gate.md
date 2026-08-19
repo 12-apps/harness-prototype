@@ -4,8 +4,8 @@
 
 ```bash
 npm install jsdom                              # once per session
-node verify.js <thing>.html
-node verify.js <thing>.html --strict
+node verify.js apps/<thing>
+node verify.js apps/<thing> --strict
 ```
 
 Add `--export <dir>` to write the handoff files — the `.feature`, `api.md` and the
@@ -30,7 +30,7 @@ The output says which one ran:
 
 **Without the marker** — it fell back to jsdom, which resolves the DOM but does no layout: `@container` never matches. The measurement rules declare themselves unverifiable instead of approving in the dark. Everything else (journeys, routes, states, permissions, disappearing content) still applies.
 
-Either engine has to load `harness.js` and the catalog, since a prototype includes the harness rather than containing it. jsdom does that with `resources: "usable"` over a `file://` url, so the gate has to be run where those relative paths resolve — from the repo, not from a copy of the prototype on its own.
+Either engine loads `proto.html?app=<name>` and lets the bench pull in the app's three files. jsdom does that with `resources: "usable"` over a `file://` url, so run the gate from the repo, where those relative paths resolve. A single-file bundle produced by `--export` needs none of that and can be checked anywhere.
 
 To force a specific browser:
 
@@ -42,7 +42,7 @@ PROTO_CHROME=/path/to/chrome node verify.js file.html
 
 `.github/workflows/gate.yml` runs the gate on every pull request and on pushes to `main`. The runner ships a Chromium and the workflow installs puppeteer alongside jsdom, so CI runs in `[browser]` mode and the measurement rules count there.
 
-It verifies every prototype it finds — `examples/`, and anything copied to the repo root — and fails if it finds none. It skips `proto.html`, which is the bench itself: with empty zones the gate passes it with `0 ok`, and a green that counts nothing is worse than no check at all.
+It verifies every app under `apps/` and fails if it finds none. It skips folders whose name starts with `_`: the starter is empty and would only ever report `0 ok`, and a green that counts nothing is worse than no check at all.
 
 Two failure modes are worth knowing about, because both once made this gate approve anything:
 

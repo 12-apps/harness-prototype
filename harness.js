@@ -154,7 +154,8 @@ let H_ROOT = null;
           <span>Para quem for implementar:</span>
           <button class="h-btn" id="h-dl-feature" title="Os cenários em Gherkin">.feature</button>
           <button class="h-btn" id="h-dl-api" title="As rotas, com pedido e resposta observados">api.md</button>
-          <button class="h-btn" id="h-dl-html" title="O protótipo, sem o harness">.html</button>
+          <button class="h-btn" id="h-dl-html" title="O protótipo em um arquivo só">.html</button>
+          <code id="h-dl-hint"></code>
         </div>
       </section>
     </main>
@@ -164,10 +165,11 @@ let H_ROOT = null;
 
   /* the chrome stylesheet goes in with it, ahead of the markup; the
      document keeps none of it, which is what makes the isolation mutual */
-  const link = document.querySelector('link[rel="stylesheet"][href*="harness.css"]');
-  if (link){
-    H_ROOT.insertBefore(link.cloneNode(true), H_ROOT.firstChild);
-    link.remove();
+  const sheet = document.querySelector('link[rel="stylesheet"][href*="harness.css"]')
+             || document.querySelector("style[data-harness-css]");
+  if (sheet){
+    H_ROOT.insertBefore(sheet.cloneNode(true), H_ROOT.firstChild);
+    sheet.remove();
   }
 
   /* light-DOM mount, projected into the frame above */
@@ -3520,6 +3522,11 @@ const Proto = (() => {
     });
 
     $("h-spec-btn").addEventListener("click", () => showSpec($("h-spec").hidden));
+    /* A page cannot read the sidecars it was loaded from — fetch does not
+       reach a file:// sibling — so the single-file bundle is the command
+       line's job. Bundled, the document already is the whole prototype. */
+    const bundled = !!window.PROTO_BUNDLED;
+    const appName = new URLSearchParams(location.search).get("app");
     const dl = {
       feature: () => download(slug() + ".feature", gherkin(), "text/plain"),
       api:     () => download("api.md", apiContract(), "text/markdown"),
@@ -3531,13 +3538,20 @@ const Proto = (() => {
     };
     $("h-dl-feature").addEventListener("click", e => { dl.feature(); flash(e.currentTarget, "baixado"); });
     $("h-dl-api").addEventListener("click",     e => { dl.api();     flash(e.currentTarget, "baixado"); });
-    $("h-dl-html").addEventListener("click",    e => { dl.html();    flash(e.currentTarget, "baixado"); });
+    if (bundled){
+      $("h-dl-html").addEventListener("click", e => { dl.html(); flash(e.currentTarget, "baixado"); });
+    } else {
+      /* say where it comes from rather than hand over an empty bench */
+      $("h-dl-html").disabled = true;
+      $("h-dl-html").title = "O arquivo único sai pela linha de comando";
+      $("h-dl-hint").textContent = "node verify.js apps/" + (appName || "<app>") + " --export handoff/";
+    }
     $("h-dl-all").addEventListener("click", e => {
       /* one click per file, spaced out: a browser drops downloads fired in
          the same tick as if they were a popup burst */
       dl.feature();
       setTimeout(dl.api, 350);
-      setTimeout(dl.html, 700);
+      if (bundled) setTimeout(dl.html, 700);
       flash(e.currentTarget, "baixando…");
     });
 
@@ -3783,3 +3797,75 @@ const Proto = (() => {
 /* in the console: Proto.state, Proto.goto("id", 2), Proto.verifyAll() */
 window.Proto = Proto;
 
+
+/* ============================================================
+   The loader
+   ============================================================
+   The bench is one fixed page and a prototype is three sidecars it
+   pulls in by name: proto.html?app=<name> loads apps/<name>/styles.css,
+   then data.js, then app.js — in that order, because app.js calls
+   Proto.init and expects the fixtures to already exist.
+
+   A missing file is the failure mode this design has to take seriously:
+   a prototype is a folder now, and folders lose files in transit. So a
+   sidecar that does not load says exactly which one, rather than
+   leaving a blank bench that looks like a bug in the harness.
+   ============================================================ */
+(function loader(){
+  /* a bundle inlines its own app, so there is nothing to fetch */
+  if (window.PROTO_BUNDLED) return;
+  const app = document.getElementById("app");
+  const shout = (title, detail, hint) => {
+    /* the gate reads this: an app that never loaded has no scenarios, and
+       "0 ok" would otherwise be reported as a pass */
+    window.PROTO_LOAD_ERROR = title + (detail ? " — " + detail : "");
+    if (!app) return;
+    app.innerHTML =
+      '<div style="max-width:52ch;margin:12vh auto;padding:0 24px;'
+      + 'font:14px/1.6 ui-sans-serif,system-ui,sans-serif;color:#e8eaef">'
+      + '<h1 style="font-size:17px;margin:0 0 10px">' + title + '</h1>'
+      + '<p style="margin:0 0 10px;color:#a6acbb">' + detail + '</p>'
+      + (hint ? '<pre style="margin:0;padding:10px 12px;background:#14171d;'
+              + 'border:1px solid #2c323e;border-radius:8px;overflow:auto;'
+              + 'font:12px/1.5 ui-monospace,monospace;color:#e8eaef">'
+              + hint + '</pre>' : '')
+      + '</div>';
+  };
+
+  const name = new URLSearchParams(location.search).get("app");
+  if (!name){
+    shout("No app selected",
+          "The bench loads a prototype by name. Open it with one:",
+          "proto.html?app=product-editor\n\n"
+        + "Each app is a folder under apps/ with styles.css, data.js and app.js.");
+    return;
+  }
+  /* the name indexes a folder, so it may not wander out of apps/ */
+  if (!/^[a-z0-9_][a-z0-9_-]*$/.test(name)){
+    shout("Bad app name",
+          "An app name is lowercase letters, digits, dashes and underscores. Got: " + Proto.esc(name));
+    return;
+  }
+
+  const base = "apps/" + name + "/";
+  const missing = file => shout(
+    "Could not load " + file,
+    "The bench is fine; this app is missing a file, or the name is wrong. "
+    + "A prototype is three files and all three have to travel together.",
+    base + "styles.css\n" + base + "data.js\n" + base + "app.js");
+
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = base + "styles.css";
+  css.onerror = () => missing(base + "styles.css");
+  document.head.appendChild(css);
+
+  const load = src => new Promise((ok, no) => {
+    const el = document.createElement("script");
+    el.src = src; el.onload = ok; el.onerror = () => no(src);
+    document.body.appendChild(el);
+  });
+
+  load(base + "data.js")
+    .then(() => load(base + "app.js"))
+    .catch(missing);
+})();

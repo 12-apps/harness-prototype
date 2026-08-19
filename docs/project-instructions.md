@@ -14,7 +14,7 @@ serves any prototype, and nothing in it knows what you are building.
 This document covers the harness and the rules it enforces. Everything about a
 specific product — its domain vocabulary, its interface language, its context
 dimensions, its settled UX decisions — belongs in that product's own instructions.
-`examples/` carries a worked set of those, for a real product, next to the demo
+`apps/product-editor/` carries a worked set of those, for a real product, beside the
 prototype they describe.
 
 The harness itself is English: identifiers, comments, filenames, tooling, these
@@ -24,23 +24,29 @@ because the scenario text and the screen are checked against each other.
 
 ## Starting point
 
-**Do not rebuild the harness. Copy `proto.html`** and fill the marked zones.
+**Do not rebuild the harness, and do not open it.** A prototype is three files:
 
-The harness is not in your file. A prototype includes it:
-
-```html
-<link rel="stylesheet" href="harness.css">
-<script src="harness.js"></script>
+```
+cp -r apps/_template apps/<area>-<thing>
 ```
 
-so `harness.js` and `harness.css` are never opened, never copied and never edited
-from a prototype — there is nothing of the harness in the file you are working on to
-edit by accident. `proto.html` is the empty template (~130 lines, all of it yours);
-on its own it reports `0 ok`, because it has no prototype in it yet. The filled-in
-reference is [`examples/product-editor.html`](../examples/product-editor.html) —
-read it when you want the shape of real scenarios, routes and states.
+```
+apps/<area>-<thing>/
+  styles.css   the prototype's styles
+  data.js      fixtures and routes
+  app.js       context, scenarios and render
+```
 
-Keep your copy next to `harness.js`, or fix the two paths if you put it deeper.
+Open it with `proto.html?app=<area>-<thing>`. The bench loads those three, in that
+order, so `app.js` can count on the fixtures already existing.
+
+The harness is never copied: one `harness.js` and one `harness.css` serve every
+prototype, and neither appears in the files you edit. The chrome also sits in a
+shadow root, so nothing you write in `styles.css` can reach it — and nothing it
+defines can reach your screen.
+
+The filled-in reference is [`apps/product-editor/`](../apps/product-editor/) — read
+it when you want the shape of real scenarios, routes and states.
 
 - `▼ DATA ▼` — fixtures and routes
 - `▼ APP ▼ (1 of 2)` — the prototype's styles
@@ -77,8 +83,8 @@ specification's prose — write it in whatever language the product's interface 
 and keep it consistent, because that text and the screen are checked against each
 other. The journey tags (`@feliz`, `@conflito`, `@recuperacao`, `@retorno`) and the
 state tags (`@carregando`, `@vazio`, `@erro`) are the harness's vocabulary and are
-spelled as shown, whatever your prose language. `examples/` shows a full set written
-in Portuguese.
+spelled as shown, whatever your prose language. `apps/product-editor/` shows a full
+set written in Portuguese.
 
 - `Given` (`Dado`) = the world before the action; fetched from the API.
 - `When` (`Quando`) = a real action: `click`, `fill`, `choose`, `toggleCtl`, `waitFor`. It runs the `Proto.on` handlers and fails if the element does not exist. `applyState` is for pure state only.

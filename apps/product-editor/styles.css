@@ -1,0 +1,104 @@
+/* The prototype's styles. Use @container, not @media: the frame is the
+   container, so a rule keyed to the window ignores the width ladder.
+   The harness chrome is in a shadow root and cannot be reached from here. */
+
+:root{
+  --brand:#5b5bd6; --brand-ink:#4a4ac4; --brand-soft:#eeeefc; --brand-line:#c9c9f2;
+  --ink:#111318; --ink-2:#3d4350; --ink-3:#6b7280; --ink-4:#9aa1ad;
+  --line:#e4e7ec; --line-2:#eef0f4; --bg:#fff; --bg-2:#f7f8fa;
+  --ok:#0f7a4d; --ok-soft:#e8f6ef; --ok-line:#bfe5d3;
+  --warn:#b45309; --warn-soft:#fdf1e3; --warn-line:#f3d9b5;
+  --bad:#c02626; --bad-soft:#fdeceb; --bad-line:#f5c6c2;
+  --r:10px;
+}
+.app{min-height:100%;display:flex;flex-direction:column;background:var(--bg-2);color:var(--ink);font:14px/1.45 var(--h-sans)}
+.app-hd{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px}
+.app-hd h1{margin:0;font-size:16px;font-weight:650;letter-spacing:-.01em}
+/* an over-long line tires the reader: the eye loses the way back */
+.app-hd p,.card p,.estado p,.trava p{max-width:52ch}
+.app-hd p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
+.app-bd{flex:1;padding:16px;display:grid;gap:10px;align-content:start}
+
+.card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.card h2{margin:0 0 6px;font-size:13px;font-weight:650}
+.card p{margin:0;font-size:13px;color:var(--ink-3)}
+
+.var{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.var b{font-size:13px;font-weight:600}
+.var input.preco{
+  margin-left:auto;width:104px;text-align:right;min-height:44px;
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;
+  font:inherit;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);
+}
+.var input.preco:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.var span{margin-left:auto;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.empty{border:1px dashed var(--line-2);border-radius:var(--r);background:var(--bg);padding:28px 16px;text-align:center}
+.empty h2{margin:0 0 4px;font-size:14px;font-weight:650}
+.empty p{margin:0 0 14px;font-size:13px;color:var(--ink-3)}
+
+.btn{
+  border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;
+  /* 44px minimum height: a finger target, not a mouse target */
+  min-height:44px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;
+  font:inherit;font-size:13px;font-weight:550;cursor:pointer;
+}
+.btn:hover{background:var(--brand-ink)}
+.btn.ghost{background:transparent;color:var(--brand);border-color:var(--brand-line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+.tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+.aviso{display:flex;gap:8px;background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);border-radius:var(--r);padding:11px 13px;font-size:12.5px}
+.linha{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px 14px;font:inherit;cursor:pointer;color:var(--ink);
+}
+.linha:hover{border-color:var(--brand-line);background:var(--brand-soft)}
+.linha .nome{display:grid;gap:2px}
+.linha b{font-size:13.5px;font-weight:600}
+.linha .cat{font-size:12px;color:var(--ink-3)}
+.linha .qtd{margin-left:auto;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.voltar{
+  background:transparent;border:0;color:var(--brand);font:inherit;font-size:13px;
+  cursor:pointer;padding:0 4px;margin-bottom:2px;text-align:left;
+  min-height:44px;display:inline-flex;align-items:center;
+}
+.estado{
+  display:grid;place-items:center;gap:10px;padding:44px 20px;text-align:center;
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
+}
+.estado h2{margin:0;font-size:14px;font-weight:650}
+.estado p{margin:0;font-size:13px;color:var(--ink-3)}
+.estado .esqueleto{width:100%;display:grid;gap:8px}
+.estado .esqueleto i{display:block;height:14px;border-radius:6px;background:var(--line-2)}
+.estado.erro{border-color:var(--bad-line);background:var(--bad-soft)}
+.estado.erro h2{color:var(--bad)}
+
+.trava{background:var(--bg);border:1px dashed var(--line-2);border-radius:var(--r);padding:16px;text-align:center}
+.trava h2{margin:0 0 4px;font-size:13.5px;font-weight:650}
+.trava p{margin:0;font-size:12.5px;color:var(--ink-3)}
+
+.actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;justify-content:flex-end}
+/* scrim: only exists in the DOM while the panel is open — never permanent */
+.scrim{position:absolute;inset:0;background:rgba(17,19,24,.45);z-index:20}
+
+/* the list changes arrangement per rung — it is not just "fitting" */
+.grade{display:grid;gap:10px;grid-template-columns:1fr}
+@container frame (min-width: 768px){
+  .grade{grid-template-columns:1fr 1fr}
+}
+@container frame (min-width: 1440px){
+  .grade{grid-template-columns:1fr 1fr 1fr}
+}
+/* on xxs/xs the primary action drops to a fixed footer bar */
+.acao-fixa{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px}
+@container frame (min-width: 768px){
+  .acao-fixa{position:static;border-top:0;padding:0;display:flex;justify-content:flex-end}
+}
+
+@container frame (max-width: 480px){
+  .app-bd{padding:12px}
+  .btn{padding:11px 14px}
+}
