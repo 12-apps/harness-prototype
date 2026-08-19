@@ -14,6 +14,12 @@ on:
     branches: [main]
   pull_request:
 
+# O portão só lê o repositório: clona, instala jsdom e roda a suíte.
+# Sem isto o GITHUB_TOKEN entra com as permissões padrão do repositório,
+# que são mais amplas do que qualquer passo aqui precisa.
+permissions:
+  contents: read
+
 jobs:
   verificar:
     runs-on: ubuntu-latest
