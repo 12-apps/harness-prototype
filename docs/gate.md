@@ -41,8 +41,11 @@ and nothing downstream can distinguish it from one an agent typed.
 
 The last three come from `catalog/ui-interactions.js`, which classifies every
 component as `exige` (always operable), `pode` (operable if given a handler) or
-`nunca` (inert). Only `exige` is enforced here; `pode` is left to the runtime
-audit, which decides from the rendered DOM, and `nunca` has nothing to demand.
+`nunca` (not the thing to operate). Only `exige` is enforced here; `pode` is
+left to the runtime audit, which decides from the rendered DOM, and `nunca` has
+no step to demand. The levels say what the screen owes a component, never
+whether to use it — `nunca` is the largest level because it holds the
+structure, `CardContent` and `SidebarHeader` and the rest.
 
 Components you define yourself are fine — composing design-system parts into a
 screen is the job. Two things the source cannot see are deliberately not

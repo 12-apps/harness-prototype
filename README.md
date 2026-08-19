@@ -157,9 +157,13 @@ The gate checks every component a prototype imports against this catalog: a name
 
 Note `catalog/ui-interactions.*` is curated by hand, not generated: it says, per
 component, whether the screen owes it a step (`exige` = always operable, `pode` =
-operable if given a handler, `nunca` = inert). Every level was read off the
-component's own declaration in the package source rather than guessed from its
-name — `CardContent` is a container, `CollapsibleTrigger` renders a button.
+operable if given a handler, `nunca` = not the thing to operate). Every level was
+read off the component's own declaration in the package source rather than
+guessed from its name — `CardContent` is a container, `CollapsibleTrigger`
+renders a button, `Label` takes an `onClick` and styles itself as clickable.
+
+The levels say what the screen owes a component, never whether to use it.
+`nunca` is the largest of the three because that is where the structure lives.
 
 It is enforced, not advisory: the gate rejects a prototype that renders an
 `exige` component with nothing to operate, a hook no `Proto.on` answers, or a

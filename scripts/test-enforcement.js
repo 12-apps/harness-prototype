@@ -79,12 +79,12 @@ for (const [label, level] of [["wiring", maps.PROTO_UI_WIRING], ["action", maps.
   check(`no ${label} level for a component that is gone`, orphan(level).length === 0, list(orphan(level)));
 }
 
-/* `nunca` means there is nothing to operate, so it cannot carry a step
-   that operates something. `efemero` is allowed: a skeleton or a loading
+/* `nunca` means the screen owes this one no step, so it cannot carry a verb
+   that describes operating it. `efemero` is allowed: a skeleton or a loading
    state appears and goes away without ever being touched. */
-const inert = names.filter(n => maps.PROTO_UI_WIRING[n] === "nunca"
+const contradictory = names.filter(n => maps.PROTO_UI_WIRING[n] === "nunca"
                              && !["passivo", "efemero"].includes(maps.PROTO_UI_ACTION[n]));
-check("no component is inert and operable at once", inert.length === 0, list(inert));
+check("no component owes no step and a step at once", contradictory.length === 0, list(contradictory));
 
 console.log(failed ? `\n✕ the component rule is not enforcing what it claims (${failed})`
                    : `\n✓ the component rule still bites (${bad.length} violations caught in the fixture)`);
