@@ -94,12 +94,6 @@ async function rodarNoNavegador(arquivo, chrome, pptr){
 }
 
 let JSDOM;
-try {
-  ({ JSDOM } = require("jsdom"));
-} catch {
-  console.error("jsdom não está instalado. Rode:  npm install jsdom");
-  process.exit(3);
-}
 
 /* navegador primeiro: é o único jeito de as regras de layout valerem */
 const chrome = acharChromium();
@@ -135,6 +129,14 @@ if (chrome && pptr){
 }
 
 function viaJsdom(){
+/* só o motor de jsdom precisa dele: quem tem navegador não deve esbarrar
+   nesta dependência para rodar o portão */
+try {
+  ({ JSDOM } = require("jsdom"));
+} catch {
+  console.error("jsdom não está instalado. Rode:  npm install jsdom");
+  process.exit(3);
+}
 const html = fs.readFileSync(arquivo, "utf8");
 const dom = new JSDOM(html, {
   runScripts: "dangerously",
