@@ -2000,7 +2000,14 @@ const Paladira = (() => {
 
     cfg.context.forEach(d => {
       if (q[d.id] == null) return;
-      if (d.kind === "flags") state.ctx[d.id] = q[d.id].split(",").filter(Boolean);
+      /* the hash is attacker-supplied: only ids this dimension declares get
+         into the context. The single-choice branch already checked; the
+         flags branch used to take whatever the URL said. */
+      if (d.kind === "flags"){
+        state.ctx[d.id] = q[d.id].split(",")
+          .filter(Boolean)
+          .filter(id => d.options.some(o => o.id === id));
+      }
       else if (d.options.some(o => o.id === q[d.id])) state.ctx[d.id] = q[d.id];
       userCtx = clone(state.ctx);
       suite = null;
@@ -3460,7 +3467,7 @@ const Paladira = (() => {
       const closed = closedGroups.has(groupLabel);
       const badOnes = items.reduce((n, x) => n + (failCount(x) ? 1 : 0), 0);
 
-      html += `<button class="h-grupo${closed ? " fechado" : ""}" data-grupo="${esc(groupLabel)}">`
+      html += `<button class="h-grupo${closed ? " fechado" : ""}" data-group="${esc(groupLabel)}">`
            +  `<span class="chev">▶</span><span class="nm">${esc(groupLabel)}</span>`
            +  `<span class="ct">${items.length}</span>`
            +  (badOnes ? `<span class="fl">${badOnes}</span>` : "")
@@ -3481,7 +3488,7 @@ const Paladira = (() => {
           const stateKey = groupLabel + "::estados";
           const fech = closedGroups.has(stateKey);
           const badStates = states.reduce((n, x) => n + (failCount(x) ? 1 : 0), 0);
-          html += `<button class="h-grupo sub${fech ? " fechado" : ""}" data-grupo="${esc(stateKey)}">`
+          html += `<button class="h-grupo sub${fech ? " fechado" : ""}" data-group="${esc(stateKey)}">`
                +  `<span class="chev">▶</span><span class="nm">estados</span>`
                +  `<span class="ct">${states.length}</span>`
                +  (badStates ? `<span class="fl">${badStates}</span>` : "")
@@ -3989,9 +3996,9 @@ const Paladira = (() => {
       if (e.target.closest("#h-toggle-ocultos")){ showHidden = !showHidden; render(); return; }
       if (e.target.closest("#h-so-falhas")){ onlyFailures = !onlyFailures; searchFocused = false; render(); return; }
 
-      const g = e.target.closest("[data-grupo]");
+      const g = e.target.closest("[data-group]");
       if (g){
-        const nameStr = g.dataset.grp;
+        const nameStr = g.dataset.group;
         closedGroups.has(nameStr) ? closedGroups.delete(nameStr) : closedGroups.add(nameStr);
         searchFocused = false; render(); return;
       }
