@@ -165,6 +165,12 @@ renders a button, `Label` takes an `onClick` and styles itself as clickable.
 The levels say what the screen owes a component, never whether to use it.
 `nunca` is the largest of the three because that is where the structure lives.
 
+`catalog/ui-composition.js` is the other half of that: the six compounds whose
+parts carry the box structure the parent does not, so the gate can reject a
+`Card` filled by hand and padded back with CSS. Its list is derived — parent
+takes children, parent supplies no padding, a part does — which is what keeps
+`Form` and `AppHeader` off it.
+
 It is enforced, not advisory: the gate rejects a prototype that renders an
 `exige` component with nothing to operate, a hook no `Proto.on` answers, or a
 handler for a hook no element carries — checked in the source, with a line

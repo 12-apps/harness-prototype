@@ -6,6 +6,7 @@ import { Card } from "@12-apps/ui/layout/Kard";
 import { CollapsibleTrigger } from "@12-apps/ui/layout/Collapsible";
 import { Thing } from "some-other-lib";
 import { Text } from "@12-apps/ui/typography/Text";
+import { Card as Kard } from "@12-apps/ui/layout/Card";
 
 export default function Screen(){
   return (
@@ -22,6 +23,8 @@ export default function Screen(){
       <Button dangerouslySetInnerHTML={{ __html: "<b>x</b>" }} data-act="pay" />
       {/* and a screen assembled as HTML text. */}
       <Text>{hand()}</Text>
+      {/* a compound filled by hand instead of with the parts that pad it */}
+      <Kard className="card"><Text>hand rolled</Text></Kard>
     </>
   );
 }

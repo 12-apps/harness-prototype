@@ -60,7 +60,17 @@ const INSTEAD = {
   nav:"Box", aside:"Box", pre:"Code", code:"Code", hr:"Divider", dialog:"Dialog"
 };
 
-function lint(file, catalog, wiring){
+/* Compounds whose parts carry the box structure the parent does not.
+   catalog/ui-composition.js says which, and why. */
+function loadParts(repo){
+  const f = path.join(repo, "catalog", "ui-composition.js");
+  if (!fs.existsSync(f)) return null;
+  const m = fs.readFileSync(f, "utf8").match(/window\.PROTO_UI_PARTS = ([\s\S]*?);\n/);
+  if (!m) throw new Error("catalog/ui-composition.js has no PROTO_UI_PARTS map");
+  return JSON.parse(m[1]);
+}
+
+function lint(file, catalog, wiring, parts){
   const babel = require("@babel/parser");
   const src = fs.readFileSync(file, "utf8");
   let ast;
@@ -160,8 +170,65 @@ function lint(file, catalog, wiring){
   problems.push(...escapes(ast, walk));
 
   if (wiring) problems.push(...unwired(ast, imported, wiring, walk));
+  if (parts)  problems.push(...uncomposed(ast, imported, parts, walk));
 
   return problems.sort((a, b) => a.line - b.line);
+}
+
+/* ============================================================
+   A compound used without the parts that give it its structure
+   ============================================================
+   `<Card>` supplies no padding — `CardContent` does. Fill a Card with
+   headings and paragraphs instead and you get an unpadded box, so the
+   padding gets written back by hand in styles.css, and the component is
+   now a border the prototype draws around its own layout. That is the
+   design system imported and rebuilt in the same file.
+
+   Only the compounds in catalog/ui-composition.js are checked, and that
+   list is derived rather than chosen: the parent must take children,
+   supply no padding itself, and have a part that does. Form, AppHeader,
+   Command and Avatar all fail that test and are not checked — demanding
+   parts for them would be noise.
+   ============================================================ */
+function uncomposed(ast, imported, parts, walk){
+  const problems = [];
+  const fromPkg = nameStr => {
+    const imp = imported.get(nameStr);
+    return imp && imp.source.startsWith(PKG) ? (imp.imported || nameStr) : null;
+  };
+
+  walk(ast.program, n => {
+    if (n.type !== "JSXElement") return;
+    const open = n.openingElement;
+    if (open.name.type !== "JSXIdentifier") return;
+    const comp = fromPkg(open.name.name);
+    if (!comp || !parts[comp]) return;
+
+    const kids = (n.children || []).filter(c =>
+      c.type !== "JSXText" || c.value.trim());
+    if (!kids.length) return;                    /* nothing inside to compose */
+
+    /* Children we cannot read are not accused: `<Card>{body}</Card>` may
+       well render a CardContent defined elsewhere in the file. Only an
+       element that puts VISIBLE markup inside itself is judged on it. */
+    let sawJsx = false;
+    walk(n.children, c => { if (c.type === "JSXElement") sawJsx = true; });
+    if (!sawJsx) return;
+
+    let used = null;
+    walk(n.children, c => {
+      if (used || c.type !== "JSXOpeningElement" || c.name.type !== "JSXIdentifier") return;
+      const inner = fromPkg(c.name.name);
+      if (inner && parts[comp].includes(inner)) used = inner;
+    });
+    if (used) return;
+
+    problems.push({ line: open.loc.start.line, kind:"uncomposed-compound",
+      msg: `<${open.name.name}> supplies no padding of its own — its parts do. `
+         + `Put its children in ${parts[comp].map(p => "<" + p + ">").join(" / ")} `
+         + `instead of styling the ${open.name.name} to look like one.` });
+  });
+  return problems;
 }
 
 /* ============================================================
@@ -365,13 +432,13 @@ function designSystemImports(file){
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-module.exports = { lint, loadCatalog, loadWiring, designSystemImports };
+module.exports = { lint, loadCatalog, loadWiring, loadParts, designSystemImports };
 
 if (require.main === module){
   const file = process.argv[2];
   if (!file){ console.error("usage: node scripts/lint-prototype.js <app.jsx>"); process.exit(3); }
   const repo = path.join(__dirname, "..");
-  const problems = lint(file, loadCatalog(repo), loadWiring(repo));
+  const problems = lint(file, loadCatalog(repo), loadWiring(repo), loadParts(repo));
   const bad  = problems.filter(p => !p.warn);
   const warn = problems.filter(p =>  p.warn);
   warn.forEach(p => console.error(`  ! ${file}:${p.line}  ${p.msg}`));
