@@ -2906,11 +2906,16 @@ const Paladira = (() => {
         }, cfg.iframeWait || 6000);
 
         const onReceive = ev => {
+          /* only this iframe may report a result. A magic field is not proof
+             of origin: any window able to post here could otherwise hand the
+             gate a fabricated all-green suite. The origin is opaque for a
+             srcdoc frame, so the window reference is what identifies it. */
+          if (ev.source !== ifr.contentWindow) return;
           const m = ev.data;
           if (!m || m.paladira !== 1) return;
           alive = true;
           if (m.kindName === "progress"){ externalProgress(m.doneCount, m.total); return; }
-          if (m.kindName === "resultado"){
+          if (m.kindName === "result"){
             clearTimeout(giveUp);
             window.removeEventListener("message", onReceive);
             ifr.remove(); verifyIframe = null;
@@ -4163,7 +4168,7 @@ const Paladira = (() => {
       window.__paladiraProgresso = sendProgress;
       setTimeout(async () => {
         const r = await verifyAll();
-        send("resultado", { suite: {
+        send("result", { suite: {
           ok:r.ok, bad:r.bad, failures:r.failures || [], warnings:r.warnings || [],
           coverage:r.coverage || null, by:r.by || {}, skipped:r.skipped || 0
         } });
