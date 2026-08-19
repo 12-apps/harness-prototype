@@ -121,7 +121,19 @@ function lint(file, catalog, wiring){
       used.add(n.name.name);
   });
   used.forEach(nameStr => {
-    if (local.has(nameStr)) return;
+    /* A component the file defines itself is composition, not a replacement:
+       everything IT renders is walked by this same pass, so a local that
+       hand-rolls a <button> is still caught on the line that writes it. It is
+       reported anyway, as a warning — a screen assembled from five private
+       components is worth seeing, because that is what rebuilding the design
+       system looks like before anyone calls it that. */
+    if (local.has(nameStr)){
+      problems.push({ line: 0, kind:"local-component", warn: true,
+        msg: `<${nameStr}> is defined in this file, not imported from ${PKG}. `
+           + `That is fine for composing catalog components into a screen — `
+           + `it is not a way to introduce one the catalog does not have.` });
+      return;
+    }
     const imp = imported.get(nameStr);
     if (!imp){
       problems.push({ line:0, kind:"unknown-component",
@@ -143,9 +155,85 @@ function lint(file, catalog, wiring){
     }
   });
 
+  problems.push(...escapes(ast, walk));
+
   if (wiring) problems.push(...unwired(ast, imported, wiring, walk));
 
   return problems.sort((a, b) => a.line - b.line);
+}
+
+/* ============================================================
+   The ways raw HTML gets in without ever being a JSX tag
+   ============================================================
+   Checking `<button>` only catches the agent who writes `<button>`. Three
+   other routes reach the same DOM and all three passed clean until now:
+
+     <Text component="b">          the tag chosen by a prop
+     <Box dangerouslySetInnerHTML={{__html: "<button>"}} />
+     `<div class="x"><h1>…</h1></div>`   markup as a string
+
+   The last two are how a screen gets rebuilt by hand inside a component
+   that came from the design system, which is the same failure as raw HTML
+   with an extra step. `component="b"` is the sharpest of them: it is one
+   prop away from legal and it renders a real <b>.
+   ============================================================ */
+const TAG_PROP = /^(component|as)$/;
+/* Only real HTML element names count. A step reads
+   "a lista aparece em <colunas> coluna(s)" — Gherkin's own placeholder
+   syntax, and indistinguishable from markup by shape alone. Matching a
+   known tag list is what tells `<div>` from `<colunas>`; the cost is that
+   markup for an invented tag inside a string goes unreported, which is the
+   right way round. */
+const HTML_TAGS = new Set(("a abbr address area article aside audio b base bdi bdo big blockquote body br "
+ + "button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em "
+ + "embed fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i iframe "
+ + "img input ins kbd label legend li link main map mark menu meta meter nav noscript object ol optgroup "
+ + "option output p param picture pre progress q rp rt ruby s samp script section select slot small "
+ + "source span strong style sub summary sup table tbody td template textarea tfoot th thead time title "
+ + "tr track u ul var video wbr svg path circle rect line polygon polyline g defs use").split(" "));
+const A_TAG = /<\/?([a-z][a-z0-9]*)(?=[\s/>])/g;
+const opensATag = str => {
+  A_TAG.lastIndex = 0;
+  for (let m; (m = A_TAG.exec(str)); ) if (HTML_TAGS.has(m[1])) return m[0].replace("<", "").replace("/", "");
+  return null;
+};
+
+function escapes(ast, walk){
+  const problems = [];
+  walk(ast.program, n => {
+    if (n.type === "JSXAttribute" && n.name && typeof n.name.name === "string"){
+      const nameStr = n.name.name;
+      const line = n.loc.start.line;
+
+      if (nameStr === "dangerouslySetInnerHTML"){
+        problems.push({ line, kind:"html-via-innerhtml",
+          msg: `dangerouslySetInnerHTML injects raw HTML. Build the screen from `
+             + `${PKG} components instead.` });
+        return;
+      }
+
+      /* component="b" / as="span" — a design-system component told to render
+         a raw tag. component={Something} is composition and stays allowed. */
+      if (TAG_PROP.test(nameStr) && n.value && n.value.type === "StringLiteral"
+          && /^[a-z]/.test(n.value.value)){
+        problems.push({ line, kind:"html-via-prop",
+          msg: `${nameStr}="${n.value.value}" renders a raw <${n.value.value}>. `
+             + `Use the component that means it — see catalog/ui-catalog.md.` });
+      }
+      return;
+    }
+
+    /* markup assembled as a string and handed to a renderer */
+    if (n.type === "StringLiteral" || n.type === "TemplateElement"){
+      const raw = n.type === "StringLiteral" ? n.value : (n.value && n.value.cooked) || "";
+      const tag = opensATag(raw);
+      if (!tag) return;
+      problems.push({ line: n.loc.start.line, kind:"html-in-string",
+        msg: `this string contains markup — <${tag}> in "${raw.trim().slice(0, 40).replace(/\s+/g, " ")}…". `
+           + `A prototype builds its screen from ${PKG} components, not from HTML text.` });
+    }
+  });
+  return problems;
 }
 
 /* ============================================================
@@ -282,8 +370,11 @@ if (require.main === module){
   if (!file){ console.error("usage: node scripts/lint-prototype.js <app.jsx>"); process.exit(3); }
   const repo = path.join(__dirname, "..");
   const problems = lint(file, loadCatalog(repo), loadWiring(repo));
-  if (!problems.length){ console.log("✓ " + file + " — every element is a component, and every one that owes a step has one"); process.exit(0); }
-  problems.forEach(p => console.error(`  ${file}:${p.line}  ${p.msg}`));
-  console.error(`\n✕ ${problems.length} violation(s) of the component rule.`);
+  const bad  = problems.filter(p => !p.warn);
+  const warn = problems.filter(p =>  p.warn);
+  warn.forEach(p => console.error(`  ! ${file}:${p.line}  ${p.msg}`));
+  if (!bad.length){ console.log("✓ " + file + " — every element is a component, and every one that owes a step has one"); process.exit(0); }
+  bad.forEach(p => console.error(`  ${file}:${p.line}  ${p.msg}`));
+  console.error(`\n✕ ${bad.length} violation(s) of the component rule.`);
   process.exit(1);
 }

@@ -28,6 +28,9 @@ and nothing downstream can distinguish it from one an agent typed.
 | kind | what it catches |
 |---|---|
 | `raw-html` | **any** lowercase JSX element — `<div>`, `<span>`, `<button>`, `<marquee>`, a web component. Not a blocklist: the check is "does the tag start lowercase". Fragments (`<>…</>`) are fine, they are not elements |
+| `html-via-prop` | `component="b"` / `as="span"` — a design-system component told to render a raw tag. `component={Something}` is composition and stays allowed |
+| `html-via-innerhtml` | `dangerouslySetInnerHTML` |
+| `html-in-string` | markup assembled as text — `` `<div class="x">…` ``. Matched against real HTML tag names, so the harness's own `<colunas>` step placeholders are left alone |
 | `foreign-import` | a component from anywhere but `@12-apps/ui` |
 | `not-in-catalog` | a name that is not in `catalog/ui-catalog.md` |
 | `wrong-path` | the right name imported from the wrong subpath |
@@ -49,9 +52,15 @@ spread. The runtime audit covers both.
 `docs/project-instructions.md` has the agent-facing version of all of this, with
 the fixes rather than just the failures.
 
-> **These checks apply to `app.jsx` only.** A vanilla `app.js` prototype builds
-> its screen from template strings, and none of the above runs against it — raw
-> HTML in an `app.js` passes the gate. Write prototypes as `app.jsx`.
+A prototype is React. `app.js` is refused at exit `3` before anything runs: a
+vanilla prototype writes its screen as HTML text, so every check above has
+nothing to read, and one used to pass clean with `<div><h1><p>` in it. The rule
+holding only for the spelling an agent happened to use is not the rule holding.
+
+Locally defined components are reported as a **warning**, not a failure.
+Composing catalog components into a `<Row>` is the job; what the warning shows
+is a screen assembled from five private components, which is what rebuilding
+the design system looks like before anyone calls it that.
 
 ## Two engines
 

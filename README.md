@@ -18,7 +18,6 @@ harness.css    the chrome
 proto.html     the bench: a loader, and it never changes
 apps/
   _react-template/  copy this to start
-  _template/        vanilla; the source rules only apply to app.jsx
   product-editor/
     styles.css   the prototype's styles
     data.js      fixtures and routes

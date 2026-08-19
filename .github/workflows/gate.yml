@@ -59,7 +59,7 @@ jobs:
           echo "path=" >> "$GITHUB_OUTPUT"
 
       # A prototype is a folder under apps/. The bench itself is not one, so
-      # there is nothing to verify in it; _template is the empty starter and
+      # there is nothing to verify in it; _react-template is the empty starter and
       # would only ever report "0 ok", which is a green that counts nothing.
       # The component rule is why a prototype cannot ship raw HTML, so it gets
       # a test of its own: loosen the linter and this goes red rather than CI

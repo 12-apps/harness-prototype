@@ -42,7 +42,18 @@ check("rejects a hook no handler answers",
 check("rejects a handler for a hook nothing carries",
       has("handler-without-hook") && bad.some(p => /nobody/.test(p.msg)), "not reported");
 
-const good = lint(fixture("complies.jsx"), catalog, wiring);
+/* Raw HTML that is never a JSX tag. Each of these reached the DOM while the
+   linter reported nothing, which made "no raw HTML" true only of the spelling
+   an agent happened to use. */
+check("rejects a tag chosen by a prop",     has("html-via-prop") && bad.some(p => /component="b"/.test(p.msg)), "not reported");
+check("rejects dangerouslySetInnerHTML",    has("html-via-innerhtml"), "not reported");
+check("rejects markup built as a string",   bad.some(p => p.kind === "html-in-string" && /<div>/.test(p.msg)), "not reported");
+/* …without firing on the harness's own step syntax, which looks identical. */
+check("leaves a Gherkin placeholder alone", !bad.some(p => /colunas/.test(p.msg)), "reported <colunas> as markup");
+/* A local component is composition, not a violation — but it is not silent. */
+check("notes a locally defined component",  lint(fixture("complies.jsx"), catalog, wiring).some(p => p.kind === "local-component" && p.warn), "not noted");
+
+const good = lint(fixture("complies.jsx"), catalog, wiring).filter(p => !p.warn);
 check("passes a compliant prototype", good.length === 0,
       good.map(p => p.kind + ": " + p.msg).join(" | "));
 
