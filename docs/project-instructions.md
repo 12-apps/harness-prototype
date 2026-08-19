@@ -1,7 +1,9 @@
 # Proto — Harness Instructions
 
-*(Paste this into the project instructions field, together with your product's own
-instructions. The files it mentions live in the project knowledge.)*
+*(The rules of the harness itself. `CLAUDE.md` is the short version an agent
+loads automatically; this is the long one. Everything about a specific product
+— its vocabulary, its context dimensions, its settled UX decisions — belongs in
+that product's own instructions, not here.)*
 
 ---
 
@@ -51,12 +53,6 @@ defines can reach your screen.
 
 The filled-in reference is [`apps/product-editor/`](../apps/product-editor/) — read
 it when you want the shape of real scenarios, routes and states.
-
-- `▼ DATA ▼` — fixtures and routes
-- `▼ APP ▼ (1 of 2)` — the prototype's styles
-- `▼ APP ▼ (2 of 2)` — context, scenarios and render
-
-Everything outside those zones is the harness. Rename the file to `<area>-<thing>.html`.
 
 The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume) and a blocking failure screen.
 
@@ -150,7 +146,7 @@ Three kinds of dimension:
 - `kind:"flags"` — independent switches, for features that can be on or off.
 
 Which dimensions exist, and what the levels are called, is the product's business —
-declare them in the `▼ APP ▼` zone. The three `kind` values are the harness's own
+declare them in `app.jsx`. The three `kind` values are the harness's own
 vocabulary and are spelled as above.
 
 Options grant permissions (`allows:[…]`, `"*"` = all); a scenario demands one with
@@ -347,13 +343,13 @@ then runs the suite. Build output goes to `apps/<name>/.build/` and is not commi
 ## Before shipping — mandatory
 
 ```bash
-npm install jsdom                                # once per session
-node verify.js <thing>.html    # has to exit 0
+pnpm install                   # once; pnpm, not npm — @12-apps/ui insists
+node verify.js apps/<name>     # has to exit 0
 ```
 
 The gate uses **Chromium when it finds one and has puppeteer to drive it** (marked `[browser]` in the output) and only then do the layout rules and the physical measurements apply. Without a browser it falls back to jsdom and those rules declare themselves unverifiable — everything else still applies.
 
-Before that, `node --check` on the `<script>` block: a syntax error leaves the page blank. Read the warnings even when it passes: `handlers 2/5` means three behaviours have no scenario. Green is not the same as covered. Details in `gate.md`.
+The gate lints `app.jsx` before it builds it, so a syntax error is reported with a line number rather than leaving the page blank. Read the warnings even when it passes: `handlers 2/5` means three behaviours have no scenario. Green is not the same as covered. Details in [`gate.md`](gate.md).
 
 ## Escapes
 

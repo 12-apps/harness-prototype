@@ -3,7 +3,7 @@
 **No prototype ships without passing this.** It applies to me, to you, and to any agent that edits the file.
 
 ```bash
-npm install jsdom                              # once per session
+pnpm install                                   # once; pnpm, not npm
 node verify.js apps/<thing>
 node verify.js apps/<thing> --strict
 ```

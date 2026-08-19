@@ -3,7 +3,7 @@
 A bench for designing and **stress-testing** UI before it becomes code. The prototype is not a picture of what will be built: it is the specification, executable, with real Gherkin scenarios checked against the DOM.
 
 ```bash
-npm install jsdom
+pnpm install
 node verify.js apps/product-editor
 # ✓ product-editor — 68 ok · 0 failing · 0 warning(s) · handlers 9/9  [browser]
 ```
@@ -106,15 +106,22 @@ The gate rejects what a visual review does not catch:
 - **A label that promises to save has to save** — a *Salvar* that makes no request is called out, even when marked as local.
 - **Width is a dimension** — the same arrangement across the whole ladder is "it fit", not "it responded". Plus a 44px touch target, 12px text, a 75-character line, overflow, and content that disappears when narrow.
 
-Details in [`docs/project-instructions.md`](docs/project-instructions.md).
+And, checked in the source before a browser starts:
+
+- **Every element is a component** — no lowercase JSX element at all, and none of the ways raw HTML gets in without being a tag: `component="b"`, `dangerouslySetInnerHTML`, markup built as a string. A vanilla `app.js` is refused outright, because none of this can be read out of template strings.
+- **Every component comes from the catalog** — from `@12-apps/ui`, by the exact subpath `catalog/ui-catalog.md` gives.
+- **A component that exists to be operated is wired** — an `exige` component with nothing to do is a hole in the specification that reads as a finished screen. Checked both ways: a hook no handler answers, and a handler for a hook no element carries.
+- **A compound is used with its parts** — a `Card` filled by hand has no padding, so the padding comes back as CSS and the component becomes a border drawn around your own layout.
+
+[`CLAUDE.md`](CLAUDE.md) is the short version an agent loads automatically; [`docs/project-instructions.md`](docs/project-instructions.md) is the long one.
 
 ## Two engines
 
 The gate uses **Chromium when it finds one and has puppeteer to drive it** (marked `[browser]` in the output) — only then do the rules that need to measure boxes apply. Without a browser it falls back to jsdom, and those rules declare themselves unverifiable instead of approving in the dark. Everything else still applies.
 
 ```bash
-npm install --no-save puppeteer            # PUPPETEER_SKIP_DOWNLOAD=1 if you already have a Chrome
-PROTO_CHROME=/path/to/chrome node verify.js file.html
+pnpm add -D puppeteer                      # PUPPETEER_SKIP_DOWNLOAD=1 if you already have a Chrome
+PROTO_CHROME=/path/to/chrome node verify.js apps/<name>
 ```
 
 Having a Chromium is not enough on its own: without puppeteer the gate falls back to jsdom. The `[browser]` marker in the output is what tells you which engine applied — check it before trusting a green run.
@@ -123,13 +130,18 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 
 | path | what it is |
 |---|---|
+| `CLAUDE.md` | what an agent must know before writing a prototype, loaded automatically |
 | `harness.js` | the engine. Loaded by every prototype, edited by none |
 | `harness.css` | the chrome, loaded inside a shadow root |
 | `proto.html` | the bench: a loader, `?app=<name>`. Never changes |
 | `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.jsx` |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
-| `catalog/` | the 210 components of `@12-apps/ui`, generated from the installed package |
+| `catalog/ui-catalog.*` | the 210 components of `@12-apps/ui`, generated from the installed package |
+| `catalog/ui-interactions.*` | what the screen owes each one: `exige` / `pode` / `nunca` |
+| `catalog/ui-composition.js` | the six compounds whose parts carry their box structure |
+| `scripts/lint-prototype.js` | the component rules, read out of the JSX source |
+| `scripts/test-enforcement.js` | fails the build when a rule stops biting, or the docs stop matching it |
 | `scripts/generate-catalog.js` | regenerates the catalog from the installed package |
 | `apps/product-editor/` | a filled-in prototype to read, with the product instructions and context it came from |
 
