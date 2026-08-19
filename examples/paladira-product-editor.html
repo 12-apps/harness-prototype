@@ -1971,10 +1971,10 @@ const Paladira = (() => {
       if (now !== def) parts.push(d.id + "=" + now);
     });
 
-    if (state.viewport !== initial.viewport) parts.push("tela=" + state.viewport);
-    if (state.zoom     !== initial.zoom)     parts.push("escala=" + state.zoom);
-    if (state.landscape)                     parts.push("girado=1");
-    if (state.sidebar !== 288)                 parts.push("barra=" + state.sidebar);
+    if (state.viewport !== initial.viewport) parts.push("viewport=" + state.viewport);
+    if (state.zoom     !== initial.zoom)     parts.push("zoom=" + state.zoom);
+    if (state.landscape)                     parts.push("rotated=1");
+    if (state.sidebar !== 288)                 parts.push("sidebar=" + state.sidebar);
 
     return h + (parts.length ? "?" + parts.join("&") : "");
   }
@@ -2006,8 +2006,12 @@ const Paladira = (() => {
       suite = null;
     });
 
-    if (q.tela && VIEWPORTS.some(v => v.id === q.tela)) state.viewport = q.tela;
-    if (q.scaleOf) state.zoom = q.scaleOf;
+    if (q.viewport && VIEWPORTS.some(v => v.id === q.viewport)) state.viewport = q.viewport;
+    /* the hash is attacker-supplied: only a known number becomes the zoom */
+    if (q.zoom != null){
+      const z = parseFloat(q.zoom);
+      if (!isNaN(z) && z > 0 && z <= 4) state.zoom = z;
+    }
     if (q.sidebar){
       const b = parseInt(q.sidebar, 10);
       if (!isNaN(b)){
