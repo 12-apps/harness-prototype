@@ -11,12 +11,51 @@
    The API it exposes is documented in docs/project-instructions.md.
    ============================================================ */
 
-/* The chrome the harness draws around the prototype. Injected once, and
-   guarded: isolated verification clones a document that already has it,
-   and a second copy would give every id two owners. */
+/* The chrome lives in a shadow root, so a prototype's CSS cannot reach it
+   and its own cannot reach the prototype. The mount is deliberately NOT in
+   there: #app stays in the light DOM and is projected through a slot, so
+   the prototype's styles and its delegated handlers work exactly as before.
+
+   Injected once and repairable: isolated verification clones this document,
+   and a shadow root does not survive serialization — the clone arrives with
+   a host element and no chrome inside it. */
+let H_ROOT = null;
+
 (function shell(){
-  if (document.querySelector(".h-shell")) return;
-  document.body.insertAdjacentHTML("afterbegin", `
+  const DOC_CSS = `
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{background:#0b0d10;overflow:hidden}
+    #app{
+      width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch;
+      container-type:inline-size;container-name:frame;
+    }
+    /* the off-screen probe verification measures: light DOM, like the mount,
+       so the prototype's own CSS reaches it — and carrying the same named
+       container, or every @container rule would sit out the measurement */
+    .h-probe{
+      position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;
+      container-type:inline-size;container-name:frame;
+    }
+  `;
+  if (!document.getElementById("h-doc-css")){
+    const st = document.createElement("style");
+    st.id = "h-doc-css"; st.textContent = DOC_CSS;
+    document.head.appendChild(st);
+  }
+
+  let host = document.getElementById("h-host");
+  if (host && host.shadowRoot){ H_ROOT = host.shadowRoot; return; }
+  if (!host){
+    host = document.createElement("div");
+    host.id = "h-host";
+    document.body.insertBefore(host, document.body.firstChild);
+  }
+
+  H_ROOT = host.attachShadow({ mode: "open" });
+
+  /* a shadow root is a DocumentFragment: no insertAdjacentHTML on it */
+  H_ROOT.innerHTML = `
 <div class="h-shell">
   <header class="h-top">
     <span class="h-brand"><span class="h-dot"></span>Proto <em id="h-title">protótipo</em></span>
@@ -66,7 +105,7 @@
 
     <main class="h-stage" id="h-stage">
       <div class="h-frame-box" id="h-frame-box">
-        <div class="h-frame" id="h-frame"><div id="app"></div></div>
+        <div class="h-frame" id="h-frame"><slot name="app"></slot></div>
       </div>
 
       <aside class="h-mon" id="h-mon" hidden>
@@ -121,7 +160,24 @@
     </main>
   </div>
 </div>
-`);
+`;
+
+  /* the chrome stylesheet goes in with it, ahead of the markup; the
+     document keeps none of it, which is what makes the isolation mutual */
+  const link = document.querySelector('link[rel="stylesheet"][href*="harness.css"]');
+  if (link){
+    H_ROOT.insertBefore(link.cloneNode(true), H_ROOT.firstChild);
+    link.remove();
+  }
+
+  /* light-DOM mount, projected into the frame above */
+  let app = host.querySelector("#app") || document.getElementById("app");
+  if (!app){
+    app = document.createElement("div");
+    app.id = "app";
+  }
+  app.setAttribute("slot", "app");
+  host.appendChild(app);
 })();
 
 /* ============================================================
@@ -163,7 +219,8 @@ const Proto = (() => {
     return current;
   }
 
-  const $ = id => document.getElementById(id);
+  /* the chrome is in the shadow root, #app is in the light DOM */
+  const $ = id => (H_ROOT && H_ROOT.getElementById(id)) || document.getElementById(id);
   const clone = o => (o == null ? {} : JSON.parse(JSON.stringify(o)));
 
   let cfg = { title:"protótipo", feature:null, context:[], scenarios:[], render:null, mount:null };
@@ -1176,7 +1233,7 @@ const Proto = (() => {
     /* everything the harness put into the document goes: the chrome, and
        the verification iframe whose srcdoc holds a whole copy of this
        very document — serializing that doubled the export. */
-    clone.querySelectorAll(".h-shell, .h-verify-frame").forEach(n => n.remove());
+    clone.querySelectorAll("#h-host, .h-shell, .h-verify-frame, #h-doc-css").forEach(n => n.remove());
     /* An included file stays a reference in the export. Some DOM
        implementations (jsdom with usable resources) park the fetched source
        inside the element, and serializing that would smuggle the whole
@@ -3564,7 +3621,11 @@ const Proto = (() => {
 
     document.addEventListener("click", e => {
       /* clicking outside closes the panel — inside .h-dim itself, it does not */
-      if (openDim && !e.target.closest(".h-dim")){ openDim = null; render(); }
+      /* the event retargets to the host on its way out of the shadow tree,
+         so the real origin has to come from the composed path */
+      const path = e.composedPath ? e.composedPath() : [e.target];
+      const inDim = path.some(n => n && n.classList && n.classList.contains("h-dim"));
+      if (openDim && !inDim){ openDim = null; render(); }
     });
 
     /* ---------- arrow-key navigation ----------
@@ -3579,7 +3640,8 @@ const Proto = (() => {
 
     document.addEventListener("keydown", e => {
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.key) < 0) return;
-      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const src = (e.composedPath && e.composedPath()[0]) || e.target;
+      if (typing(src) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (!$("h-spec").hidden || !$("h-falha").hidden || !$("h-dados").hidden) return;
 
       /* the arrows walk what is on show: jumping to a scenario inside a

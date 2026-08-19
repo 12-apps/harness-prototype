@@ -11,7 +11,7 @@
    ============================================================ */
 *,*::before,*::after{box-sizing:border-box}
 
-:root{
+:root, :host{
   --h-bg:#0b0d10; --h-panel:#14171d; --h-panel-2:#1c2029;
   --h-line:#232833; --h-line-2:#2c323e;
   --h-fg:#e8eaef; --h-fg-dim:#a6acbb; --h-fg-mute:#6b7482;
@@ -22,12 +22,22 @@
   --h-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
 }
 
-html,body{height:100%;margin:0}
-body{
+:host{
+  display:block;
   background:var(--h-bg);color:var(--h-fg);
-  font:13px/1.45 var(--h-sans);overflow:hidden;-webkit-font-smoothing:antialiased;
+  font:13px/1.45 var(--h-sans);-webkit-font-smoothing:antialiased;
 }
-.h-shell{display:flex;flex-direction:column;height:100vh;position:relative}
+/* Inherited properties cross a shadow boundary — they come in through the
+   host, so a prototype's `* { font-family: … !important }` would still reach
+   the chrome. Re-declaring them here stops that: nothing in the document can
+   match .h-shell, because it lives inside the shadow tree. */
+.h-shell{
+  display:flex;flex-direction:column;height:100vh;position:relative;
+  background:var(--h-bg);color:var(--h-fg);
+  font:13px/1.45 var(--h-sans);
+  letter-spacing:normal;word-spacing:normal;text-transform:none;text-align:left;
+  white-space:normal;visibility:visible;cursor:auto;direction:ltr;
+}
 
 /* ---------- barra superior ---------- */
 .h-top{
@@ -371,7 +381,6 @@ body{
   box-shadow:0 0 0 1px #313846,0 24px 60px rgba(0,0,0,.55);
   transform-origin:0 0;container-type:inline-size;container-name:frame;
 }
-#app{width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch}
 
 .h-err{
   height:100%;overflow:auto;padding:20px;margin:0;
@@ -381,10 +390,6 @@ body{
 
 /* needs a real width and container-type, otherwise the @container rules
    do not apply and verification would test a layout nobody sees */
-.h-probe{
-  position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;
-  container-type:inline-size;container-name:frame;
-}
 
 /* failure screen: covers everything. If verification does not pass there
    is no point looking at the prototype — the pasteable report is what
