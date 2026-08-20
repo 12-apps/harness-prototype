@@ -107,6 +107,35 @@ const contradictory = names.filter(n => maps.PROTO_UI_WIRING[n] === "nunca"
                              && !["passivo", "efemero"].includes(maps.PROTO_UI_ACTION[n]));
 check("no component owes no step and a step at once", contradictory.length === 0, list(contradictory));
 
+/* ------------------------------------------------------------
+   The docs have to name the rules that exist.
+   ------------------------------------------------------------
+   CLAUDE.md is what an agent loads before writing a prototype, so a rule
+   missing from it is a rule the agent will trip over rather than follow.
+   Prose drifts from code silently; this is the same guard the catalog
+   coverage check gives the classification.
+   ------------------------------------------------------------ */
+const claude = fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8");
+const emitted = new Set([...fs.readFileSync(path.join(__dirname, "lint-prototype.js"), "utf8")
+  .matchAll(/kind:"([a-z-]+)"/g)].map(m => m[1]));
+/* `syntax` is a parse failure rather than a rule, and `local-component` is a
+   warning explained in prose rather than in the table */
+["syntax", "local-component"].forEach(k => emitted.delete(k));
+const documented = new Set([...claude.matchAll(/\| `([a-z-]+)` \|/g)].map(m => m[1]));
+const undocumented = [...emitted].filter(k => !documented.has(k));
+const phantom     = [...documented].filter(k => !emitted.has(k));
+check("CLAUDE.md documents every rule the linter enforces", undocumented.length === 0, list(undocumented));
+check("CLAUDE.md invents no rule the linter does not have", phantom.length === 0, list(phantom));
+
+/* and must not misstate the two numbers that move on their own */
+const nComp = Object.keys(catalog).length;
+const badCount = ["CLAUDE.md", "README.md"]
+  .filter(f => [...fs.readFileSync(path.join(repo, f), "utf8").matchAll(/(\d{3}) components?/g)]
+    .some(m => +m[1] !== nComp));
+check("no doc misstates the component count", badCount.length === 0, badCount.join(", ") + ` — catalog has ${nComp}`);
+const namedCompounds = Object.keys(compounds.PROTO_UI_PARTS).filter(c => !claude.includes("`" + c + "`"));
+check("CLAUDE.md names every checked compound", namedCompounds.length === 0, list(namedCompounds));
+
 console.log(failed ? `\n✕ the component rule is not enforcing what it claims (${failed})`
                    : `\n✓ the component rule still bites (${bad.length} violations caught in the fixture)`);
 process.exit(failed ? 1 : 0);
