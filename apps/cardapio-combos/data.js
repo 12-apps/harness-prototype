@@ -13,10 +13,14 @@ window.PROTO_DATA = {
      ficha (BOM) até o insumo, e é por isso que a baixa de um combo tem dois
      níveis: Combo → ComboItem(qtd) → MenuItem → BOM(qtd) → insumo. */
   products: {
-    "m1": { id:"m1", nameStr:"Sanduíche do chef", priceCents:2800, categoria:"Lanches",  estacao:"Grelha"  },
-    "m2": { id:"m2", nameStr:"Coca-Cola 350ml",   priceCents:800,  categoria:"Bebidas",  estacao:null      },
-    "m3": { id:"m3", nameStr:"Batata frita",      priceCents:1500, categoria:"Porções",  estacao:"Fritura" },
-    "m4": { id:"m4", nameStr:"Pastel de nata",    priceCents:750,  categoria:"Doces",    estacao:null      }
+    "m1": { id:"m1", nameStr:"Sanduíche do chef", priceCents:2800, categoria:"Lanches",
+            categoryId:"cat-lanches", estacao:"Grelha"  },
+    "m2": { id:"m2", nameStr:"Coca-Cola 350ml",   priceCents:800,  categoria:"Bebidas",
+            categoryId:"cat-bebidas", estacao:null      },
+    "m3": { id:"m3", nameStr:"Batata frita",      priceCents:1500, categoria:"Porções",
+            categoryId:"cat-porcoes", estacao:"Fritura" },
+    "m4": { id:"m4", nameStr:"Pastel de nata",    priceCents:750,  categoria:"Doces",
+            categoryId:"cat-doces",   estacao:null      }
   },
 
   combos: {
@@ -35,13 +39,45 @@ window.PROTO_DATA = {
             items:[], targetProductId:"m4", chargedQuantity:3, receivedQuantity:4 }
   },
 
-  /* O motor de descontos (FUT-235) já está no ar. A regra decidida: a linha de
-     combo é OPACA para desconto de item e de categoria — só desconto de pedido
-     alcança, e alcança o preço do combo, nunca a soma das partes. */
-  discounts: [
-    { id:"d1", scope:"ITEM",  alvo:"m2", label:"10% em Coca-Cola 350ml", percent:10 },
-    { id:"d2", scope:"ORDER", alvo:null, label:"5% no pedido",           percent:5  }
+  /* As regras vêm de @12-apps/discounts, no formato do pacote — não num
+     inventado aqui: porcentagem em pontos-base (1..10000), valor fixo em
+     centavos, escopo PEDIDO/CATEGORIA/ITEM, gatilho automático ou por cupom.
+     A regra decidida em FUT-272: a linha de combo é OPACA para desconto de
+     item e de categoria — só desconto de pedido alcança, e alcança o preço
+     do combo, nunca a soma das partes. */
+  rules: [
+    { id:"d1", name:"10% em Coca-Cola 350ml", type:"PERCENTAGE",
+      percentOffBp:1000, amountOffCents:null, scope:"ITEM",
+      targetCategoryIds:[], targetMenuItemIds:["m2"],
+      trigger:"AUTOMATIC", code:null, active:true,
+      startsAt:null, endsAt:null, minSubtotalCents:null,
+      usageLimit:null, usageCount:0, perBuyerLimit:null, buyerUsageCount:0,
+      stackable:true },
+
+    { id:"d2", name:"5% no pedido", type:"PERCENTAGE",
+      percentOffBp:500, amountOffCents:null, scope:"ORDER",
+      targetCategoryIds:[], targetMenuItemIds:[],
+      trigger:"AUTOMATIC", code:null, active:true,
+      startsAt:null, endsAt:null, minSubtotalCents:null,
+      usageLimit:null, usageCount:0, perBuyerLimit:null, buyerUsageCount:0,
+      stackable:true },
+
+    { id:"d3", name:"Cupom CUPOM10", type:"FIXED_AMOUNT",
+      percentOffBp:null, amountOffCents:1000, scope:"ORDER",
+      targetCategoryIds:[], targetMenuItemIds:[],
+      trigger:"CODE", code:"CUPOM10", active:true,
+      startsAt:null, endsAt:null, minSubtotalCents:5000,
+      usageLimit:null, usageCount:0, perBuyerLimit:null, buyerUsageCount:0,
+      stackable:true }
   ],
+
+  /* O cupom que o comprador digitou. Só o que ele PEDE gera recusa visível —
+     uma regra automática que não coube some em silêncio, de propósito. */
+  couponCode: null,
+
+  /* relógio fixo: vigência é comparação com "agora", e um cenário não pode
+     depender do minuto em que roda */
+  agora: "2026-08-21T12:00:00Z",
 
   cart: { lines: [] },
 
@@ -107,71 +143,180 @@ window.PROTO_DATA = {
     return data_.products[line.productId].priceCents * line.quantity;
   }
 
-  /* O avaliador de descontos, na ordem ITEM → CATEGORIA → PEDIDO, cada passe
-     sobre o que sobrou. A linha de combo entra sem identidade de alvo, então
-     nenhum desconto de item a enxerga — é isso que impede o duplo desconto. */
-  function avaliar(data_, lines, descontosLigados){
-    const detalhadas = lines.map(l => {
-      const brutoCents = precoDaLinha(data_, l);
-      return { ...l, brutoCents, discountCents:0 };
-    });
-    if (!descontosLigados) {
-      const subtotal = detalhadas.reduce((t, l) => t + l.brutoCents, 0);
-      return { lines:detalhadas, subtotalCents:subtotal, discountTotalCents:0, totalCents:subtotal, aplicados:[] };
-    }
+  /* A cópia pt-BR das recusas, do pacote. Deliberadamente mais grossa que o
+     conjunto de motivos: desligado, ainda não começou e expirado dizem a mesma
+     coisa, porque a diferença só vaza como o lojista agenda promoção e o
+     comprador não poderia agir sobre ela de qualquer jeito. */
+  const RECUSA = {
+    UNKNOWN_CODE:"Cupom inválido ou expirado.",
+    INACTIVE:"Cupom inválido ou expirado.",
+    NOT_STARTED:"Cupom inválido ou expirado.",
+    EXPIRED:"Cupom inválido ou expirado.",
+    MIN_SUBTOTAL_NOT_MET:"Este cupom exige um pedido mínimo de {min}.",
+    USAGE_LIMIT_REACHED:"Este cupom já atingiu o limite de uso.",
+    BUYER_LIMIT_REACHED:"Você já usou este cupom.",
+    NO_ELIGIBLE_ITEMS:"Este cupom não vale para os itens do seu carrinho.",
+    ZERO_VALUE:"Este cupom não vale para os itens do seu carrinho.",
+    NOT_STACKABLE:"Outra promoção já aplicada é melhor que este cupom.",
+    EMPTY_CART:"Seu carrinho está vazio."
+  };
 
-    const aplicados = [];
-    data_.discounts.filter(d => d.scope === "ITEM").forEach(d => {
-      detalhadas.forEach(l => {
-        /* a linha de combo não tem menuItemId que um DiscountItem alcance */
-        if (l.comboId) return;
-        if (l.productId !== d.alvo) return;
-        const corte = Math.round((l.brutoCents - l.discountCents) * d.percent / 100);
-        l.discountCents += corte;
-        aplicados.push({ id:d.id, label:d.label, scope:"ITEM", cents:corte });
-      });
-    });
+  const emReais = (cents) => "R$ " + (cents / 100).toFixed(2).replace(".", ",");
 
-    const subtotalCents = detalhadas.reduce((t, l) => t + l.brutoCents, 0);
-    let descontoCents = detalhadas.reduce((t, l) => t + l.discountCents, 0);
+  /* Um pedido descontado nunca vale menos que um centavo. Isso é restrição de
+     PAGAMENTO, não de preço: o provedor recusa cobrança de R$ 0,00, e o pedido
+     ficaria esperando um pagamento que ninguém consegue levantar. */
+  const PISO_CENTAVOS = 1;
 
-    data_.discounts.filter(d => d.scope === "ORDER").forEach(d => {
-      const base = subtotalCents - descontoCents;
-      const corte = Math.round(base * d.percent / 100);
-      /* rateio por maior resto: a soma por linha tem de bater exatamente com
-         o desconto do pedido, senão sobra centavo e o CHECK do banco reprova */
-      let restante = corte;
-      const pesos = detalhadas.map(l => l.brutoCents - l.discountCents);
-      const somaPesos = pesos.reduce((t, p) => t + p, 0) || 1;
-      detalhadas.forEach((l, i) => {
-        const parte = i === detalhadas.length - 1
-          ? restante
-          : Math.round(corte * pesos[i] / somaPesos);
-        l.discountCents += parte;
-        restante -= parte;
-      });
-      descontoCents += corte;
-      aplicados.push({ id:d.id, label:d.label, scope:"ORDER", cents:corte });
-    });
-
-    /* nunca zera: o provedor recusa cobrança de R$ 0,00 e o pedido encalha */
-    const totalCents = Math.max(1, subtotalCents - descontoCents);
-    return { lines:detalhadas, subtotalCents, discountTotalCents:subtotalCents - totalCents,
-             totalCents, aplicados };
+  /* A linha como o avaliador a enxerga. Uma linha de COMBO entra sem identidade
+     de alvo — um menuItemId que nenhum DiscountItem referencia e categoryPath
+     vazio — e é isso, e só isso, que a torna opaca a desconto de item e de
+     categoria. Não há regra especial em lugar nenhum: a opacidade cai fora da
+     forma da linha. */
+  function linhaParaAvaliador(data_, l){
+    if (l.comboId) return {
+      lineId:l.lineId, menuItemId:"combo:" + l.comboId, variationMenuItemId:null,
+      categoryPath:[], quantity:l.quantity, grossCents:precoDaLinha(data_, l), discountCents:0
+    };
+    const p = data_.products[l.productId];
+    return {
+      lineId:l.lineId, menuItemId:p.id, variationMenuItemId:null,
+      categoryPath:[p.categoryId], quantity:l.quantity,
+      grossCents:p.priceCents * l.quantity, discountCents:0
+    };
   }
 
-  function montarCarrinho(data_, descontosLigados){
-    const avaliado = avaliar(data_, data_.cart.lines, descontosLigados);
+  /* null = nem foi pedida (cupom que ninguém digitou); "OK" = vale;
+     qualquer outra coisa é o motivo da recusa. */
+  function elegibilidade(regra, subtotalCents, couponCode, now){
+    if (regra.trigger === "CODE"
+        && (!couponCode || couponCode.trim().toUpperCase() !== regra.code)) return null;
+    if (!regra.active) return "INACTIVE";
+    if (regra.startsAt && new Date(regra.startsAt) > now) return "NOT_STARTED";
+    /* janela meio-aberta [startsAt, endsAt): endsAt é EXCLUSIVO */
+    if (regra.endsAt && new Date(regra.endsAt) <= now) return "EXPIRED";
+    /* o mínimo é sempre contra o subtotal INTOCADO, nunca contra um total
+       correndo — é o que faz o resultado não depender da ordem de aplicação */
+    if (regra.minSubtotalCents != null && subtotalCents < regra.minSubtotalCents)
+      return "MIN_SUBTOTAL_NOT_MET";
+    if (regra.usageLimit != null && regra.usageCount >= regra.usageLimit)
+      return "USAGE_LIMIT_REACHED";
+    if (regra.perBuyerLimit != null && regra.buyerUsageCount >= regra.perBuyerLimit)
+      return "BUYER_LIMIT_REACHED";
+    return "OK";
+  }
+
+  /* O avaliador: função pura de { linhas, regras, cupom, agora }.
+     Do escopo mais estreito para o mais largo — um desconto de pedido nunca
+     pode dar de volta o dinheiro que um de item já tirou. */
+  function avaliar(data_, cartLines, ligado){
+    const linhas = cartLines.map(l => linhaParaAvaliador(data_, l));
+    const subtotalCents = linhas.reduce((t, l) => t + l.grossCents, 0);
+    const aplicados = [];
+    const recusas = [];
+    const cupom = data_.couponCode;
+
+    const recusar = (regra, motivo) => recusas.push({
+      discountId: regra ? regra.id : null,
+      code: regra ? regra.code : cupom,
+      texto: (RECUSA[motivo] || RECUSA.UNKNOWN_CODE)
+               .replace("{min}", regra && regra.minSubtotalCents != null
+                                   ? emReais(regra.minSubtotalCents) : "um valor mínimo")
+    });
+
+    if (!ligado || !linhas.length){
+      if (ligado && cupom) recusar(null, "EMPTY_CART");
+      return { linhas, subtotalCents, discountTotalCents:0, totalCents:subtotalCents,
+               aplicados, recusas };
+    }
+
+    const now = new Date(data_.agora);
+    const alcanca = (regra, l) =>
+      regra.scope === "ORDER" ? true
+      : regra.scope === "ITEM" ? regra.targetMenuItemIds.indexOf(l.menuItemId) > -1
+      : l.categoryPath.some(c => regra.targetCategoryIds.indexOf(c) > -1);
+
+    let cupomAtendido = false;
+
+    ["ITEM", "CATEGORY", "ORDER"].forEach(escopo => {
+      data_.rules.filter(r => r.scope === escopo).forEach(regra => {
+        const motivo = elegibilidade(regra, subtotalCents, cupom, now);
+        if (motivo === null) return;
+        if (regra.trigger === "CODE") cupomAtendido = true;
+        if (motivo !== "OK"){
+          if (regra.trigger === "CODE") recusar(regra, motivo);
+          return;
+        }
+
+        const alvos = linhas.filter(l => alcanca(regra, l));
+        const base = alvos.reduce((t, l) => t + (l.grossCents - l.discountCents), 0);
+        if (base <= 0){
+          if (regra.trigger === "CODE") recusar(regra, "NO_ELIGIBLE_ITEMS");
+          return;
+        }
+
+        /* porcentagem em pontos-base: 1000 = 10%. Valor fixo é limitado ao que
+           ainda resta, para nunca virar crédito ao comprador. */
+        const pedido = regra.type === "PERCENTAGE"
+          ? Math.round(base * regra.percentOffBp / 10000)
+          : Math.min(regra.amountOffCents, base);
+
+        /* o piso entra DURANTE a aplicação, nunca como poda do total depois:
+           é o que mantém Σ por linha === desconto do pedido, ao centavo */
+        const jaTirado = linhas.reduce((t, l) => t + l.discountCents, 0);
+        const disponivel = Math.max(0, subtotalCents - jaTirado - PISO_CENTAVOS);
+        const corte = Math.min(pedido, disponivel);
+        if (corte <= 0){
+          if (regra.trigger === "CODE") recusar(regra, "ZERO_VALUE");
+          return;
+        }
+
+        /* rateio por maior resto entre as linhas alcançadas: a soma por linha
+           bate exatamente com o corte, sem centavo sobrando */
+        let restante = corte;
+        alvos.forEach((l, i) => {
+          const peso = l.grossCents - l.discountCents;
+          const parte = i === alvos.length - 1 ? restante : Math.round(corte * peso / base);
+          l.discountCents += parte;
+          restante -= parte;
+        });
+
+        aplicados.push({
+          discountId:regra.id, name:regra.name, code:regra.code, type:regra.type,
+          scope:regra.scope, trigger:regra.trigger,
+          percentOffBp:regra.percentOffBp, amountOffCents:regra.amountOffCents,
+          amountCents:corte
+        });
+      });
+    });
+
+    /* só o que o comprador PEDIU vira recusa visível; uma regra automática que
+       não coube some em silêncio, de propósito */
+    if (cupom && !cupomAtendido) recusar(null, "UNKNOWN_CODE");
+
+    const discountTotalCents = linhas.reduce((t, l) => t + l.discountCents, 0);
+    return { linhas, subtotalCents, discountTotalCents,
+             totalCents: subtotalCents - discountTotalCents, aplicados, recusas };
+  }
+
+  function montarCarrinho(data_, ligado){
+    const avaliado = avaliar(data_, data_.cart.lines, ligado);
+    const porLinha = new Map(avaliado.linhas.map(l => [l.lineId, l]));
     return {
-      lines: avaliado.lines.map(l => {
-        const c = l.comboId ? data_.combos[l.comboId] : null;
+      lines: data_.cart.lines.map(orig => {
+        const l = porLinha.get(orig.lineId);
+        const c = orig.comboId ? data_.combos[orig.comboId] : null;
         return {
           lineId:l.lineId, quantity:l.quantity,
-          comboId:l.comboId || null, productId:l.productId || null,
-          nameStr: c ? c.nameStr : data_.products[l.productId].nameStr,
+          comboId:orig.comboId || null, productId:orig.productId || null,
+          nameStr: c ? c.nameStr : data_.products[orig.productId].nameStr,
           type: c ? c.type : "ITEM",
-          brutoCents:l.brutoCents, discountCents:l.discountCents,
-          /* o snapshot dos componentes: o pedido guarda o que entrou no combo,
+          /* a forma que o avaliador consome, exposta para a tela poder mostrar
+             POR QUE um desconto não alcançou esta linha */
+          menuItemId:l.menuItemId, categoryPath:l.categoryPath,
+          brutoCents:l.grossCents, discountCents:l.discountCents,
+          liquidoCents:l.grossCents - l.discountCents,
+          /* o retrato dos componentes: o pedido guarda o que entrou no combo,
              para uma edição futura do produto não reescrever a história */
           componentes: c ? comboParaVitrine(data_, c).componentes : [],
           termos: c && c.type === "QUANTITY_DEAL"
@@ -182,7 +327,9 @@ window.PROTO_DATA = {
       subtotalCents:avaliado.subtotalCents,
       discountTotalCents:avaliado.discountTotalCents,
       totalCents:avaliado.totalCents,
-      aplicados:avaliado.aplicados
+      aplicados:avaliado.aplicados,
+      recusas:avaliado.recusas,
+      couponCode:data_.couponCode
     };
   }
 
@@ -291,6 +438,15 @@ window.PROTO_DATA = {
         const q = (payload || {}).quantity;
         if (!(q > 0)) throw new Error("Quantidade inválida");
         linha.quantity = q;
+        return montarCarrinho(data_, data_.descontosLigados);
+      } },
+
+    /* o cupom é o que o comprador PEDE: guardá-lo é o que faz a recusa poder
+       aparecer para ele, em vez de sumir em silêncio como uma regra automática */
+    { httpMethod:"PUT", pathStr:"/api/cart/:slug/coupon",
+      responds: ({ payload, data_ }) => {
+        const c = ((payload || {}).code || "").trim();
+        data_.couponCode = c === "" ? null : c.toUpperCase();
         return montarCarrinho(data_, data_.descontosLigados);
       } },
 

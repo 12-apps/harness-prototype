@@ -91,6 +91,20 @@ function Aviso({ s }){
   );
 }
 
+/* Os rótulos das promoções são os que o admin já usa (discount-labels.ts):
+   um conjunto fechado no banco, com o valor cru como reserva — uma lista que
+   mostra "PERCENTAGE" é muito melhor que uma que quebra. */
+const TIPO_LABEL    = { PERCENTAGE:"Porcentagem", FIXED_AMOUNT:"Valor fixo" };
+const ESCOPO_LABEL  = { ORDER:"Pedido", CATEGORY:"Categoria", ITEM:"Item" };
+const GATILHO_LABEL = { AUTOMATIC:"Automático", CODE:"Código" };
+
+/* O valor como o operador o lê: "10%" ou "R$ 15,00". Pontos-base dividem por
+   100 na exibição — a unidade existe para "12,5%" sobreviver à ida e volta. */
+const valorDoDesconto = (a) =>
+  a.type === "PERCENTAGE"
+    ? String(a.percentOffBp / 100).replace(".", ",") + "%"
+    : reais(a.amountOffCents);
+
 /* O selo falado da promoção. "leve 4, pague 3" é como o lojista diz — e é por
    isso que os campos se chamam cobrada/recebida e não compra/leva. */
 const termosFalados = (c) =>
@@ -467,14 +481,34 @@ function CarrinhoScreen({ s }){
 
         <Card variant="outlined" className="totais" data-totais>
           <CardContent>
+            <Box className="cupom">
+              <Input
+                value={s.app.cupom || ""}
+                placeholder="Cupom"
+                slotProps={{ htmlInput:{ className:"campo", "data-campo":"cupom",
+                                         "aria-label":"Código do cupom" } }}
+              />
+              <Button className="btn ghost" data-act="aplicar-cupom">Aplicar cupom</Button>
+            </Box>
+
+            {/* só o que o comprador pediu recusa em voz alta: uma promoção
+                automática que não coube não vira ruído na tela */}
+            {(cart.recusas || []).map((r, i) => (
+              <Alert key={i} className="aviso" data-erro="cupom"
+                     data-recusa={r.code || "cupom"}>{r.texto}</Alert>
+            ))}
+
             <Text className="linha-total">Subtotal {reais(cart.subtotalCents)}</Text>
             <Text className="linha-total">Desconto − {reais(cart.discountTotalCents)}</Text>
             <Text className="linha-total total" weight="bold">
               Total {reais(cart.totalCents)}
             </Text>
+
             {(cart.aplicados || []).map(a => (
-              <Badge key={a.id} className="tag aplicado" data-escopo={a.scope}>
-                {a.label}
+              <Badge key={a.discountId} className="tag aplicado" data-escopo={a.scope}>
+                {a.name + " · " + ESCOPO_LABEL[a.scope] + " · " + TIPO_LABEL[a.type]
+                  + " " + valorDoDesconto(a) + " · " + GATILHO_LABEL[a.trigger]
+                  + " · − " + reais(a.amountCents)}
               </Badge>
             ))}
           </CardContent>
@@ -1225,7 +1259,9 @@ Proto.init({
       network:{ "PUT /api/cart/:slug/items/:lineId":
                 { status:500, payload:{ error_:"Não foi possível mudar a quantidade" } },
               "DELETE /api/cart/:slug/items/:lineId":
-                { status:500, payload:{ error_:"Não foi possível tirar a linha" } } },
+                { status:500, payload:{ error_:"Não foi possível tirar a linha" } },
+              "PUT /api/cart/:slug/coupon":
+                { status:500, payload:{ error_:"Não foi possível aplicar o cupom" } } },
       given:{
         text:"que o cliente já tem o combo no carrinho e o servidor vai recusar a quantidade",
         state: async (ex, api) => ({ page:"cardapio", menu: await api.get("/api/menu/" + SLUG) })
@@ -1238,6 +1274,12 @@ Proto.init({
           check:(a, el) => !!el.querySelector('[data-erro="carrinho"]') },
         { when:"tenta então tirar a linha", click:'[data-act="tirar-linha"]' },
         { then:"a recusa continua e a linha não se perde",
+          check:(a, el) => !!el.querySelector('[data-erro="carrinho"]')
+                        && el.querySelectorAll(".linha-carrinho").length === 1 },
+        { when:"tenta ainda aplicar um cupom", local:true,
+          fill:{ sel:'[data-campo="cupom"]', val:"CUPOM10" } },
+        { when:"aplica o cupom", click:'[data-act="aplicar-cupom"]' },
+        { then:"o cupom também é recusado e o carrinho continua de pé",
           check:(a, el) => !!el.querySelector('[data-erro="carrinho"]')
                         && el.querySelectorAll(".linha-carrinho").length === 1 }
       ]
@@ -1260,6 +1302,62 @@ Proto.init({
         { then:"o carrinho volta ao vazio inteiro, sem sobrar componente solto",
           check:(a, el) => !!el.querySelector('[data-estado="vazio"]')
                         && !el.querySelector(".componente") }
+      ]
+    },
+    {
+      id:"carrinho-cupom-aceito",
+      name:"Cupom de valor fixo entra no pedido",
+      page:"carrinho", tags:["@combos","@descontos","@feliz"],
+      impl:{ component:"CartCombos",
+             notes:"gatilho CODE: só vale se o comprador digitar; valor fixo limitado ao que resta" },
+      given:{
+        text:"que a loja tem CUPOM10 com pedido mínimo de R$ 50,00 e o cliente abriu o cardápio",
+        state: async (ex, api) => {
+          api.data_.descontosLigados = true;
+          return { page:"cardapio", menu: await api.get("/api/menu/" + SLUG) };
+        }
+      },
+      steps:[
+        { when:"o cliente pega o combo do chef", click:'[data-act="por-no-carrinho"][data-id="c1"]' },
+        { when:"pega também um sanduíche", click:'[data-act="por-item"][data-id="m1"]' },
+        { when:"abre o carrinho", click:'[data-act="ir-carrinho"]' },
+        { when:"digita o cupom", local:true, fill:{ sel:'[data-campo="cupom"]', val:"CUPOM10" } },
+        { when:"aplica o cupom", click:'[data-act="aplicar-cupom"]' },
+        { then:"o cupom entra como promoção de pedido, por código, ao lado da automática",
+          check:(a, el) => {
+            const conta = (el.querySelector("[data-totais]") || {}).textContent || "";
+            return conta.indexOf("Cupom CUPOM10") > -1
+                && conta.indexOf("Código") > -1
+                && conta.indexOf("Automático") > -1;
+          } },
+        { and:"a conta fecha com o automático e o cupom somados",
+          check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
+                            .indexOf("Total R$ 47,00") > -1 }
+      ]
+    },
+    {
+      id:"carrinho-cupom-recusado",
+      name:"Cupom abaixo do mínimo é recusado com o motivo",
+      page:"carrinho", tags:["@combos","@descontos","@conflito"],
+      impl:{ component:"CartCombos",
+             notes:"o mínimo é contra o subtotal INTOCADO, nunca contra um total correndo" },
+      given:{
+        text:"que a loja tem CUPOM10 com pedido mínimo de R$ 50,00 e o cliente abriu o cardápio",
+        state: async (ex, api) => {
+          api.data_.descontosLigados = true;
+          return { page:"cardapio", menu: await api.get("/api/menu/" + SLUG) };
+        }
+      },
+      steps:[
+        { when:"o cliente pega só o combo do chef", click:'[data-act="por-no-carrinho"][data-id="c1"]' },
+        { when:"abre o carrinho", click:'[data-act="ir-carrinho"]' },
+        { when:"digita o cupom", local:true, fill:{ sel:'[data-campo="cupom"]', val:"CUPOM10" } },
+        { when:"aplica o cupom", click:'[data-act="aplicar-cupom"]' },
+        { then:"a recusa diz qual é o mínimo, em dinheiro",
+          check:(a, el) => (el.querySelector("[data-recusa]") || {}).textContent
+                            .indexOf("pedido mínimo de R$ 50,00") > -1 },
+        { and:"a promoção automática de pedido continua valendo",
+          check:(a, el) => !!el.querySelector('[data-escopo="ORDER"]') }
       ]
     }
   ],
@@ -1440,6 +1538,15 @@ Proto.on("click", '[data-act="tirar-linha"]', async (e, el, s) => {
     .find(l => l.lineId === el.dataset.id) || ((s.app.cart || {}).lines || [])[0];
   try {
     const cart = await Proto.api.del(loja + "/items/" + linha.lineId);
+    Proto.set({ cart, erroAcao:null });
+  } catch (err){ Proto.set({ erroAcao: err.message }); }
+});
+
+Proto.on("input", '[data-campo="cupom"]', (e, el) => Proto.set({ cupom: el.value }));
+
+Proto.on("click", '[data-act="aplicar-cupom"]', async (e, el, s) => {
+  try {
+    const cart = await Proto.api.put(loja + "/coupon", { code: s.app.cupom || "" });
     Proto.set({ cart, erroAcao:null });
   } catch (err){ Proto.set({ erroAcao: err.message }); }
 });
