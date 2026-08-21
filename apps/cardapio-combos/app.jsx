@@ -20,6 +20,13 @@ import { Badge } from "@12-apps/ui/data-display/Badge";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Banner } from "@12-apps/ui/data-display/Banner";
 import { Dashboard } from "@12-apps/ui/layout/Dashboard";
+import { Autocomplete } from "@12-apps/ui/form/Autocomplete";
+import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
+import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
+import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
+import { List } from "@12-apps/ui/mui/List";
+import { ListItem } from "@12-apps/ui/mui/ListItem";
+import { ListItemText } from "@12-apps/ui/mui/ListItemText";
 
 /* Uma raiz React por elemento que o harness entrega, desenhando num container
    próprio — nunca direto no elemento do harness. A suíte desenha em sondas
@@ -208,36 +215,6 @@ function ConstrutorScreen({ s }){
     : !(precoCents >= 0) ? "O preço do combo não pode ser negativo"
     : null;
 
-  const resultados =
-    st === "carregando" ? <Carregando barras={3} label="Buscando…" /> :
-    st === "erro" ? <Erro s={s} titulo="Não deu para buscar" acao="tentar-busca" /> :
-    st === "vazio" ? (
-      <Box className="estado compacto" data-estado="vazio">
-        <Paragraph>
-          {busca && busca.termo
-            ? "Nenhum produto com “" + busca.termo + "”."
-            : "Busque um produto pelo nome para pôr no combo."}
-        </Paragraph>
-      </Box>
-    ) : (
-      <Box className="resultados" data-estado="conteudo">
-        {busca.itens.map(p => (
-          <Card key={p.id} variant="outlined" className="resultado">
-            <CardContent>
-              <Text weight="bold">{p.nameStr}</Text>
-              <Text className="preco-item">{reais(p.priceCents)}</Text>
-              <Button className="btn ghost" data-act="por-no-combo" data-id={p.id}>Pôr no combo</Button>
-            </CardContent>
-          </Card>
-        ))}
-        {busca.total > busca.itens.length && (
-          <Text className="carimbo">
-            {busca.total + " produtos encontrados · refine a busca para ver os outros"}
-          </Text>
-        )}
-      </Box>
-    );
-
   return (
     <Box className="app">
       <Dashboard testIdPrefix="construtor">
@@ -248,12 +225,19 @@ function ConstrutorScreen({ s }){
         ]} />
         <Dashboard.Header title={s.app.editandoId ? "Editar combo" : "Novo combo"}>
           <Dashboard.Info title="Como funciona">
-            Escolha os produtos e quantas unidades de cada, depois o preço do combo.
+            Busque produtos e escolha quantas unidades de cada, depois o preço do combo.
             Quatro do mesmo produto por um preço menor é “leve 4, pague 3”.
           </Dashboard.Info>
           <Dashboard.Spacer />
           <Dashboard.Action>
             <Button className="btn ghost" data-act="voltar-combos">Cancelar</Button>
+          </Dashboard.Action>
+          {/* o Salvar mora no cabeçalho: fica à vista por mais longa que a
+              montagem fique, e nunca depende de rolar até o fim */}
+          <Dashboard.Action>
+            <Button className="btn" data-act="salvar-combo" disabled={!!impedimento}>
+              Salvar combo
+            </Button>
           </Dashboard.Action>
         </Dashboard.Header>
 
@@ -261,86 +245,158 @@ function ConstrutorScreen({ s }){
           <Aviso s={s} />
           <ErroDeAcao s={s} hook="construtor" />
 
-          {/* duas colunas quando há largura: montar à esquerda, buscar à direita.
-              Nada disso rola a página — cada lista rola dentro da sua caixa. */}
           <Box className="construtor" data-async data-estado-atual={st}>
-            <Box className="coluna montar">
-              <Box className="form">
-                <Input
-                  label="Nome do combo"
-                  value={f.nameStr || ""}
-                  placeholder="Combo do chef"
-                  onChange={(e) => Proto.set({ form:{ ...f, nameStr:e.target.value } })}
-                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"nome",
-                                           "aria-label":"Nome do combo" } }}
-                />
-                <Input
-                  label="Preço do combo"
-                  value={(f.priceReais || "").replace(".", ",")}
-                  placeholder="0,00"
-                  onChange={(e) => Proto.set({ form:{ ...f, priceReais:e.target.value.replace(",", ".") } })}
-                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"preco",
-                                           inputMode:"decimal", "aria-label":"Preço do combo" } }}
-                />
-              </Box>
+           <Box className="coluna catalogo">
 
-              <Box className="escolhidos" data-escolhidos>
-                {itens.length === 0 ? (
-                  <Text className="carimbo">Nenhum produto no combo ainda.</Text>
-                ) : itens.map(it => (
-                  <Card key={it.productId} variant="outlined" className="item-combo">
-                    <CardContent>
-                      <Text weight="bold">{it.nameStr}</Text>
-                      <Text className="preco-item">
-                        {it.quantity + "× " + reais(it.unitPriceCents)}
-                      </Text>
-                      <Box className="linha-acoes">
-                        <Button className="btn ghost" data-act="menos-item" data-id={it.productId}>−1</Button>
-                        <Button className="btn ghost" data-act="mais-item" data-id={it.productId}>+1</Button>
+            {/* uma loja tem centenas de produtos: quem procura é o autocomplete
+                do catálogo, buscando no servidor, e escolher já põe no combo */}
+            {/* O Autocomplete é o campo de busca (assíncrono, com estado de
+                carregando). A lista de resultados abaixo é o seletor, por duas
+                razões: a lista do próprio componente volta fechada a cada passo
+                — o harness redesenha a tela a partir do estado, e um
+                comportamento que a suíte não alcança não está especificado — e
+                a linha de "nada encontrado" dele é a string inglesa
+                "No results found", sem prop que a traduza. Numa tela pt-BR isso
+                não pode aparecer, então o popup fica suprimido até o componente
+                aceitar a cópia por fora. */}
+            <Box className="busca-linha">
+              <Autocomplete
+                value={s.app.termo || ""}
+                onChange={(val) => Proto.buscarProduto(val)}
+                onSelect={(p) => {
+                  /* o mesmo produto de novo é uma unidade a mais, não uma linha
+                     nova: é assim que "4 pastéis" existe sem um segundo modelo */
+                  const lista = itens.slice();
+                  const i = lista.findIndex(x => x.productId === p.id);
+                  if (i >= 0) lista[i] = { ...lista[i], quantity: lista[i].quantity + 1 };
+                  else lista.push({ productId:p.id, quantity:1,
+                                    nameStr:p.nameStr, unitPriceCents:p.priceCents });
+                  Proto.set({ form:{ ...f, items: lista } });
+                }}
+                suggestions={[]}
+                getKey={(p) => p.id}
+                getLabel={(p) => p.nameStr}
+                getDescription={(p) => p.categoria + " · " + reais(p.priceCents)}
+                async
+                isLoading={st === "carregando"}
+                placeholder="Buscar produto pelo nome"
+                inputAriaLabel="Buscar produto"
+                inputClassName="campo campo-busca"
+                itemClassName="sugestao"
+                listClassName="dropdown-suprimido"
+                maxVisibleItems={6}
+                portal={false}
+              />
+            </Box>
+
+            {/* o marcador de estado fica no invólucro: é ele que a suíte lê,
+                e o componente do catálogo desenha o conteúdo */}
+            {st === "carregando" ? (
+              <Box className="resultado-estado" data-estado="carregando" aria-busy="true">
+                <LoadingState variant="skeleton" message="Buscando produtos…" />
+              </Box>
+            ) : st === "erro" ? (
+              <Box className="resultado-estado" data-estado="erro">
+                <ErrorState title="Não deu para buscar"
+                            message={s.app.error_ || ""}
+                            retryLabel="Tentar novamente"
+                            onRetry={() => Proto.buscarProduto(s.app.termo || "")} />
+              </Box>
+            ) : st === "vazio" ? (
+              <Box className="resultado-estado" data-estado="vazio">
+                <EmptyState variant="minimal"
+                  title={busca && busca.termo ? "Nada com “" + busca.termo + "”" : "Busque um produto"}
+                  description={busca && busca.termo
+                    ? "Tente outro nome — a busca é pelo nome do produto no cardápio."
+                    : "A loja tem centenas de produtos, então nada aparece antes de você buscar."} />
+              </Box>
+            ) : (
+              <Box className="resultado-estado" data-estado="conteudo">
+                <Text className="carimbo">
+                  {busca.total + " encontrado(s)"
+                    + (busca.total > busca.itens.length ? " · refine para ver os outros" : "")}
+                </Text>
+                <List className="lista-resultados">
+                  {busca.itens.map(p => (
+                    <ListItem key={p.id} className="resultado" divider>
+                      <ListItemText primary={p.nameStr}
+                                    secondary={p.categoria + " · " + reais(p.priceCents)} />
+                      <Button className="btn ghost" data-act="por-no-combo" data-id={p.id}>
+                        Pôr no combo
+                      </Button>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+           </Box>
+
+           <Box className="coluna sacola">
+            <Box className="form">
+              <Input
+                label="Nome do combo"
+                value={f.nameStr || ""}
+                placeholder="Combo do chef"
+                onChange={(e) => Proto.set({ form:{ ...f, nameStr:e.target.value } })}
+                slotProps={{ htmlInput:{ className:"campo", "data-campo":"nome",
+                                         "aria-label":"Nome do combo" } }}
+              />
+              <Input
+                label="Preço do combo"
+                value={(f.priceReais || "").replace(".", ",")}
+                placeholder="0,00"
+                onChange={(e) => Proto.set({ form:{ ...f, priceReais:e.target.value.replace(",", ".") } })}
+                slotProps={{ htmlInput:{ className:"campo", "data-campo":"preco",
+                                         inputMode:"decimal", "aria-label":"Preço do combo" } }}
+              />
+            </Box>
+            <Box className="escolhidos" data-escolhidos>
+              {itens.length === 0 ? (
+                <Text className="carimbo">Nenhum produto ainda.</Text>
+              ) : (
+                <List className="lista-itens">
+                  {itens.map(it => (
+                    <ListItem key={it.productId} className="item-combo" divider>
+                      <ListItemText
+                        primary={it.nameStr}
+                        secondary={reais(it.unitPriceCents) + " cada · "
+                                   + reais(it.unitPriceCents * it.quantity) + " no total"}
+                      />
+                      <Box className="stepper">
+                        <Button className="btn passo" data-act="menos-item" data-id={it.productId}>−</Button>
+                        <Text className="i-qtd">{it.quantity}</Text>
+                        <Button className="btn passo" data-act="mais-item" data-id={it.productId}>+</Button>
                         <Button className="btn ghost" data-act="tirar-item" data-id={it.productId}>Tirar</Button>
                       </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Box>
-
-              <Box className="comparativo" data-comparativo>
-                <Text className="soma">Soma das partes {reais(somaCents)}</Text>
-                <Text className="preco">Preço do combo {reais(precoCents)}</Text>
-                <Badge className="tag economia">
-                  {precoCents <= somaCents
-                    ? "cliente economiza " + reais(somaCents - precoCents)
-                    : "acima da soma das partes"}
-                </Badge>
-              </Box>
-
-              {impedimento && (
-                <Banner className="impedimento" data-impedimento>
-                  <Text>{impedimento}</Text>
-                </Banner>
+                    </ListItem>
+                  ))}
+                </List>
               )}
-
-              <Box className="acoes">
-                <Button className="btn" data-act="salvar-combo" disabled={!!impedimento}>
-                  Salvar combo
-                </Button>
-              </Box>
             </Box>
 
-            <Box className="coluna buscar">
-              <Box className="form">
-                <Input
-                  label="Buscar produto"
-                  value={s.app.termo || ""}
-                  placeholder="nome do produto"
-                  onChange={(e) => Proto.set({ termo:e.target.value })}
-                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"busca",
-                                           "aria-label":"Buscar produto" } }}
-                />
-                <Button className="btn ghost" data-act="buscar-produto">Buscar</Button>
-              </Box>
-              {resultados}
+            <Box className="comparativo" data-comparativo>
+              <Text className="linha-resumo">
+                <Text className="rot">Soma das partes</Text>
+                <Text className="soma">{reais(somaCents)}</Text>
+              </Text>
+              <Text className="linha-resumo forte">
+                <Text className="rot">Preço do combo</Text>
+                <Text className="preco">{reais(precoCents)}</Text>
+              </Text>
+              <Text className="linha-resumo">
+                <Text className="rot">
+                  {precoCents <= somaCents ? "Cliente economiza" : "Acima da soma das partes"}
+                </Text>
+                <Badge className="tag economia">{reais(Math.abs(somaCents - precoCents))}</Badge>
+              </Text>
             </Box>
+
+            {impedimento && (
+              <Banner className="impedimento" data-impedimento>
+                <Text>{impedimento}</Text>
+              </Banner>
+            )}
+           </Box>
           </Box>
         </Dashboard.Body>
       </Dashboard>
@@ -678,8 +734,7 @@ Proto.init({
           check:(a, el) => !!el.querySelector('[data-estado="vazio"]') },
         { when:"dá um nome ao combo", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo doce" } },
-        { when:"busca por pastel", local:true, fill:{ sel:'[data-campo="busca"]', val:"pastel" } },
-        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"busca por pastel", local:true, fill:{ sel:'.campo-busca input', val:"pastel" } },
         { when:"põe o pastel no combo", click:'[data-act="por-no-combo"][data-id="m4"]', local:true },
         { when:"põe outro", click:'[data-act="mais-item"][data-id="m4"]', local:true },
         { when:"define o preço", local:true, fill:{ sel:'[data-campo="preco"]', val:"13,00" } },
@@ -783,21 +838,21 @@ Proto.init({
                         && !el.querySelector(".resultado") },
         { when:"dá um nome ao combo", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo do chef" } },
-        { when:"busca por sanduíche", local:true, fill:{ sel:'[data-campo="busca"]', val:"sandu" } },
-        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"busca por sanduíche", local:true, fill:{ sel:'.campo-busca input', val:"sandu" } },
         { then:"só o que casa com o termo aparece",
           check:(a, el) => el.querySelectorAll(".resultado").length === 1 },
         { when:"põe o sanduíche no combo",
           click:'[data-act="por-no-combo"][data-id="m1"]', local:true },
         { when:"põe o segundo sanduíche",
           click:'[data-act="mais-item"][data-id="m1"]', local:true },
-        { when:"busca por Coca", local:true, fill:{ sel:'[data-campo="busca"]', val:"coca" } },
-        { when:"pede a busca de novo", click:'[data-act="buscar-produto"]' },
+        { when:"busca por Coca", local:true, fill:{ sel:'.campo-busca input', val:"coca" } },
         { when:"põe a Coca no combo",
           click:'[data-act="por-no-combo"][data-id="m2"]', local:true },
         { then:"a soma das partes conta a quantidade de cada um",
-          check:(a, el) => (el.querySelector("[data-comparativo]") || {}).textContent
-                            .indexOf("Soma das partes R$ 64,00") > -1 },
+          check:(a, el) => {
+            const t = (el.querySelector("[data-comparativo]") || {}).textContent || "";
+            return t.indexOf("Soma das partes") > -1 && t.indexOf("R$ 64,00") > -1;
+          } },
         { when:"define o preço do combo", local:true,
           fill:{ sel:'[data-campo="preco"]', val:"59,00" } },
         { when:"salva o combo", click:'[data-act="salvar-combo"]' },
@@ -820,8 +875,7 @@ Proto.init({
         { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
         { when:"dá um nome", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Batata: leve 4, pague 3" } },
-        { when:"busca por batata", local:true, fill:{ sel:'[data-campo="busca"]', val:"batata" } },
-        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"busca por batata", local:true, fill:{ sel:'.campo-busca input', val:"batata" } },
         { when:"põe a batata no combo",
           click:'[data-act="por-no-combo"][data-id="m3"]', local:true },
         { when:"sobe para quatro unidades",
@@ -850,8 +904,9 @@ Proto.init({
         }
       },
       steps:[
-        { then:"a caixa de resultados mostra o esqueleto",
-          check:(a, el) => !!el.querySelector('[data-estado="carregando"] .esqueleto') },
+        { then:"a caixa de resultados entra em carregamento, sem tela em branco",
+          check:(a, el) => !!el.querySelector('[data-estado="carregando"]')
+                        && !el.querySelector(".resultado") },
         { and:"a região é anunciada como ocupada",
           check:(a, el) => el.querySelector('[data-estado="carregando"]').getAttribute("aria-busy") === "true" },
         { when:"a resposta chega", waitFor:"GET /api/admin/:slug/products/busca/:termo",
@@ -873,8 +928,7 @@ Proto.init({
       steps:[
         { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
         { when:"busca por algo que não existe", local:true,
-          fill:{ sel:'[data-campo="busca"]', val:"feijoada" } },
-        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+          fill:{ sel:'.campo-busca input', val:"feijoada" } },
         { then:"a caixa diz o que foi buscado, sem inventar produto",
           check:(a, el) => (el.querySelector('[data-estado="vazio"]') || {}).textContent
                             .indexOf("feijoada") > -1 },
@@ -906,7 +960,7 @@ Proto.init({
       steps:[
         { then:"a caixa explica a falha",
           check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista tenta novamente", click:'[data-act="tentar-busca"]' },
+        { when:"o lojista busca de novo", fill:{ sel:'.campo-busca input', val:"sandu" } },
         { then:"o resultado aparece e a explicação some",
           check:(a, el) => el.querySelectorAll(".resultado").length === 1
                         && !el.querySelector('[data-estado="erro"]') },
@@ -928,9 +982,14 @@ Proto.init({
       steps:[
         { when:"o lojista abre o combo do chef",
           click:'[data-act="editar-combo"][data-id="c1"]' },
-        { then:"o combo abre com as três unidades dentro",
-          check:(a, el) => el.querySelectorAll(".item-combo").length === 2
-                        && el.textContent.indexOf("2× R$ 28,00") > -1 },
+        { then:"o combo abre com os dois produtos e as três unidades dentro",
+          check:(a, el) => {
+            const linhas = el.querySelectorAll(".item-combo");
+            const t = el.textContent || "";
+            return linhas.length === 2
+                && t.indexOf("R$ 28,00 cada") > -1
+                && t.indexOf("R$ 56,00 no total") > -1;
+          } },
         { when:"o lojista tira a Coca", click:'[data-act="tirar-item"][data-id="m2"]', local:true },
         { when:"e baixa o sanduíche para um",
           click:'[data-act="menos-item"][data-id="m1"]', local:true },
@@ -964,8 +1023,7 @@ Proto.init({
         { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
         { when:"dá um nome que já existe", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo do chef" } },
-        { when:"busca por sanduíche", local:true, fill:{ sel:'[data-campo="busca"]', val:"sandu" } },
-        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"busca por sanduíche", local:true, fill:{ sel:'.campo-busca input', val:"sandu" } },
         { when:"põe duas unidades", click:'[data-act="por-no-combo"][data-id="m1"]', local:true },
         { when:"e mais uma", click:'[data-act="mais-item"][data-id="m1"]', local:true },
         { when:"tenta salvar", click:'[data-act="salvar-combo"]' },
@@ -1483,38 +1541,33 @@ Proto.on("input", '[data-campo="preco"]', (e, el, s) => {
   Proto.set({ form:{ ...(s.app.form || {}), priceReais: el.value.replace(",", ".") } });
 });
 
-Proto.on("input", '[data-campo="busca"]', (e, el) => Proto.set({ termo: el.value }));
-
-/* a busca é do servidor: a loja tem centenas de produtos e a tela não desenha
-   nenhum antes de alguém pedir */
-Proto.on("click", '[data-act="buscar-produto"]', async (e, el, s) => {
-  const termo = (s.app.termo || "").trim();
+/* Uma busca só sai com termo: pedir /busca/ vazio é rota que não existe.
+   Apagar o campo volta ao estado de "busque alguma coisa", sem requisição. */
+Proto.buscarProduto = async function(val){
+  Proto.set({ termo: val });
+  const termo = (val || "").trim();
+  if (!termo){ Proto.set({ busca:null, error_:null }); return; }
   try {
     const r = await Proto.api.get(admin + "/products/busca/" + encodeURIComponent(termo));
     Proto.set({ busca:r, error_:null });
   } catch (err){ Proto.set({ error_:err.message }); }
-});
+};
 
-Proto.on("click", '[data-act="tentar-busca"]', async (e, el, s) => {
-  const termo = (s.app.termo || "").trim();
-  try {
-    const r = await Proto.api.get(admin + "/products/busca/" + encodeURIComponent(termo));
-    Proto.set({ busca:r, error_:null });
-  } catch (err){ Proto.set({ error_:err.message }); }
-});
+/* o passo `preenche` da suíte escreve no DOM, o que não acorda o onChange do
+   React — este ouvinte nativo é o que mantém a suíte e a pessoa no mesmo caminho */
+Proto.on("input", ".campo-busca input", (e, el) => { Proto.buscarProduto(el.value); });
 
 Proto.on("click", '[data-act="por-no-combo"]', (e, el, s) => {
   const f = s.app.form || {};
   const achado = ((s.app.busca || {}).itens || []).find(p => p.id === el.dataset.id);
   if (!achado) return;
-  const itens = (f.items || []).slice();
-  const i = itens.findIndex(x => x.productId === achado.id);
-  /* o mesmo produto de novo é uma unidade a mais, não uma linha nova: é assim
-     que "4 pastéis" existe sem um segundo modelo */
-  if (i >= 0) itens[i] = { ...itens[i], quantity: itens[i].quantity + 1 };
-  else itens.push({ productId:achado.id, quantity:1,
+  const lista = (f.items || []).slice();
+  const i = lista.findIndex(x => x.productId === achado.id);
+  /* o mesmo produto de novo é uma unidade a mais, não uma linha nova */
+  if (i >= 0) lista[i] = { ...lista[i], quantity: lista[i].quantity + 1 };
+  else lista.push({ productId:achado.id, quantity:1,
                     nameStr:achado.nameStr, unitPriceCents:achado.priceCents });
-  Proto.set({ form:{ ...f, items: itens } });
+  Proto.set({ form:{ ...f, items: lista } });
 });
 
 Proto.on("click", '[data-act="mais-item"]', (e, el, s) => {

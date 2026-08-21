@@ -10,7 +10,10 @@
    exatamente quando eles importam. */
 .app { display: grid; gap: 10px; padding: 14px; container-type: inline-size;
        block-size: 100%; box-sizing: border-box; align-content: start;
-       min-block-size: 0; }
+       min-block-size: 0;
+       /* pinta a própria cor: sem isto o texto herda a do bench (quase branco)
+          e some no cartão branco do palco */
+       color: #191c22; }
 
 .app-hd { display: grid; gap: 4px; padding: 2px 0 8px; }
 .app-hd h1 { margin: 0; }
@@ -34,8 +37,8 @@
 
 /* a soma das partes fica riscada ao lado do preço do combo: é a comparação
    que faz o lojista enxergar o desconto que está dando */
-.soma { display: block; font-size: 13px; text-decoration: line-through; opacity: .7;
-        font-variant-numeric: tabular-nums; }
+.soma { display: block; font-size: 13px; text-decoration: line-through;
+        color: #5b6472; font-variant-numeric: tabular-nums; }
 
 .precos { display: grid; gap: 2px; margin: 6px 0; }
 .tag { display: inline-block; margin: 6px 6px 0 0; font-size: 12px; }
@@ -90,7 +93,10 @@
 
 /* montar à esquerda, buscar à direita quando há largura; empilhado abaixo
    disso, e nunca a página inteira rolando */
-.construtor { display: grid; gap: 14px; min-block-size: 0; }
+/* catálogo à esquerda, onde se passa o tempo; o combo sendo montado à direita,
+   como uma sacola que acompanha. Empilhado, busca-se primeiro. */
+.construtor { display: grid; gap: 18px; min-block-size: 0; align-items: start; }
+@container (min-width: 700px) { .construtor { grid-template-columns: 1.1fr 1fr; } }
 @container (min-width: 700px) { .construtor { grid-template-columns: 1fr 1fr; } }
 
 .coluna { display: grid; gap: 10px; align-content: start; min-block-size: 0; }
@@ -98,12 +104,8 @@
 /* empilhado, busca-se ANTES de montar: procurar é o primeiro gesto, e um
    Salvar travado acima da busca não faz sentido nenhum. Lado a lado, montar
    volta para a esquerda, que é por onde se lê. */
-.coluna.buscar { order: 1; }
-.coluna.montar { order: 2; }
-@container (min-width: 700px) {
-  .coluna.montar { order: 1; }
-  .coluna.buscar { order: 2; }
-}
+.coluna.catalogo { order: 1; }
+.coluna.sacola { order: 2; }
 
 /* as duas listas do construtor rolam dentro de si, com teto por altura de
    quadro — é o que mantém o resumo e o Salvar sempre à vista */
@@ -117,3 +119,35 @@
 
 .buscar .form { display: grid; grid-template-columns: 1fr auto; gap: 8px;
                 align-items: center; max-inline-size: none; }
+
+
+/* ------------------------------------------- legibilidade e densidade */
+
+/* nada de texto apagado: o nome do produto é a informação principal da linha */
+.lista-resultados, .lista-itens { padding: 0; }
+.resultado { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
+.resultado .MuiListItemText-primary { font-weight: 600; color: #191c22; }
+.resultado .MuiListItemText-secondary { color: #5b6472; }
+.item-combo { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
+.item-combo .MuiListItemText-primary { font-weight: 600; color: #191c22; }
+.item-combo .MuiListItemText-secondary { color: #5b6472; }
+
+/* o passo de quantidade é compacto: três controles numa linha não podem
+   empurrar o resto da sacola para fora da tela */
+.stepper { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.stepper .passo { min-width: 40px; padding: 0 10px; }
+.i-qtd { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+@container (max-width: 699px) { .stepper .passo { min-height: 46px; } }
+
+.linha-resumo { display: flex; justify-content: space-between; gap: 12px;
+                align-items: baseline; padding: 3px 0; }
+.linha-resumo .rot { font-size: 13px; }
+.linha-resumo.forte .preco { font-size: 18px; font-weight: 700; }
+.linha-resumo .soma { text-decoration: line-through; }
+
+.busca-linha { margin-bottom: 6px; }
+.resultado-estado { min-block-size: 0; }
+
+/* O popup do Autocomplete fica suprimido: a lista de resultados abaixo é o
+   seletor, e a linha vazia do componente é inglesa e sem prop de tradução. */
+.dropdown-suprimido { display: none !important; }
