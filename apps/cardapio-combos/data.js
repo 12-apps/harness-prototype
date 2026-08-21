@@ -23,20 +23,22 @@ window.PROTO_DATA = {
             categoryId:"cat-doces",   estacao:null      }
   },
 
+  /* Um combo é uma coisa só: produtos com quantidade, e um preço próprio.
+     "2 sanduíches + 1 coca" e "leve 4, pague 3" são o mesmo objeto — o segundo
+     é 4× o mesmo produto pelo preço de 3. Não há dois tipos a manter, nem dois
+     caminhos de preço a conciliar. */
   combos: {
-    "c1": { id:"c1", nameStr:"Combo do chef", type:"FIXED_BUNDLE",
-            descricao:"Sanduíche do chef com Coca-Cola gelada.",
-            priceCents:3200, categoria:"Lanches", active:true, listed:true,
-            items:[ { productId:"m1", quantity:1 }, { productId:"m2", quantity:1 } ],
-            chargedQuantity:null, receivedQuantity:null, targetProductId:null },
+    "c1": { id:"c1", nameStr:"Combo do chef",
+            descricao:"Dois sanduíches do chef com uma Coca gelada.",
+            priceCents:5900, categoria:"Lanches", categoryId:"cat-lanches",
+            active:true, listed:true,
+            items:[ { productId:"m1", quantity:2 }, { productId:"m2", quantity:1 } ] },
 
-    /* "compre 3, leve 4" — os nomes são chargedQuantity/receivedQuantity de
-       propósito: buyQuantity/takeQuantity leem ao contrário do que se fala e
-       é assim que sai promoção com off-by-one. Invariante: recebida > cobrada > 0. */
-    "c2": { id:"c2", nameStr:"Pastel: leve 4, pague 3", type:"QUANTITY_DEAL",
-            descricao:"Levou quatro pastéis, paga três.",
-            priceCents:null, categoria:"Doces", active:true, listed:true,
-            items:[], targetProductId:"m4", chargedQuantity:3, receivedQuantity:4 }
+    "c2": { id:"c2", nameStr:"Pastel: leve 4, pague 3",
+            descricao:"Quatro pastéis de nata pelo preço de três.",
+            priceCents:2250, categoria:"Doces", categoryId:"cat-doces",
+            active:true, listed:true,
+            items:[ { productId:"m4", quantity:4 } ] }
   },
 
   /* As regras vêm de @12-apps/discounts, no formato do pacote — não num
@@ -110,35 +112,40 @@ window.PROTO_DATA = {
 
   /* O que a vitrine mostra de um combo: os componentes com nome e quantidade,
      o preço do combo e, no caso da promoção, os termos falados. */
+  /* O que a vitrine mostra de um combo. O selo falado — "leve 4, pague 3" — é
+     DERIVADO: só existe quando o combo é N× de um produto só e o preço bate
+     num número inteiro de unidades. Nada disso é um campo a manter. */
   function comboParaVitrine(data_, c){
-    return {
-      id:c.id, nameStr:c.nameStr, descricao:c.descricao, categoria:c.categoria,
-      type:c.type, priceCents:c.priceCents,
-      chargedQuantity:c.chargedQuantity, receivedQuantity:c.receivedQuantity,
-      somaCents: somaDosComponentes(data_, c),
-      alvo: c.targetProductId ? clone(data_.products[c.targetProductId]) : null,
-      componentes: (c.items || []).map(it => ({
-        productId:it.productId, quantity:it.quantity,
-        nameStr:(data_.products[it.productId] || {}).nameStr || "(item removido)",
-        unitPriceCents:(data_.products[it.productId] || {}).priceCents || 0,
-        estacao:(data_.products[it.productId] || {}).estacao || null
-      }))
-    };
+    const componentes = (c.items || []).map(it => {
+      const p = data_.products[it.productId] || {};
+      return { productId:it.productId, quantity:it.quantity,
+               nameStr:p.nameStr || "(item removido)",
+               unitPriceCents:p.priceCents || 0, estacao:p.estacao || null };
+    });
+    const somaCents = componentes.reduce((t, x) => t + x.unitPriceCents * x.quantity, 0);
+
+    let selo = null;
+    if (componentes.length === 1 && componentes[0].quantity > 1){
+      const unit = componentes[0].unitPriceCents;
+      if (unit > 0 && c.priceCents % unit === 0){
+        const pagas = c.priceCents / unit;
+        if (pagas < componentes[0].quantity)
+          selo = "leve " + componentes[0].quantity + ", pague " + pagas;
+      }
+    }
+
+    return { id:c.id, nameStr:c.nameStr, descricao:c.descricao, categoria:c.categoria,
+             priceCents:c.priceCents, somaCents, economiaCents:somaCents - c.priceCents,
+             selo, componentes };
   }
 
-  /* Preço de uma linha, servidor-autoritativo.
-     - pacote fechado: o preço do combo, vezes a quantidade;
-     - promoção: a cada `recebida` unidades, cobram-se `cobrada`; a sobra sai
-       pelo preço cheio. É o que faz "leve 4 pague 3" valer também em 9 unidades. */
+  /* Preço de uma linha, servidor-autoritativo. Um combo tem um preço; um item
+     avulso tem o seu. Não há mais um segundo caminho de cálculo a manter. */
   function precoDaLinha(data_, line){
     if (line.comboId){
       const c = data_.combos[line.comboId];
       if (!c) throw new Error("Combo não encontrado");
-      if (c.type === "FIXED_BUNDLE") return c.priceCents * line.quantity;
-      const alvo = data_.products[c.targetProductId];
-      const grupos = Math.floor(line.quantity / c.receivedQuantity);
-      const resto  = line.quantity % c.receivedQuantity;
-      return (grupos * c.chargedQuantity + resto) * alvo.priceCents;
+      return c.priceCents * line.quantity;
     }
     return data_.products[line.productId].priceCents * line.quantity;
   }
@@ -310,7 +317,7 @@ window.PROTO_DATA = {
           lineId:l.lineId, quantity:l.quantity,
           comboId:orig.comboId || null, productId:orig.productId || null,
           nameStr: c ? c.nameStr : data_.products[orig.productId].nameStr,
-          type: c ? c.type : "ITEM",
+          ehCombo: !!c,
           /* a forma que o avaliador consome, exposta para a tela poder mostrar
              POR QUE um desconto não alcançou esta linha */
           menuItemId:l.menuItemId, categoryPath:l.categoryPath,
@@ -319,9 +326,7 @@ window.PROTO_DATA = {
           /* o retrato dos componentes: o pedido guarda o que entrou no combo,
              para uma edição futura do produto não reescrever a história */
           componentes: c ? comboParaVitrine(data_, c).componentes : [],
-          termos: c && c.type === "QUANTITY_DEAL"
-            ? { chargedQuantity:c.chargedQuantity, receivedQuantity:c.receivedQuantity }
-            : null
+          selo: c ? comboParaVitrine(data_, c).selo : null
         };
       }),
       subtotalCents:avaliado.subtotalCents,
@@ -336,16 +341,13 @@ window.PROTO_DATA = {
   /* As invariantes que o construtor promete e o servidor confere de novo. */
   function validarCombo(data_, corpo){
     if (!corpo.nameStr || !corpo.nameStr.trim()) throw new Error("O combo precisa de um nome");
-    if (corpo.type === "FIXED_BUNDLE"){
-      if ((corpo.items || []).length < 2)
-        throw new Error("Um pacote fechado precisa de pelo menos 2 produtos");
-      if (!(corpo.priceCents >= 0))
-        throw new Error("O preço do combo não pode ser negativo");
-    } else {
-      if (!corpo.targetProductId) throw new Error("Escolha o produto da promoção");
-      if (!(corpo.receivedQuantity > corpo.chargedQuantity && corpo.chargedQuantity > 0))
-        throw new Error("A quantidade levada tem de ser maior que a cobrada");
-    }
+    const itens = corpo.items || [];
+    const unidades = itens.reduce((t, it) => t + (it.quantity || 0), 0);
+    /* dois produtos, ou o mesmo produto duas vezes: o que não é combo é uma
+       unidade solta, e essa já existe no cardápio */
+    if (unidades < 2) throw new Error("Um combo precisa de pelo menos 2 unidades");
+    if (itens.some(it => !(it.quantity > 0))) throw new Error("Toda linha do combo precisa de quantidade");
+    if (!(corpo.priceCents >= 0)) throw new Error("O preço do combo não pode ser negativo");
   }
 
   window.PROTO_ROUTES = [
@@ -356,10 +358,28 @@ window.PROTO_DATA = {
         return Object.values(data_.combos).map(c => comboParaVitrine(data_, c));
       } },
 
-    { httpMethod:"GET", pathStr:"/api/admin/:slug/products", onLoad:true,
-      responds: ({ data_ }) => {
-        if (data_.productsFailOnce){ data_.productsFailOnce = false; throw new Error("Não deu para carregar os produtos"); }
-        return Object.values(data_.products).map(p => clone(p));
+    /* Busca no servidor. Uma loja tem centenas de produtos: desenhar todos é
+       inútil na tela e caro na rede. A rota real recebe ?q=; aqui o termo vai
+       no caminho porque o harness casa rota por path. */
+    { httpMethod:"GET", pathStr:"/api/admin/:slug/products/busca/:termo",
+      responds: ({ params, data_ }) => {
+        if (data_.productsFailOnce){ data_.productsFailOnce = false; throw new Error("Não deu para buscar os produtos"); }
+        const termo = decodeURIComponent(params.termo || "").trim().toLowerCase();
+        if (!termo) return { termo:"", itens:[] };
+        const achados = Object.values(data_.products)
+          .filter(p => p.nameStr.toLowerCase().indexOf(termo) > -1)
+          .map(p => clone(p));
+        /* o servidor limita a página, não a tela */
+        return { termo, itens:achados.slice(0, 8), total:achados.length };
+      } },
+
+    /* abrir para editar é uma leitura: o formulário se hidrata do registro, não
+       do que a lista por acaso trouxe */
+    { httpMethod:"GET", pathStr:"/api/admin/:slug/combos/:id",
+      responds: ({ params, data_ }) => {
+        const c = data_.combos[params.id];
+        if (!c) throw new Error("Combo não encontrado");
+        return comboParaVitrine(data_, c);
       } },
 
     { httpMethod:"POST", pathStr:"/api/admin/:slug/combos",
@@ -369,12 +389,9 @@ window.PROTO_DATA = {
         const id = nextId("c");
         data_.combos[id] = {
           id, nameStr:corpo.nameStr, descricao:corpo.descricao || "",
-          type:corpo.type, priceCents:corpo.type === "FIXED_BUNDLE" ? corpo.priceCents : null,
-          categoria:corpo.categoria || "Lanches", active:true, listed:true,
-          items: corpo.type === "FIXED_BUNDLE" ? clone(corpo.items || []) : [],
-          targetProductId: corpo.type === "QUANTITY_DEAL" ? corpo.targetProductId : null,
-          chargedQuantity: corpo.type === "QUANTITY_DEAL" ? corpo.chargedQuantity : null,
-          receivedQuantity: corpo.type === "QUANTITY_DEAL" ? corpo.receivedQuantity : null
+          priceCents:corpo.priceCents,
+          categoria:corpo.categoria || "Lanches", categoryId:"cat-lanches",
+          active:true, listed:true, items:clone(corpo.items || [])
         };
         return comboParaVitrine(data_, data_.combos[id]);
       } },
@@ -385,11 +402,8 @@ window.PROTO_DATA = {
         if (!c) throw new Error("Combo não encontrado");
         const corpo = { ...c, ...(payload || {}) };
         validarCombo(data_, corpo);
-        Object.assign(c, {
-          nameStr:corpo.nameStr, priceCents:corpo.priceCents,
-          items:clone(corpo.items || []), listed:corpo.listed,
-          chargedQuantity:corpo.chargedQuantity, receivedQuantity:corpo.receivedQuantity
-        });
+        Object.assign(c, { nameStr:corpo.nameStr, priceCents:corpo.priceCents,
+                           items:clone(corpo.items || []), listed:corpo.listed });
         return comboParaVitrine(data_, c);
       } },
 

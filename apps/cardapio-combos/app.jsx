@@ -19,6 +19,7 @@ import { Skeleton } from "@12-apps/ui/layout/Skeleton";
 import { Badge } from "@12-apps/ui/data-display/Badge";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Banner } from "@12-apps/ui/data-display/Banner";
+import { Dashboard } from "@12-apps/ui/layout/Dashboard";
 
 /* Uma raiz React por elemento que o harness entrega, desenhando num container
    próprio — nunca direto no elemento do harness. A suíte desenha em sondas
@@ -105,10 +106,9 @@ const valorDoDesconto = (a) =>
     ? String(a.percentOffBp / 100).replace(".", ",") + "%"
     : reais(a.amountOffCents);
 
-/* O selo falado da promoção. "leve 4, pague 3" é como o lojista diz — e é por
-   isso que os campos se chamam cobrada/recebida e não compra/leva. */
-const termosFalados = (c) =>
-  "leve " + c.receivedQuantity + ", pague " + c.chargedQuantity;
+/* Um combo é UMA coisa: produtos com quantidade e um preço. O "leve 4, pague 3"
+   não é um segundo tipo — é o que se lê quando o combo é N× de um produto só e
+   o preço bate num número inteiro de unidades. O servidor deriva o selo. */
 
 /* ------------------------------------------------- admin: lista de combos */
 
@@ -124,7 +124,7 @@ function CombosScreen({ s }){
     st === "vazio" ? (
       <Box className="estado" data-estado="vazio">
         <Heading level="h2">Nenhum combo ainda</Heading>
-        <Paragraph>Junte produtos num preço só, ou monte uma promoção por quantidade.</Paragraph>
+        <Paragraph>Junte produtos num preço só — dois sanduíches e uma Coca, ou quatro pastéis pelo preço de três.</Paragraph>
         {podeEditar && <Button className="btn" data-act="novo-combo">Criar combo</Button>}
       </Box>
     ) : (
@@ -135,21 +135,14 @@ function CombosScreen({ s }){
             <Card key={c.id} variant="outlined" className="combo">
               <CardContent>
                 <Text className="nome" weight="bold">{c.nameStr}</Text>
-                {c.type === "FIXED_BUNDLE" ? (
-                  <Box className="precos">
-                    <Text className="preco">{reais(c.priceCents)}</Text>
-                    <Text className="soma">{reais(c.somaCents)}</Text>
-                    <Badge className="tag economia">
-                      economiza {reais(c.somaCents - c.priceCents)}
-                    </Badge>
-                  </Box>
-                ) : (
-                  <Badge className="tag promo">{termosFalados(c)}</Badge>
-                )}
+                <Box className="precos">
+                  <Text className="preco">{reais(c.priceCents)}</Text>
+                  <Text className="soma">{reais(c.somaCents)}</Text>
+                </Box>
+                {c.selo && <Badge className="tag promo">{c.selo}</Badge>}
+                <Badge className="tag economia">economiza {reais(c.economiaCents)}</Badge>
                 <Text className="componentes">
-                  {c.type === "FIXED_BUNDLE"
-                    ? c.componentes.map(x => x.quantity + "× " + x.nameStr).join(" + ")
-                    : "Vale para " + (c.alvo ? c.alvo.nameStr : "—")}
+                  {c.componentes.map(x => x.quantity + "× " + x.nameStr).join(" + ")}
                 </Text>
                 {podeEditar && (
                   <Box className="linha-acoes">
@@ -166,19 +159,32 @@ function CombosScreen({ s }){
       </Box>
     );
 
+  /* o cabeçalho consolidado que todas as páginas do admin usam */
   return (
     <Box className="app">
-      <AppBar className="app-hd" position="sticky" color="transparent" elevation={0}>
-        <Heading level="h1">Combos</Heading>
-        <Paragraph>{combos ? combos.length + (combos.length === 1 ? " combo" : " combos") : "—"}</Paragraph>
-        <Box className="nav">
-          {podeEditar && <Button className="btn" data-act="novo-combo">Novo combo</Button>}
-          <Button className="btn ghost" data-act="ir-cardapio">Ver o cardápio</Button>
-          <Button className="btn ghost" data-act="recarregar-combos">Recarregar</Button>
-        </Box>
-      </AppBar>
-      <Aviso s={s} />
-      <Box className="app-bd" data-async data-estado-atual={st}>{corpo}</Box>
+      <Dashboard testIdPrefix="combos">
+        <Dashboard.Breadcrumb items={[{ label:"Início", href:"/admin" }, { label:"Combos" }]} />
+        <Dashboard.Header title="Combos">
+          <Dashboard.Info title="Sobre os combos">
+            Um combo junta produtos num preço próprio. Quatro pastéis pelo preço de três
+            é um combo de quatro unidades do mesmo produto.
+          </Dashboard.Info>
+          <Dashboard.Spacer />
+          {podeEditar && (
+            <Dashboard.Action>
+              <Button className="btn" data-act="novo-combo">Novo combo</Button>
+            </Dashboard.Action>
+          )}
+        </Dashboard.Header>
+        <Dashboard.Body>
+          <Box className="nav">
+            <Button className="btn ghost" data-act="ir-cardapio">Ver o cardápio</Button>
+            <Button className="btn ghost" data-act="recarregar-combos">Recarregar</Button>
+          </Box>
+          <Aviso s={s} />
+          <Box className="app-bd" data-async data-estado-atual={st}>{corpo}</Box>
+        </Dashboard.Body>
+      </Dashboard>
     </Box>
   );
 }
@@ -187,162 +193,157 @@ function CombosScreen({ s }){
 
 function ConstrutorScreen({ s }){
   const f = s.app.form || {};
-  const produtos = s.app.produtos;
-  const st = estadoDe(s, !!(produtos && produtos.length));
-  const pacote = f.type === "FIXED_BUNDLE";
+  const busca = s.app.busca;                 /* { termo, itens, total } | null */
+  const itens = f.items || [];
+  const st = estadoDe(s, !!(busca && busca.itens && busca.itens.length));
 
-  const escolhidos = f.items || [];
-  const somaCents = escolhidos.reduce((t, it) => {
-    const p = (produtos || []).find(x => x.id === it.productId);
-    return t + (p ? p.priceCents * it.quantity : 0);
-  }, 0);
-  const precoCents = Number(f.priceReais || 0) * 100;
+  const unidades = itens.reduce((t, it) => t + it.quantity, 0);
+  const somaCents = itens.reduce((t, it) => t + it.unitPriceCents * it.quantity, 0);
+  const precoCents = Math.round(Number(f.priceReais || 0) * 100);
 
-  /* As mesmas invariantes que o servidor confere de novo: o construtor só
-     não deixa chegar lá com o erro óbvio. */
+  /* as mesmas invariantes que o servidor confere de novo — aqui só chegam antes */
   const impedimento =
     !f.nameStr || !f.nameStr.trim() ? "Dê um nome ao combo"
-    : pacote && escolhidos.length < 2 ? "Um pacote fechado precisa de pelo menos 2 produtos"
-    : pacote && !(precoCents >= 0) ? "O preço do combo não pode ser negativo"
-    : !pacote && !f.targetProductId ? "Escolha o produto da promoção"
-    : !pacote && !(Number(f.receivedQuantity) > Number(f.chargedQuantity) && Number(f.chargedQuantity) > 0)
-      ? "A quantidade levada tem de ser maior que a cobrada"
+    : unidades < 2 ? "Um combo precisa de pelo menos 2 unidades"
+    : !(precoCents >= 0) ? "O preço do combo não pode ser negativo"
     : null;
 
-  const corpo =
-    st === "carregando" ? <Carregando barras={4} label="Carregando os produtos…" /> :
-    st === "erro" ? <Erro s={s} titulo="Não deu para carregar os produtos" acao="tentar-produtos" /> :
+  const resultados =
+    st === "carregando" ? <Carregando barras={3} label="Buscando…" /> :
+    st === "erro" ? <Erro s={s} titulo="Não deu para buscar" acao="tentar-busca" /> :
     st === "vazio" ? (
-      <Box className="estado" data-estado="vazio">
-        <Heading level="h2">Nenhum produto no cardápio</Heading>
-        <Paragraph>Um combo junta produtos que já existem — cadastre-os antes.</Paragraph>
+      <Box className="estado compacto" data-estado="vazio">
+        <Paragraph>
+          {busca && busca.termo
+            ? "Nenhum produto com “" + busca.termo + "”."
+            : "Busque um produto pelo nome para pôr no combo."}
+        </Paragraph>
       </Box>
     ) : (
-      <Box data-estado="conteudo">
-        <ErroDeAcao s={s} hook="construtor" />
-
-        <Box className="tipos">
-          <Button className={"btn chip" + (pacote ? " selecionado" : "")}
-                  data-act="tipo-combo" data-tipo="FIXED_BUNDLE">Pacote fechado</Button>
-          <Button className={"btn chip" + (!pacote ? " selecionado" : "")}
-                  data-act="tipo-combo" data-tipo="QUANTITY_DEAL">Promoção por quantidade</Button>
-        </Box>
-
-        <Box className="form">
-          <Input
-            value={f.nameStr || ""}
-            placeholder="Nome do combo"
-            slotProps={{ htmlInput:{ className:"campo", "data-campo":"nome",
-                                     "aria-label":"Nome do combo" } }}
-          />
-        </Box>
-
-        {pacote ? (
-          <Box className="bloco" data-bloco="pacote">
-            <Heading level="h2">Produtos do pacote</Heading>
-            <Box className="grade">
-              {(produtos || []).map(p => {
-                const escolhido = escolhidos.find(x => x.productId === p.id);
-                return (
-                  <Card key={p.id} variant="outlined"
-                        className={"produto" + (escolhido ? " escolhido" : "")}>
-                    <CardContent>
-                      <Text weight="bold">{p.nameStr}</Text>
-                      <Text className="preco-item">{reais(p.priceCents)}</Text>
-                      {escolhido && <Badge className="tag">{escolhido.quantity}× no pacote</Badge>}
-                      <Button className="btn ghost" data-act="alternar-produto" data-id={p.id}>
-                        {escolhido ? "Tirar do pacote" : "Pôr no pacote"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </Box>
-
-            <Box className="form">
-              <Input
-                value={(f.priceReais || "").replace(".", ",")}
-                placeholder="0,00"
-                slotProps={{ htmlInput:{ className:"campo", "data-campo":"preco",
-                                         inputMode:"decimal", "aria-label":"Preço do combo" } }}
-              />
-            </Box>
-
-            {/* a referência que faz o lojista enxergar o desconto que está dando */}
-            <Box className="comparativo" data-comparativo>
-              <Text className="soma">Soma das partes {reais(somaCents)}</Text>
-              <Text className="preco">Preço do combo {reais(precoCents)}</Text>
-              <Badge className="tag economia">
-                {precoCents <= somaCents
-                  ? "cliente economiza " + reais(somaCents - precoCents)
-                  : "acima da soma das partes"}
-              </Badge>
-            </Box>
-          </Box>
-        ) : (
-          <Box className="bloco" data-bloco="promocao">
-            <Heading level="h2">Promoção por quantidade</Heading>
-            <Box className="grade">
-              {(produtos || []).map(p => (
-                <Card key={p.id} variant="outlined"
-                      className={"produto" + (f.targetProductId === p.id ? " escolhido" : "")}>
-                  <CardContent>
-                    <Text weight="bold">{p.nameStr}</Text>
-                    <Text className="preco-item">{reais(p.priceCents)}</Text>
-                    <Button className="btn ghost" data-act="alvo-promocao" data-id={p.id}>
-                      {f.targetProductId === p.id ? "É este" : "Escolher"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-            <Box className="form">
-              <Input
-                value={f.receivedQuantity || ""}
-                placeholder="leva quantos"
-                slotProps={{ htmlInput:{ className:"campo", "data-campo":"levada",
-                                         inputMode:"numeric", "aria-label":"Quantidade levada" } }}
-              />
-              <Input
-                value={f.chargedQuantity || ""}
-                placeholder="paga quantos"
-                slotProps={{ htmlInput:{ className:"campo", "data-campo":"cobrada",
-                                         inputMode:"numeric", "aria-label":"Quantidade cobrada" } }}
-              />
-            </Box>
-            <Box className="comparativo" data-comparativo>
-              <Text className="frase">
-                {"Fica assim no cardápio: leve " + (f.receivedQuantity || "—")
-                  + ", pague " + (f.chargedQuantity || "—")}
-              </Text>
-            </Box>
-          </Box>
-        )}
-
-        {impedimento && (
-          <Banner className="impedimento" data-impedimento>
-            <Text>{impedimento}</Text>
-          </Banner>
+      <Box className="resultados" data-estado="conteudo">
+        {busca.itens.map(p => (
+          <Card key={p.id} variant="outlined" className="resultado">
+            <CardContent>
+              <Text weight="bold">{p.nameStr}</Text>
+              <Text className="preco-item">{reais(p.priceCents)}</Text>
+              <Button className="btn ghost" data-act="por-no-combo" data-id={p.id}>Pôr no combo</Button>
+            </CardContent>
+          </Card>
+        ))}
+        {busca.total > busca.itens.length && (
+          <Text className="carimbo">
+            {busca.total + " produtos encontrados · refine a busca para ver os outros"}
+          </Text>
         )}
       </Box>
     );
 
   return (
     <Box className="app">
-      <AppBar className="app-hd" position="sticky" color="transparent" elevation={0}>
-        <Button className="voltar" data-act="voltar-combos">← Combos</Button>
-        <Heading level="h1">{s.app.editandoId ? "Editar combo" : "Novo combo"}</Heading>
-        <Paragraph>Junte produtos num preço só, ou dê unidades de graça por quantidade.</Paragraph>
-      </AppBar>
-      <Aviso s={s} />
-      <Box className="app-bd" data-async data-estado-atual={st}>{corpo}</Box>
-      {st === "conteudo" && (
-        <Box className="acoes acao-fixa">
-          <Button className="btn" data-act="salvar-combo" disabled={!!impedimento}>
-            Salvar combo
-          </Button>
-        </Box>
-      )}
+      <Dashboard testIdPrefix="construtor">
+        <Dashboard.Breadcrumb items={[
+          { label:"Início", href:"/admin" },
+          { label:"Combos", href:"/admin/combos" },
+          { label: s.app.editandoId ? "Editar" : "Novo" }
+        ]} />
+        <Dashboard.Header title={s.app.editandoId ? "Editar combo" : "Novo combo"}>
+          <Dashboard.Info title="Como funciona">
+            Escolha os produtos e quantas unidades de cada, depois o preço do combo.
+            Quatro do mesmo produto por um preço menor é “leve 4, pague 3”.
+          </Dashboard.Info>
+          <Dashboard.Spacer />
+          <Dashboard.Action>
+            <Button className="btn ghost" data-act="voltar-combos">Cancelar</Button>
+          </Dashboard.Action>
+        </Dashboard.Header>
+
+        <Dashboard.Body>
+          <Aviso s={s} />
+          <ErroDeAcao s={s} hook="construtor" />
+
+          {/* duas colunas quando há largura: montar à esquerda, buscar à direita.
+              Nada disso rola a página — cada lista rola dentro da sua caixa. */}
+          <Box className="construtor" data-async data-estado-atual={st}>
+            <Box className="coluna montar">
+              <Box className="form">
+                <Input
+                  label="Nome do combo"
+                  value={f.nameStr || ""}
+                  placeholder="Combo do chef"
+                  onChange={(e) => Proto.set({ form:{ ...f, nameStr:e.target.value } })}
+                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"nome",
+                                           "aria-label":"Nome do combo" } }}
+                />
+                <Input
+                  label="Preço do combo"
+                  value={(f.priceReais || "").replace(".", ",")}
+                  placeholder="0,00"
+                  onChange={(e) => Proto.set({ form:{ ...f, priceReais:e.target.value.replace(",", ".") } })}
+                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"preco",
+                                           inputMode:"decimal", "aria-label":"Preço do combo" } }}
+                />
+              </Box>
+
+              <Box className="escolhidos" data-escolhidos>
+                {itens.length === 0 ? (
+                  <Text className="carimbo">Nenhum produto no combo ainda.</Text>
+                ) : itens.map(it => (
+                  <Card key={it.productId} variant="outlined" className="item-combo">
+                    <CardContent>
+                      <Text weight="bold">{it.nameStr}</Text>
+                      <Text className="preco-item">
+                        {it.quantity + "× " + reais(it.unitPriceCents)}
+                      </Text>
+                      <Box className="linha-acoes">
+                        <Button className="btn ghost" data-act="menos-item" data-id={it.productId}>−1</Button>
+                        <Button className="btn ghost" data-act="mais-item" data-id={it.productId}>+1</Button>
+                        <Button className="btn ghost" data-act="tirar-item" data-id={it.productId}>Tirar</Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+
+              <Box className="comparativo" data-comparativo>
+                <Text className="soma">Soma das partes {reais(somaCents)}</Text>
+                <Text className="preco">Preço do combo {reais(precoCents)}</Text>
+                <Badge className="tag economia">
+                  {precoCents <= somaCents
+                    ? "cliente economiza " + reais(somaCents - precoCents)
+                    : "acima da soma das partes"}
+                </Badge>
+              </Box>
+
+              {impedimento && (
+                <Banner className="impedimento" data-impedimento>
+                  <Text>{impedimento}</Text>
+                </Banner>
+              )}
+
+              <Box className="acoes">
+                <Button className="btn" data-act="salvar-combo" disabled={!!impedimento}>
+                  Salvar combo
+                </Button>
+              </Box>
+            </Box>
+
+            <Box className="coluna buscar">
+              <Box className="form">
+                <Input
+                  label="Buscar produto"
+                  value={s.app.termo || ""}
+                  placeholder="nome do produto"
+                  onChange={(e) => Proto.set({ termo:e.target.value })}
+                  slotProps={{ htmlInput:{ className:"campo", "data-campo":"busca",
+                                           "aria-label":"Buscar produto" } }}
+                />
+                <Button className="btn ghost" data-act="buscar-produto">Buscar</Button>
+              </Box>
+              {resultados}
+            </Box>
+          </Box>
+        </Dashboard.Body>
+      </Dashboard>
     </Box>
   );
 }
@@ -373,22 +374,14 @@ function CardapioScreen({ s }){
               <CardContent>
                 <Text className="nome" weight="bold">{c.nameStr}</Text>
                 <Text className="desc">{c.descricao}</Text>
-                {c.type === "FIXED_BUNDLE" ? (
-                  <Box className="precos">
-                    <Text className="preco">{reais(c.priceCents)}</Text>
-                    <Text className="soma">{reais(c.somaCents)}</Text>
-                    <Text className="inclui">
-                      Inclui: {c.componentes.map(x => x.quantity + "× " + x.nameStr).join(", ")}
-                    </Text>
-                  </Box>
-                ) : (
-                  <Box className="precos">
-                    <Badge className="tag promo">{termosFalados(c)}</Badge>
-                    <Text className="inclui">
-                      {c.alvo ? c.alvo.nameStr + " · " + reais(c.alvo.priceCents) + " cada" : ""}
-                    </Text>
-                  </Box>
-                )}
+                <Box className="precos">
+                  <Text className="preco">{reais(c.priceCents)}</Text>
+                  <Text className="soma">{reais(c.somaCents)}</Text>
+                  {c.selo && <Badge className="tag promo">{c.selo}</Badge>}
+                  <Text className="inclui">
+                    Inclui: {c.componentes.map(x => x.quantity + "× " + x.nameStr).join(", ")}
+                  </Text>
+                </Box>
                 <Button className="btn" data-act="por-no-carrinho" data-id={c.id}>
                   Adicionar
                 </Button>
@@ -446,7 +439,8 @@ function CarrinhoScreen({ s }){
         <Box className="carrinho-layout">
         <Box className="linhas grade">
         {lines.map(l => (
-          <Card key={l.lineId} variant="outlined" className="linha-carrinho" data-linha={l.type}>
+          <Card key={l.lineId} variant="outlined" className="linha-carrinho"
+                data-linha={l.ehCombo ? "combo" : "item"}>
             <CardContent>
               <Text className="nome" weight="bold">{l.nameStr}</Text>
               <Text className="qtd">{l.quantity}×</Text>
@@ -454,11 +448,7 @@ function CarrinhoScreen({ s }){
               {l.discountCents > 0 && (
                 <Badge className="tag desconto">− {reais(l.discountCents)}</Badge>
               )}
-              {l.termos && (
-                <Badge className="tag promo">
-                  {"leve " + l.termos.receivedQuantity + ", pague " + l.termos.chargedQuantity}
-                </Badge>
-              )}
+              {l.selo && <Badge className="tag promo">{l.selo}</Badge>}
               {/* o combo é UMA linha, e os componentes ficam à vista dentro dela —
                   é esse retrato que o pedido guarda depois */}
               {l.componentes.length > 0 && (
@@ -596,13 +586,13 @@ Proto.init({
       steps:[
         { then:"o pacote fechado mostra o preço do combo ao lado da soma das partes",
           check:(a, el) => !!el.querySelector(".combo .economia")
-                        && el.textContent.indexOf("economiza R$ 4,00") > -1 },
+                        && el.textContent.indexOf("economiza R$ 5,00") > -1 },
         { and:"a promoção aparece com os termos falados",
           check:(a, el) => el.textContent.indexOf("leve 4, pague 3") > -1 },
         { when:"o lojista confere o combo no cardápio",
           click:'[data-act="ver-no-cardapio"][data-id="c1"]' },
         { then:"o cardápio mostra o combo com o que vem dentro",
-          check:(a, el) => el.textContent.indexOf("Inclui: 1× Sanduíche do chef") > -1 },
+          check:(a, el) => el.textContent.indexOf("Inclui: 2× Sanduíche do chef") > -1 },
         { when:"o lojista volta para o admin", click:'[data-act="voltar-combos"]' },
         { then:"a lista de combos continua completa",
           check:(a, el) => el.querySelectorAll(".combo").length === 2 }
@@ -683,13 +673,15 @@ Proto.init({
       steps:[
         { then:"a lista convida a criar o primeiro",
           check:(a, el) => !!el.querySelector('[data-estado="vazio"] [data-act="novo-combo"]') },
-        { when:"o lojista cria um combo", click:'[data-act="novo-combo"]' },
-        { then:"o construtor abre no pacote fechado",
-          check:(a, el) => !!el.querySelector('[data-bloco="pacote"]') },
+        { when:"o lojista cria um combo", click:'[data-act="novo-combo"]', local:true },
+        { then:"o construtor abre pedindo uma busca, sem desenhar produto nenhum",
+          check:(a, el) => !!el.querySelector('[data-estado="vazio"]') },
         { when:"dá um nome ao combo", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo doce" } },
-        { when:"põe a Coca no pacote", click:'[data-act="alternar-produto"][data-id="m2"]', local:true },
-        { when:"põe o pastel no pacote", click:'[data-act="alternar-produto"][data-id="m4"]', local:true },
+        { when:"busca por pastel", local:true, fill:{ sel:'[data-campo="busca"]', val:"pastel" } },
+        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"põe o pastel no combo", click:'[data-act="por-no-combo"][data-id="m4"]', local:true },
+        { when:"põe outro", click:'[data-act="mais-item"][data-id="m4"]', local:true },
         { when:"define o preço", local:true, fill:{ sel:'[data-campo="preco"]', val:"13,00" } },
         { when:"salva o primeiro combo da loja", click:'[data-act="salvar-combo"]' },
         { then:"a loja sai do zero com o combo guardado",
@@ -749,104 +741,143 @@ Proto.init({
       ]
     },
 
+    {
+      id:"combos-abrir-recusado",
+      name:"Abrir um combo que o servidor não devolve",
+      page:"combos", tags:["@combos","@conflito","@pode:combo.editar"],
+      impl:{ component:"CombosAdmin", notes:"a lista fica de pé: o erro é da leitura, não da página" },
+      network:{ "GET /api/admin/:slug/combos/:id":
+                { status:500, payload:{ error_:"Não foi possível abrir o combo" } } },
+      given:{
+        text:"que o lojista está nos combos e a leitura vai falhar",
+        state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
+      },
+      steps:[
+        { when:"o lojista tenta abrir o combo do chef",
+          click:'[data-act="editar-combo"][data-id="c1"]' },
+        { then:"a lista explica que não deu para abrir",
+          check:(a, el) => !!el.querySelector('[data-erro="combos"]') },
+        { and:"a lista continua inteira",
+          check:(a, el) => el.querySelectorAll(".combo").length === 2 },
+        { when:"o lojista recarrega", click:'[data-act="recarregar-combos"]' },
+        { then:"os combos continuam lá",
+          check:(a, el) => el.querySelectorAll(".combo").length === 2 }
+      ]
+    },
+
     /* ---------------------------------------------------------- construtor */
     {
-      id:"construtor-pacote",
-      name:"Montar um pacote fechado e salvar",
+      id:"construtor-monta",
+      name:"Montar um combo de dois sanduíches e uma Coca",
       page:"construtor", tags:["@combos","@feliz","@pode:combo.editar"],
       impl:{ component:"ComboBuilder", route:"/:tenantSlug/combos/novo",
-             notes:"a soma das partes fica ao lado do preço, para o lojista ver o desconto que dá" },
+             notes:"a busca é do servidor: a loja tem centenas de produtos" },
       given:{
         text:"que o lojista está na lista de combos",
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]' },
+        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
+        { then:"nenhum produto é desenhado antes de alguém buscar",
+          check:(a, el) => !!el.querySelector('[data-estado="vazio"]')
+                        && !el.querySelector(".resultado") },
         { when:"dá um nome ao combo", local:true,
-          fill:{ sel:'[data-campo="nome"]', val:"Combo da casa" } },
-        { when:"põe o sanduíche no pacote", click:'[data-act="alternar-produto"][data-id="m1"]', local:true },
-        { when:"põe a batata no pacote", click:'[data-act="alternar-produto"][data-id="m3"]', local:true },
-        { then:"a soma das partes aparece para comparar",
+          fill:{ sel:'[data-campo="nome"]', val:"Combo do chef" } },
+        { when:"busca por sanduíche", local:true, fill:{ sel:'[data-campo="busca"]', val:"sandu" } },
+        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { then:"só o que casa com o termo aparece",
+          check:(a, el) => el.querySelectorAll(".resultado").length === 1 },
+        { when:"põe o sanduíche no combo",
+          click:'[data-act="por-no-combo"][data-id="m1"]', local:true },
+        { when:"põe o segundo sanduíche",
+          click:'[data-act="mais-item"][data-id="m1"]', local:true },
+        { when:"busca por Coca", local:true, fill:{ sel:'[data-campo="busca"]', val:"coca" } },
+        { when:"pede a busca de novo", click:'[data-act="buscar-produto"]' },
+        { when:"põe a Coca no combo",
+          click:'[data-act="por-no-combo"][data-id="m2"]', local:true },
+        { then:"a soma das partes conta a quantidade de cada um",
           check:(a, el) => (el.querySelector("[data-comparativo]") || {}).textContent
-                            .indexOf("Soma das partes R$ 43,00") > -1 },
+                            .indexOf("Soma das partes R$ 64,00") > -1 },
         { when:"define o preço do combo", local:true,
-          fill:{ sel:'[data-campo="preco"]', val:"38,00" } },
-        { then:"o construtor mostra quanto o cliente economiza",
-          check:(a, el) => el.textContent.indexOf("economiza R$ 5,00") > -1 },
+          fill:{ sel:'[data-campo="preco"]', val:"59,00" } },
         { when:"salva o combo", click:'[data-act="salvar-combo"]' },
-        { then:"o combo novo entra na lista",
+        { then:"o combo novo entra na lista com o que tem dentro",
           check:(a, el) => el.querySelectorAll(".combo").length === 3
-                        && el.textContent.indexOf("Combo da casa") > -1 }
+                        && el.textContent.indexOf("2× Sanduíche do chef + 1× Coca-Cola 350ml") > -1 }
       ]
     },
     {
-      id:"construtor-promocao",
-      name:"Montar uma promoção por quantidade",
+      id:"construtor-leve-pague",
+      name:"Quatro do mesmo produto viram “leve 4, pague 3”",
       page:"construtor", tags:["@combos","@feliz","@pode:combo.editar"],
       impl:{ component:"ComboBuilder",
-             notes:"campos cobrada/levada: buyQuantity/takeQuantity leem ao contrário do falado" },
+             notes:"não há um segundo tipo: o selo é derivado de N× um produto e do preço" },
       given:{
         text:"que o lojista está na lista de combos",
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]' },
-        { when:"escolhe promoção por quantidade",
-          click:'[data-act="tipo-combo"][data-tipo="QUANTITY_DEAL"]', local:true },
+        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
         { when:"dá um nome", local:true,
-          fill:{ sel:'[data-campo="nome"]', val:"Batata: leve 3, pague 2" } },
-        { when:"escolhe a batata", click:'[data-act="alvo-promocao"][data-id="m3"]', local:true },
-        { when:"diz que leva 3", local:true, fill:{ sel:'[data-campo="levada"]', val:"3" } },
-        { when:"diz que paga 2", local:true, fill:{ sel:'[data-campo="cobrada"]', val:"2" } },
-        { then:"o construtor mostra como fica falado no cardápio",
-          check:(a, el) => el.textContent.indexOf("leve 3, pague 2") > -1 },
-        { when:"salva a promoção", click:'[data-act="salvar-combo"]' },
-        { then:"a promoção nova entra na lista",
-          check:(a, el) => el.querySelectorAll(".combo").length === 3 }
+          fill:{ sel:'[data-campo="nome"]', val:"Batata: leve 4, pague 3" } },
+        { when:"busca por batata", local:true, fill:{ sel:'[data-campo="busca"]', val:"batata" } },
+        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"põe a batata no combo",
+          click:'[data-act="por-no-combo"][data-id="m3"]', local:true },
+        { when:"sobe para quatro unidades",
+          click:'[data-act="mais-item"][data-id="m3"]', local:true },
+        { when:"e mais uma", click:'[data-act="mais-item"][data-id="m3"]', local:true },
+        { when:"e a quarta", click:'[data-act="mais-item"][data-id="m3"]', local:true },
+        { when:"cobra o preço de três", local:true,
+          fill:{ sel:'[data-campo="preco"]', val:"45,00" } },
+        { when:"salva", click:'[data-act="salvar-combo"]' },
+        { then:"a lista lê o combo em voz alta, sem campo nenhum para isso",
+          check:(a, el) => el.textContent.indexOf("leve 4, pague 3") > -1 }
       ]
     },
     {
       id:"construtor-carregando",
-      name:"Abrir o construtor e esperar os produtos",
+      name:"Buscar um produto e esperar o servidor",
       page:"construtor", tags:["@combos","@carregando","@pode:combo.editar"],
-      impl:{ component:"ComboBuilder", notes:"LoadingState enquanto o catálogo não chega" },
-      network:{ "GET /api/admin/:slug/products": "pendente" },
+      impl:{ component:"ComboBuilder", notes:"LoadingState só na caixa de resultados" },
+      network:{ "GET /api/admin/:slug/products/busca/:termo": "pendente" },
       given:{
-        text:"que o lojista abriu o construtor e os produtos não chegaram",
+        text:"que o lojista buscou um produto e a resposta não chegou",
         state: async (ex, api) => {
-          api.get(admin + "/products").catch(() => {});
-          return { page:"construtor", loading:true,
-                   form:{ type:"FIXED_BUNDLE", items:[], nameStr:"" } };
+          api.get(admin + "/products/busca/sandu").catch(() => {});
+          return { page:"construtor", loading:true, termo:"sandu",
+                   form:{ nameStr:"", priceReais:"", items:[] } };
         }
       },
       steps:[
-        { then:"o construtor mostra o esqueleto no lugar dos produtos",
+        { then:"a caixa de resultados mostra o esqueleto",
           check:(a, el) => !!el.querySelector('[data-estado="carregando"] .esqueleto') },
         { and:"a região é anunciada como ocupada",
           check:(a, el) => el.querySelector('[data-estado="carregando"]').getAttribute("aria-busy") === "true" },
-        { when:"os produtos chegam", waitFor:"GET /api/admin/:slug/products",
-          applyState:(a, payload) => ({ ...a, produtos:payload, loading:false }) },
-        { when:"o lojista volta para os combos", click:'[data-act="voltar-combos"]' },
+        { when:"a resposta chega", waitFor:"GET /api/admin/:slug/products/busca/:termo",
+          applyState:(a, payload) => ({ ...a, busca:payload, loading:false }) },
+        { when:"o lojista desiste", click:'[data-act="voltar-combos"]' },
         { then:"a lista de combos aparece",
           check:(a, el) => el.querySelectorAll(".combo").length === 2 }
       ]
     },
     {
-      id:"construtor-sem-produtos",
-      name:"Construtor sem produtos para juntar",
+      id:"construtor-busca-sem-resultado",
+      name:"Busca que não acha nada não inventa produto",
       page:"construtor", tags:["@combos","@vazio","@pode:combo.editar"],
-      impl:{ component:"ComboBuilder", notes:"um combo junta produtos que já existem" },
-      network:{ "GET /api/admin/:slug/products": { status:200, payload:[] } },
+      impl:{ component:"ComboBuilder", notes:"EmptyState com o termo buscado, para o lojista corrigir" },
       given:{
-        text:"que o lojista está nos combos e o cardápio não tem produtos",
+        text:"que o lojista está na lista de combos",
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]' },
-        { then:"o construtor explica que não há o que juntar",
-          check:(a, el) => !!el.querySelector('[data-estado="vazio"]') },
-        { and:"não oferece salvar um combo vazio",
-          check:(a, el) => !el.querySelector('[data-act="salvar-combo"]') },
+        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
+        { when:"busca por algo que não existe", local:true,
+          fill:{ sel:'[data-campo="busca"]', val:"feijoada" } },
+        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { then:"a caixa diz o que foi buscado, sem inventar produto",
+          check:(a, el) => (el.querySelector('[data-estado="vazio"]') || {}).textContent
+                            .indexOf("feijoada") > -1 },
         { when:"o lojista volta para os combos", click:'[data-act="voltar-combos"]' },
         { then:"a lista continua completa",
           check:(a, el) => el.querySelectorAll(".combo").length === 2 }
@@ -854,29 +885,30 @@ Proto.init({
     },
     {
       id:"construtor-erro",
-      name:"Produtos fora do ar e a recuperação",
+      name:"Busca fora do ar e a recuperação",
       page:"construtor", tags:["@combos","@erro","@recuperacao","@pode:combo.editar"],
-      impl:{ component:"ComboBuilder", notes:"ErrorState com Tentar novamente" },
+      impl:{ component:"ComboBuilder", notes:"ErrorState dentro da caixa de resultados" },
       fixtureFailure:true,
       given:{
-        text:"que o lojista abriu o construtor e o catálogo caiu na primeira tentativa",
+        text:"que o lojista buscou e a busca caiu na primeira tentativa",
         state: async (ex, api) => {
           api.data_.productsFailOnce = true;
           try {
-            return { page:"construtor", form:{ type:"FIXED_BUNDLE", items:[], nameStr:"" },
-                     produtos: await api.get(admin + "/products") };
+            return { page:"construtor", termo:"sandu",
+                     form:{ nameStr:"", priceReais:"", items:[] },
+                     busca: await api.get(admin + "/products/busca/sandu") };
           } catch (e){
-            return { page:"construtor", form:{ type:"FIXED_BUNDLE", items:[], nameStr:"" },
-                     error_:e.message };
+            return { page:"construtor", termo:"sandu",
+                     form:{ nameStr:"", priceReais:"", items:[] }, error_:e.message };
           }
         }
       },
       steps:[
-        { then:"o construtor explica a falha",
+        { then:"a caixa explica a falha",
           check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
-        { when:"o lojista tenta novamente", click:'[data-act="tentar-produtos"]' },
-        { then:"os produtos aparecem e a explicação some",
-          check:(a, el) => el.querySelectorAll(".produto").length === 4
+        { when:"o lojista tenta novamente", click:'[data-act="tentar-busca"]' },
+        { then:"o resultado aparece e a explicação some",
+          check:(a, el) => el.querySelectorAll(".resultado").length === 1
                         && !el.querySelector('[data-estado="erro"]') },
         { when:"o lojista volta para os combos", click:'[data-act="voltar-combos"]' },
         { then:"a lista carrega normalmente",
@@ -885,34 +917,36 @@ Proto.init({
     },
     {
       id:"construtor-invariante",
-      name:"Tirar um produto trava o pacote até ele voltar",
+      name:"Uma unidade só não é combo até ganhar a segunda",
       page:"construtor", tags:["@combos","@feliz","@pode:combo.editar"],
       impl:{ component:"ComboBuilder",
              notes:"a invariante é a mesma no cliente e no servidor; aqui só chega antes" },
       given:{
-        text:"que o lojista abriu um pacote fechado que já existe",
+        text:"que o lojista abriu um combo que já existe",
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o combo do chef", click:'[data-act="editar-combo"][data-id="c1"]' },
-        { then:"o pacote abre com os dois produtos dentro",
-          check:(a, el) => el.querySelectorAll(".produto.escolhido").length === 2 },
-        { when:"o lojista tira a Coca do pacote",
-          click:'[data-act="alternar-produto"][data-id="m2"]', local:true },
-        { then:"a tela diz por que agora não dá para salvar",
+        { when:"o lojista abre o combo do chef",
+          click:'[data-act="editar-combo"][data-id="c1"]' },
+        { then:"o combo abre com as três unidades dentro",
+          check:(a, el) => el.querySelectorAll(".item-combo").length === 2
+                        && el.textContent.indexOf("2× R$ 28,00") > -1 },
+        { when:"o lojista tira a Coca", click:'[data-act="tirar-item"][data-id="m2"]', local:true },
+        { when:"e baixa o sanduíche para um",
+          click:'[data-act="menos-item"][data-id="m1"]', local:true },
+        { then:"a tela diz que uma unidade só não é combo",
           check:(a, el) => (el.querySelector("[data-impedimento]") || {}).textContent
-                            .indexOf("pelo menos 2 produtos") > -1 },
+                            .indexOf("pelo menos 2 unidades") > -1 },
         { and:"o botão de salvar fica travado",
           check:(a, el) => !!el.querySelector('[data-act="salvar-combo"][disabled]') },
-        { when:"o lojista devolve a Coca ao pacote",
-          click:'[data-act="alternar-produto"][data-id="m2"]', local:true },
+        { when:"o lojista devolve a segunda unidade",
+          click:'[data-act="mais-item"][data-id="m1"]', local:true },
         { then:"o impedimento some e o salvar destrava",
           check:(a, el) => !el.querySelector("[data-impedimento]")
                         && !el.querySelector('[data-act="salvar-combo"][disabled]') },
         { when:"o lojista salva", click:'[data-act="salvar-combo"]' },
-        { then:"o combo volta inteiro para a lista, com a economia de sempre",
-          check:(a, el) => el.querySelectorAll(".combo").length === 2
-                        && el.textContent.indexOf("economiza R$ 4,00") > -1 }
+        { then:"o combo volta para a lista",
+          check:(a, el) => el.querySelectorAll(".combo").length === 2 }
       ]
     },
     {
@@ -927,16 +961,19 @@ Proto.init({
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]' },
-        { when:"dá um nome ao combo", local:true,
+        { when:"o lojista abre o construtor", click:'[data-act="novo-combo"]', local:true },
+        { when:"dá um nome que já existe", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo do chef" } },
-        { when:"põe o sanduíche no pacote", click:'[data-act="alternar-produto"][data-id="m1"]', local:true },
-        { when:"põe a batata no pacote", click:'[data-act="alternar-produto"][data-id="m3"]', local:true },
+        { when:"busca por sanduíche", local:true, fill:{ sel:'[data-campo="busca"]', val:"sandu" } },
+        { when:"pede a busca", click:'[data-act="buscar-produto"]' },
+        { when:"põe duas unidades", click:'[data-act="por-no-combo"][data-id="m1"]', local:true },
+        { when:"e mais uma", click:'[data-act="mais-item"][data-id="m1"]', local:true },
         { when:"tenta salvar", click:'[data-act="salvar-combo"]' },
         { then:"a tela mostra por que não salvou",
           check:(a, el) => !!el.querySelector('[data-erro="construtor"]') },
         { and:"o que ele montou continua na tela",
-          check:(a, el) => el.querySelector('[data-campo="nome"]').value === "Combo do chef" }
+          check:(a, el) => el.querySelectorAll(".item-combo").length === 1
+                        && el.querySelector('[data-campo="nome"]').value === "Combo do chef" }
       ]
     },
     {
@@ -949,17 +986,15 @@ Proto.init({
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o combo do chef", click:'[data-act="editar-combo"][data-id="c1"]' },
-        { then:"o construtor abre com o pacote já montado",
-          check:(a, el) => el.querySelectorAll(".produto.escolhido").length === 2 },
+        { when:"o lojista abre o combo do chef",
+          click:'[data-act="editar-combo"][data-id="c1"]' },
         { when:"baixa o preço do combo", local:true,
-          fill:{ sel:'[data-campo="preco"]', val:"30,00" } },
+          fill:{ sel:'[data-campo="preco"]', val:"55,00" } },
         { when:"salva", click:'[data-act="salvar-combo"]' },
         { then:"a lista mostra o preço novo e a economia recalculada",
-          check:(a, el) => el.textContent.indexOf("economiza R$ 6,00") > -1 }
+          check:(a, el) => el.textContent.indexOf("economiza R$ 9,00") > -1 }
       ]
     },
-
     {
       id:"construtor-edicao-recusada",
       name:"Servidor recusa a edição do combo",
@@ -972,7 +1007,8 @@ Proto.init({
         state: async (ex, api) => ({ page:"combos", combos: await api.get(admin + "/combos") })
       },
       steps:[
-        { when:"o lojista abre o combo do chef", click:'[data-act="editar-combo"][data-id="c1"]' },
+        { when:"o lojista abre o combo do chef",
+          click:'[data-act="editar-combo"][data-id="c1"]' },
         { when:"renomeia o combo", local:true,
           fill:{ sel:'[data-campo="nome"]', val:"Combo do chef II" } },
         { when:"baixa demais o preço", local:true,
@@ -980,8 +1016,8 @@ Proto.init({
         { when:"tenta salvar", click:'[data-act="salvar-combo"]' },
         { then:"a tela mostra por que não salvou",
           check:(a, el) => !!el.querySelector('[data-erro="construtor"]') },
-        { and:"o pacote continua montado, sem perder os componentes",
-          check:(a, el) => el.querySelectorAll(".produto.escolhido").length === 2 }
+        { and:"o combo continua montado, sem perder os componentes",
+          check:(a, el) => el.querySelectorAll(".item-combo").length === 2 }
       ]
     },
 
@@ -998,8 +1034,8 @@ Proto.init({
       },
       steps:[
         { then:"o combo mostra o que vem dentro e o preço do combo",
-          check:(a, el) => el.textContent.indexOf("Inclui: 1× Sanduíche do chef, 1× Coca-Cola 350ml") > -1
-                        && el.textContent.indexOf("R$ 32,00") > -1 },
+          check:(a, el) => el.textContent.indexOf("Inclui: 2× Sanduíche do chef, 1× Coca-Cola 350ml") > -1
+                        && el.textContent.indexOf("R$ 59,00") > -1 },
         { when:"o cliente põe o combo no carrinho", click:'[data-act="por-no-carrinho"][data-id="c1"]' },
         { when:"abre o carrinho", click:'[data-act="ir-carrinho"]' },
         { then:"o combo ocupa uma linha só, com os componentes dentro",
@@ -1007,32 +1043,33 @@ Proto.init({
                         && el.querySelectorAll(".componente").length === 2 },
         { and:"o total é o preço do combo, não a soma das partes",
           check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
-                            .indexOf("Total R$ 32,00") > -1 }
+                            .indexOf("Total R$ 59,00") > -1 }
       ]
     },
     {
       id:"cardapio-promocao",
-      name:"Promoção por quantidade cobra as unidades certas",
+      name:"Quatro pastéis entram como uma linha só",
       page:"cardapio", tags:["@combos","@feliz"],
       impl:{ component:"MenuCombos",
-             notes:"a cada `recebida` unidades cobram-se `cobrada`; a sobra sai pelo preço cheio" },
+             notes:"não há maths de promoção: o combo tem um preço e a linha o multiplica" },
       given:{
         text:"que o cliente abriu o cardápio",
         state: async (ex, api) => ({ page:"cardapio", menu: await api.get("/api/menu/" + SLUG) })
       },
       steps:[
-        { then:"a promoção aparece com os termos falados",
+        { then:"o cardápio lê a promoção em voz alta",
           check:(a, el) => el.textContent.indexOf("leve 4, pague 3") > -1 },
-        { when:"o cliente pega a promoção", click:'[data-act="por-no-carrinho"][data-id="c2"]' },
+        { when:"o cliente pega o combo de pastéis", click:'[data-act="por-no-carrinho"][data-id="c2"]' },
         { when:"abre o carrinho", click:'[data-act="ir-carrinho"]' },
-        { then:"uma unidade sozinha ainda sai pelo preço cheio",
-          check:(a, el) => el.textContent.indexOf("R$ 7,50") > -1 },
-        { when:"o cliente sobe para duas", click:'[data-act="mais-um"]' },
-        { when:"sobe para três", click:'[data-act="mais-um"]' },
-        { when:"sobe para quatro", click:'[data-act="mais-um"]' },
-        { then:"quatro pastéis custam três",
+        { then:"os quatro pastéis ocupam uma linha só, pelo preço de três",
+          check:(a, el) => el.querySelectorAll(".linha-carrinho").length === 1
+                        && el.textContent.indexOf("4× Pastel de nata") > -1
+                        && (el.querySelector("[data-totais]") || {}).textContent
+                            .indexOf("Total R$ 22,50") > -1 },
+        { when:"o cliente leva outro combo", click:'[data-act="mais-um"]' },
+        { then:"oito pastéis custam o dobro, sem promoção nova",
           check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
-                            .indexOf("Total R$ 22,50") > -1 }
+                            .indexOf("Total R$ 45,00") > -1 }
       ]
     },
     {
@@ -1149,7 +1186,7 @@ Proto.init({
                         && el.querySelectorAll(".componente").length === 2 },
         { and:"o total é o combo mais a batata",
           check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
-                            .indexOf("Total R$ 47,00") > -1 }
+                            .indexOf("Total R$ 74,00") > -1 }
       ]
     },
     {
@@ -1175,7 +1212,7 @@ Proto.init({
                         && !el.querySelector('[data-escopo="ITEM"]') },
         { and:"o desconto do pedido incide sobre o preço do combo",
           check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
-                            .indexOf("Desconto − R$ 1,60") > -1 },
+                            .indexOf("Desconto − R$ 2,95") > -1 },
         { when:"o cliente volta ao cardápio", click:'[data-act="ir-cardapio"]' },
         { when:"pega uma Coca avulsa", click:'[data-act="por-item"][data-id="m2"]' },
         { when:"volta ao carrinho", click:'[data-act="ir-carrinho"]' },
@@ -1332,7 +1369,7 @@ Proto.init({
           } },
         { and:"a conta fecha com o automático e o cupom somados",
           check:(a, el) => (el.querySelector("[data-totais]") || {}).textContent
-                            .indexOf("Total R$ 47,00") > -1 }
+                            .indexOf("Total R$ 72,65") > -1 }
       ]
     },
     {
@@ -1349,7 +1386,7 @@ Proto.init({
         }
       },
       steps:[
-        { when:"o cliente pega só o combo do chef", click:'[data-act="por-no-carrinho"][data-id="c1"]' },
+        { when:"o cliente pega só o combo de pastéis", click:'[data-act="por-no-carrinho"][data-id="c2"]' },
         { when:"abre o carrinho", click:'[data-act="ir-carrinho"]' },
         { when:"digita o cupom", local:true, fill:{ sel:'[data-campo="cupom"]', val:"CUPOM10" } },
         { when:"aplica o cupom", click:'[data-act="aplicar-cupom"]' },
@@ -1412,41 +1449,32 @@ Proto.on("click", '[data-act="ver-no-cardapio"]', async () => {
   } catch (e){ Proto.set({ page:"cardapio", error_:e.message }); }
 });
 
-Proto.on("click", '[data-act="novo-combo"]', async () => {
-  try {
-    const produtos = await Proto.api.get(admin + "/products");
-    Proto.set({ page:"construtor", produtos, editandoId:null, error_:null, erroAcao:null,
-                form:{ type:"FIXED_BUNDLE", nameStr:"", items:[], priceReais:"",
-                       targetProductId:null, chargedQuantity:"", receivedQuantity:"" } });
-  } catch (e){
-    Proto.set({ page:"construtor", editandoId:null, error_:e.message,
-                form:{ type:"FIXED_BUNDLE", nameStr:"", items:[], priceReais:"" } });
-  }
+Proto.on("click", '[data-act="novo-combo"]', () => {
+  Proto.set({ page:"construtor", editandoId:null, error_:null, erroAcao:null,
+              busca:null, termo:"", form:{ nameStr:"", priceReais:"", items:[] } });
 });
 
-Proto.on("click", '[data-act="editar-combo"]', async (e, el, s) => {
-  const c = (s.app.combos || []).find(x => x.id === el.dataset.id);
+Proto.on("click", '[data-act="editar-combo"]', async (e, el) => {
   try {
-    const produtos = await Proto.api.get(admin + "/products");
+    const c = await Proto.api.get(admin + "/combos/" + el.dataset.id);
     Proto.set({
-      page:"construtor", produtos, editandoId:c.id, error_:null, erroAcao:null,
+      page:"construtor", editandoId:c.id, error_:null, erroAcao:null, busca:null, termo:"",
       form:{
-        type:c.type, nameStr:c.nameStr,
-        items:(c.componentes || []).map(x => ({ productId:x.productId, quantity:x.quantity })),
-        priceReais: c.priceCents != null ? (c.priceCents / 100).toFixed(2) : "",
-        targetProductId:c.alvo ? c.alvo.id : null,
-        chargedQuantity:c.chargedQuantity || "", receivedQuantity:c.receivedQuantity || ""
+        nameStr:c.nameStr,
+        priceReais:(c.priceCents / 100).toFixed(2),
+        items:(c.componentes || []).map(x => ({
+          productId:x.productId, quantity:x.quantity,
+          nameStr:x.nameStr, unitPriceCents:x.unitPriceCents
+        }))
       }
     });
-  } catch (err){ Proto.set({ page:"construtor", editandoId:c.id, error_:err.message }); }
+  } catch (err){ Proto.set({ erroAcao: err.message }); }
 });
 
 /* ----------------------------------------------------------- construtor */
 
-Proto.on("click", '[data-act="tipo-combo"]', (e, el, s) => {
-  Proto.set({ form:{ ...(s.app.form || {}), type: el.dataset.tipo } });
-});
-
+/* os campos são controlados pelo React (onChange no próprio componente); o
+   Proto.on existe para o passo `preenche` da suíte, que escreve no DOM */
 Proto.on("input", '[data-campo="nome"]', (e, el, s) => {
   Proto.set({ form:{ ...(s.app.form || {}), nameStr: el.value } });
 });
@@ -1455,36 +1483,64 @@ Proto.on("input", '[data-campo="preco"]', (e, el, s) => {
   Proto.set({ form:{ ...(s.app.form || {}), priceReais: el.value.replace(",", ".") } });
 });
 
-Proto.on("input", '[data-campo="levada"]', (e, el, s) => {
-  Proto.set({ form:{ ...(s.app.form || {}), receivedQuantity: el.value } });
+Proto.on("input", '[data-campo="busca"]', (e, el) => Proto.set({ termo: el.value }));
+
+/* a busca é do servidor: a loja tem centenas de produtos e a tela não desenha
+   nenhum antes de alguém pedir */
+Proto.on("click", '[data-act="buscar-produto"]', async (e, el, s) => {
+  const termo = (s.app.termo || "").trim();
+  try {
+    const r = await Proto.api.get(admin + "/products/busca/" + encodeURIComponent(termo));
+    Proto.set({ busca:r, error_:null });
+  } catch (err){ Proto.set({ error_:err.message }); }
 });
 
-Proto.on("input", '[data-campo="cobrada"]', (e, el, s) => {
-  Proto.set({ form:{ ...(s.app.form || {}), chargedQuantity: el.value } });
+Proto.on("click", '[data-act="tentar-busca"]', async (e, el, s) => {
+  const termo = (s.app.termo || "").trim();
+  try {
+    const r = await Proto.api.get(admin + "/products/busca/" + encodeURIComponent(termo));
+    Proto.set({ busca:r, error_:null });
+  } catch (err){ Proto.set({ error_:err.message }); }
 });
 
-Proto.on("click", '[data-act="alternar-produto"]', (e, el, s) => {
+Proto.on("click", '[data-act="por-no-combo"]', (e, el, s) => {
   const f = s.app.form || {};
+  const achado = ((s.app.busca || {}).itens || []).find(p => p.id === el.dataset.id);
+  if (!achado) return;
   const itens = (f.items || []).slice();
-  const i = itens.findIndex(x => x.productId === el.dataset.id);
-  if (i >= 0) itens.splice(i, 1);
-  else itens.push({ productId: el.dataset.id, quantity: 1 });
+  const i = itens.findIndex(x => x.productId === achado.id);
+  /* o mesmo produto de novo é uma unidade a mais, não uma linha nova: é assim
+     que "4 pastéis" existe sem um segundo modelo */
+  if (i >= 0) itens[i] = { ...itens[i], quantity: itens[i].quantity + 1 };
+  else itens.push({ productId:achado.id, quantity:1,
+                    nameStr:achado.nameStr, unitPriceCents:achado.priceCents });
   Proto.set({ form:{ ...f, items: itens } });
 });
 
-Proto.on("click", '[data-act="alvo-promocao"]', (e, el, s) => {
-  Proto.set({ form:{ ...(s.app.form || {}), targetProductId: el.dataset.id } });
+Proto.on("click", '[data-act="mais-item"]', (e, el, s) => {
+  const f = s.app.form || {};
+  Proto.set({ form:{ ...f, items:(f.items || []).map(x =>
+    x.productId === el.dataset.id ? { ...x, quantity:x.quantity + 1 } : x) } });
+});
+
+Proto.on("click", '[data-act="menos-item"]', (e, el, s) => {
+  const f = s.app.form || {};
+  Proto.set({ form:{ ...f, items:(f.items || [])
+    .map(x => x.productId === el.dataset.id ? { ...x, quantity:x.quantity - 1 } : x)
+    .filter(x => x.quantity > 0) } });
+});
+
+Proto.on("click", '[data-act="tirar-item"]', (e, el, s) => {
+  const f = s.app.form || {};
+  Proto.set({ form:{ ...f, items:(f.items || []).filter(x => x.productId !== el.dataset.id) } });
 });
 
 Proto.on("click", '[data-act="salvar-combo"]', async (e, el, s) => {
   const f = s.app.form || {};
   const corpo = {
-    nameStr: f.nameStr, type: f.type,
-    items: f.items || [],
+    nameStr: f.nameStr,
     priceCents: Math.round(Number(f.priceReais || 0) * 100),
-    targetProductId: f.targetProductId,
-    chargedQuantity: Number(f.chargedQuantity) || null,
-    receivedQuantity: Number(f.receivedQuantity) || null
+    items: (f.items || []).map(x => ({ productId:x.productId, quantity:x.quantity }))
   };
   try {
     if (s.app.editandoId) await Proto.api.put(admin + "/combos/" + s.app.editandoId, corpo);
@@ -1493,11 +1549,6 @@ Proto.on("click", '[data-act="salvar-combo"]', async (e, el, s) => {
                 editandoId:null, erroAcao:null,
                 aviso:{ tipo:"ok", texto:"Combo salvo." } });
   } catch (err){ Proto.set({ erroAcao: err.message }); }
-});
-
-Proto.on("click", '[data-act="tentar-produtos"]', async () => {
-  try { Proto.set({ produtos: await Proto.api.get(admin + "/products"), error_:null }); }
-  catch (e){ Proto.set({ error_:e.message }); }
 });
 
 /* ------------------------------------------------------------- cardápio */

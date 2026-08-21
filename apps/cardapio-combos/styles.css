@@ -5,9 +5,14 @@
    O container é o .app e ele tem padding, então a largura consultada é a do
    quadro menos 32px — por isso os degraus estão em 700/1300 e não 768/1440. */
 
-.app { display: grid; gap: 12px; padding: 16px; container-type: inline-size; }
+/* A página não rola: o quadro é a altura, e cada lista rola dentro da sua
+   própria caixa. Uma tela de montagem que rola esconde o resumo e o salvar
+   exatamente quando eles importam. */
+.app { display: grid; gap: 10px; padding: 14px; container-type: inline-size;
+       block-size: 100%; box-sizing: border-box; align-content: start;
+       min-block-size: 0; }
 
-.app-hd { display: grid; gap: 4px; padding: 4px 0 12px; }
+.app-hd { display: grid; gap: 4px; padding: 2px 0 8px; }
 .app-hd h1 { margin: 0; }
 .app-hd p { margin: 0; max-inline-size: 62ch; }
 
@@ -47,7 +52,7 @@
 .aviso { display: grid; gap: 8px; justify-items: start; font-size: 14px; max-inline-size: 62ch; }
 .aviso [data-act] { min-block-size: 48px; }
 
-.form { display: grid; gap: 10px; max-inline-size: 40ch; margin: 10px 0; }
+.form { display: grid; gap: 8px; max-inline-size: 40ch; margin: 6px 0; }
 .campo { min-height: 46px; font-size: 14px; }
 
 .tipos { display: grid; gap: 8px; margin-bottom: 10px; }
@@ -58,7 +63,7 @@
 .bloco h2 { margin: 0; font-size: 15px; }
 .produto.escolhido { outline: 2px solid currentColor; }
 
-.comparativo { display: grid; gap: 4px; padding: 10px 0; }
+.comparativo { display: grid; gap: 2px; padding: 6px 0; }
 .comparativo .frase { font-size: 14px; max-inline-size: 62ch; }
 
 .impedimento { display: grid; gap: 6px; font-size: 14px; max-inline-size: 62ch; }
@@ -79,3 +84,36 @@
 .totais { margin-top: 12px; }
 .linha-total { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
 .linha-total.total { font-size: 16px; }
+
+
+/* ------------------------------------------------------------ construtor */
+
+/* montar à esquerda, buscar à direita quando há largura; empilhado abaixo
+   disso, e nunca a página inteira rolando */
+.construtor { display: grid; gap: 14px; min-block-size: 0; }
+@container (min-width: 700px) { .construtor { grid-template-columns: 1fr 1fr; } }
+
+.coluna { display: grid; gap: 10px; align-content: start; min-block-size: 0; }
+
+/* empilhado, busca-se ANTES de montar: procurar é o primeiro gesto, e um
+   Salvar travado acima da busca não faz sentido nenhum. Lado a lado, montar
+   volta para a esquerda, que é por onde se lê. */
+.coluna.buscar { order: 1; }
+.coluna.montar { order: 2; }
+@container (min-width: 700px) {
+  .coluna.montar { order: 1; }
+  .coluna.buscar { order: 2; }
+}
+
+/* as duas listas do construtor rolam dentro de si, com teto por altura de
+   quadro — é o que mantém o resumo e o Salvar sempre à vista */
+/* teto fixo e rolagem PRÓPRIA: é o que impede a página de crescer com o
+   catálogo e empurrar o resumo e o Salvar para fora da vista */
+.escolhidos, .resultados { display: grid; gap: 8px; overflow-y: auto;
+                           max-block-size: 190px; min-block-size: 0; }
+
+.item-combo, .resultado { display: block; }
+.item-combo .linha-acoes, .resultado .linha-acoes { margin-top: 6px; }
+
+.buscar .form { display: grid; grid-template-columns: 1fr auto; gap: 8px;
+                align-items: center; max-inline-size: none; }
