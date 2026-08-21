@@ -1,0 +1,81 @@
+/* Os estilos do protótipo. O design system traz os seus; aqui fica só o
+   layout que os componentes não cobrem. @container, não @media: o quadro é o
+   container, e @media responderia à janela em vez dele.
+
+   O container é o .app e ele tem padding, então a largura consultada é a do
+   quadro menos 32px — por isso os degraus estão em 700/1300 e não 768/1440. */
+
+.app { display: grid; gap: 12px; padding: 16px; container-type: inline-size; }
+
+.app-hd { display: grid; gap: 4px; padding: 4px 0 12px; }
+.app-hd h1 { margin: 0; }
+.app-hd p { margin: 0; max-inline-size: 62ch; }
+
+.nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+/* 44px é o piso de toque, então o alvo tem de passar dele, não encostar */
+.btn, .voltar, .chip { min-height: 46px; padding: 0 14px; font-size: 14px; }
+.btn.ghost { font-weight: 400; }
+.voltar { justify-self: start; padding-left: 0; }
+
+.grade { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@container (min-width: 700px)  { .grade { grid-template-columns: 1fr 1fr; } }
+@container (min-width: 1300px) { .grade { grid-template-columns: 1fr 1fr 1fr; } }
+
+.nome { display: block; font-size: 16px; }
+.desc, .inclui, .componentes { display: block; font-size: 13px; max-inline-size: 62ch; }
+.preco { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+.preco-item, .qtd, .bruto { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* a soma das partes fica riscada ao lado do preço do combo: é a comparação
+   que faz o lojista enxergar o desconto que está dando */
+.soma { display: block; font-size: 13px; text-decoration: line-through; opacity: .7;
+        font-variant-numeric: tabular-nums; }
+
+.precos { display: grid; gap: 2px; margin: 6px 0; }
+.tag { display: inline-block; margin: 6px 6px 0 0; font-size: 12px; }
+
+/* as ações da linha empilham enquanto não há largura para elas */
+.linha-acoes { display: grid; gap: 8px; margin-top: 10px; }
+@container (min-width: 700px) { .linha-acoes { display: flex; flex-wrap: wrap; } }
+
+.estado { display: grid; gap: 10px; justify-items: start; padding: 20px 0; }
+.estado h2 { margin: 0; font-size: 16px; }
+.estado p { margin: 0; max-inline-size: 62ch; }
+.esqueleto { display: grid; gap: 8px; width: 100%; }
+
+.aviso { display: grid; gap: 8px; justify-items: start; font-size: 14px; max-inline-size: 62ch; }
+.aviso [data-act] { min-block-size: 48px; }
+
+.form { display: grid; gap: 10px; max-inline-size: 40ch; margin: 10px 0; }
+.campo { min-height: 46px; font-size: 14px; }
+
+.tipos { display: grid; gap: 8px; margin-bottom: 10px; }
+@container (min-width: 700px) { .tipos { display: flex; flex-wrap: wrap; } }
+.chip.selecionado { font-weight: 700; }
+
+.bloco { display: grid; gap: 10px; }
+.bloco h2 { margin: 0; font-size: 15px; }
+.produto.escolhido { outline: 2px solid currentColor; }
+
+.comparativo { display: grid; gap: 4px; padding: 10px 0; }
+.comparativo .frase { font-size: 14px; max-inline-size: 62ch; }
+
+.impedimento { display: grid; gap: 6px; font-size: 14px; max-inline-size: 62ch; }
+
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+/* o combo é uma linha só; os componentes moram dentro dela */
+.componentes-linha { display: grid; gap: 2px; margin: 8px 0 0 12px; }
+.componente { display: block; font-size: 13px; }
+
+/* o carrinho vira duas colunas quando há largura: linhas de um lado, conta
+   do outro; empilhado, a conta fica embaixo, onde se lê por último */
+.carrinho-layout { display: grid; gap: 12px; }
+.linhas { display: grid; gap: 12px; }
+@container (min-width: 700px) { .carrinho-layout { grid-template-columns: 2fr 1fr;
+                                                   align-items: start; } }
+
+.totais { margin-top: 12px; }
+.linha-total { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+.linha-total.total { font-size: 16px; }
