@@ -1,0 +1,44 @@
+/* Three devices on one stage.
+
+   Each view is pinned at the width of the device it stands for: two phones
+   and one kitchen screen. That is what "multi-device" means — a phone view
+   measured at anything but a phone's width is not a phone view. */
+
+.palco {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.vista {
+  flex: 0 0 auto;
+  border: 1px solid #2c323e;
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.vista.telefone { width: 375px; }   /* iPhone SE */
+.vista.mesa     { width: 1024px; }  /* the kitchen screen */
+
+.estado { display: grid; gap: 10px; }
+.esqueleto { display: grid; gap: 8px; }
+
+.quadro {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.raia { display: grid; gap: 8px; align-content: start; }
+.ficha, .linha { display: block; }
+.situacao { display: inline-block; }
+.btn { min-height: 44px; }
+
+/* EXPERIMENT: finger-hostile target and unreadable text, inside a PHONE view,
+   present in the content state the layout pass actually measures. */
+.vista.telefone .minusculo { min-height: 24px; height: 24px; width: 30px; padding: 0; }
+.vista.telefone .miudo { font-size: 9px; }
