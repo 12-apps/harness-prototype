@@ -144,6 +144,9 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 | `scripts/test-enforcement.js` | fails the build when a rule stops biting, or the docs stop matching it |
 | `scripts/generate-catalog.js` | regenerates the catalog from the installed package |
 | `apps/product-editor/` | a filled-in prototype to read, with the product instructions and context it came from |
+| `apps/multi-view-demo/` | the worked reference for `views`: three people watching one order, on three devices |
+| `docs/multi-device-views.md` | why `views` is shaped the way it is, and what was measured to get there |
+| `scripts/test-multiview.js` | fails the build when a several-views rule stops biting |
 
 ## Component catalog
 

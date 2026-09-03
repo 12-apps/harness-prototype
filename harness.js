@@ -37,6 +37,38 @@ let H_ROOT = null;
       position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;
       container-type:inline-size;container-name:frame;
     }
+    /* Several devices watching the same data at once. The mount is still one
+       screen: the harness calls it once per declared view and lays the
+       results out side by side. The named container moves from the mount to
+       each view's frame, so every @container rule resolves against the width
+       of the device that view stands for — which is what lets every rule
+       written for one screen keep applying to each of them. */
+    #app.h-multi, .h-probe.h-multi{
+      display:flex;gap:20px;align-items:flex-start;
+      width:auto;height:auto;overflow:visible;container-type:normal;
+    }
+    .h-view{flex:0 0 auto;display:flex;flex-direction:column;gap:6px}
+    .h-view-label{
+      display:flex;align-items:center;gap:8px;min-height:22px;
+      font:600 10px/1.6 ui-sans-serif,system-ui,sans-serif;letter-spacing:.09em;
+      text-transform:uppercase;color:#8b93a5;
+    }
+    .h-view-name{white-space:nowrap}
+    /* the device this view is being shown on: the declared one until somebody
+       asks to see the same screen somewhere else */
+    .h-view-vp{
+      font:500 10px/1.4 ui-sans-serif,system-ui,sans-serif;letter-spacing:.04em;
+      text-transform:none;color:#c3cad8;background:#1b1f27;
+      border:1px solid #2f3643;border-radius:6px;padding:2px 4px;max-width:170px;
+    }
+    .h-view-vp:hover{border-color:#414a5b;color:#e8eaef}
+    .h-view-vp:focus-visible{outline:2px solid #5b7cfa;outline-offset:1px}
+    .h-view-frame{
+      background:#fff;border-radius:14px;overflow:auto;
+      box-shadow:0 0 0 1px #313846,0 18px 44px rgba(0,0,0,.5);
+      container-type:inline-size;container-name:frame;
+    }
+    .h-probe .h-view-frame{box-shadow:none;border-radius:0}
   `;
   if (!document.getElementById("h-doc-css")){
     const st = document.createElement("style");
@@ -214,6 +246,71 @@ const Proto = (() => {
   let LADDER = DEFAULT_LADDER.slice();
   let VIEWPORTS = LADDER.concat(DEVICES);
 
+  /* ---------- views: more than one device on the same data ----------
+     A flow that needs two people needs two screens at once — someone orders,
+     someone else prepares, and each has to see what the other did. `views`
+     declares them; how many and who they are is the product's business, and
+     the harness holds no opinion beyond needing a width for each.
+
+         views:[
+           { id:"cliente", label:"Cliente", actor:"cliente", viewport:"se"   },
+           { id:"cozinha", label:"Cozinha", actor:"cozinha", viewport:"ipad" }
+         ]
+
+     The prototype does NOT draw the stage. It keeps rendering ONE screen and
+     the harness calls `mount` once per view, each in a frame the width of the
+     device it stands for. That is the whole design: a view is an ordinary
+     screen, so every rule the harness already has for one screen — the width
+     ladder, the three states, touch targets, wiring, the journey — applies to
+     each of them unchanged, instead of a stage nobody can measure.
+
+     Declaring no views leaves every path below exactly as it was. */
+  let VIEWS = [];
+  function multi(){ return VIEWS.length > 0; }
+
+  /* the view being drawn or measured right now: what `state.rung`,
+     `state.widthPx` and the measurements answer for */
+  let renderingView = null;
+
+  function normalizeViews(list){
+    if (!Array.isArray(list) || !list.length) return [];
+    return list.map((v, i) => {
+      const id = String(v.id || v.identifier || ("vista" + (i + 1)));
+      return { id, label: v.label || id, actor: v.actor || v.papel || null,
+               viewport: v.viewport || v.aparelho || null,
+               w: Number(v.w) || 0, h: Number(v.h) || 0 };
+    });
+  }
+
+  function viewById(id){ return VIEWS.find(v => v.id === id) || null; }
+
+  /* A view's width. What `views` declares is the device the specification is
+     about; `state.viewSizes` is the person at the bench asking to see that
+     same screen on another one — the audit still walks every view across the
+     whole ladder either way, so swapping here changes what you look at, never
+     what is verified. */
+  function declaredWidth(v){
+    if (!v) return null;
+    if (v.w) return { id: rungOf(v.w).id, w: v.w, h: v.h || 800 };
+    const d = VIEWPORTS.find(x => x.id === v.viewport);
+    return d ? { id: d.id, w: d.w, h: d.h } : null;
+  }
+
+  function viewWidth(v){
+    if (!v) return null;
+    /* The swap is the bench's, never the suite's. Verification and the audit
+       always measure the device the view DECLARES — otherwise looking at a
+       screen on another size would quietly change what the gate approved,
+       and the specification would be whatever was last picked from a
+       dropdown. */
+    const swap = !verifying && state.viewSizes && state.viewSizes[v.id];
+    if (swap){
+      const d = VIEWPORTS.find(x => x.id === swap);
+      if (d && !d.freeForm) return { id: d.id, w: d.w, h: d.h };
+    }
+    return declaredWidth(v);
+  }
+
   /* which rung a width falls on: the largest rung it reaches */
   function rungOf(w){
     let current = LADDER[0];
@@ -282,10 +379,18 @@ const Proto = (() => {
     ctx:{},        /* dimensionId -> active id (string), or a list (flags) */
     app:{}, ex:null,
     viewport:"xs", landscape:false, zoom:"fit", sidebar:288,
+    /* viewId -> a viewport id, when the bench is showing that view on a
+       device other than the one it declares */
+    viewSizes:{},
 
     /* is a request in flight right now? AsyncStateContainer uses this to show
        the loading state without the prototype hand-managing a flag */
     waitingFor(){ return network.inFlightScreen > 0; },
+    /* which view is being drawn. With no views declared this is null and the
+       prototype never has to ask. */
+    get view(){ return renderingView ? renderingView.id : null; },
+    get viewLabel(){ return renderingView ? renderingView.label : null; },
+    get actor(){ return renderingView ? renderingView.actor : null; },
     /* the rung the screen is being drawn at: lets the prototype change
        structure, not just CSS, when the arrangement calls for it */
     get rung(){ return rungOf(currentWidth().w).id; },
@@ -306,10 +411,17 @@ const Proto = (() => {
 
   /* the options active right now. On a scale, the active level includes the
      ones below it: whoever is on Ultra also has what Pro has. */
-  function activeOptions(){
+  function activeOptions(actor){
     const out = [];
     cfg.context.forEach(d => {
-      const v = state.ctx[d.id];
+      let v = state.ctx[d.id];
+      /* A view declares its actor, and several are on screen at once — so
+         "the role" stops being one answer for the whole bench. For the view
+         being drawn, the exclusive dimension that owns that actor answers as
+         the actor, whatever the bar has ticked. The other dimensions (the
+         plan, the flags) still answer for the bench: they describe the
+         installation, not who is looking. */
+      if (actor && d.kind !== "flags" && d.options.some(o => o.id === actor)) v = actor;
       if (d.kind === "flags"){
         (v || []).forEach(id => {
           const o = d.options.find(x => x.id === id);
@@ -332,20 +444,20 @@ const Proto = (() => {
      permission has no opinion. A permission nobody mentions does not
      exist: better that a scenario visibly disappears than that a
      mistyped @pode: slips through unnoticed. */
-  function can(perm){
+  function can(perm, actor){
     let cited = false;
     for (const d of cfg.context){
       const mentions = d.options.some(o => (o.allows || []).indexOf(perm) > -1);
       if (!mentions) continue;
       cited = true;
-      const ok = activeOptions()
+      const ok = activeOptions(actor)
         .filter(x => x.d.id === d.id)
         .some(({ o }) => (o.allows || []).some(p => p === perm || p === "*"));
       if (!ok) return false;
     }
     if (!cited){
       /* only the wildcard can cover a permission no option lists */
-      return activeOptions().some(({ o }) => (o.allows || []).indexOf("*") > -1);
+      return activeOptions(actor).some(({ o }) => (o.allows || []).indexOf("*") > -1);
     }
     return true;
   }
@@ -453,19 +565,190 @@ const Proto = (() => {
     if (!cfg.primitives) return [];
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = currentWidth().w + "px";
+    sizeProbe(probe, currentWidth().w);
     document.body.appendChild(probe);
     const steps = (s.steps || []).length;
     const built = await buildState(s, steps - 1, 0);
     let list = [];
     try {
-      const st = { ...state, app:built.app, ex:built.ex, scenario:s.id, step:steps - 1, example:0 };
-      if (cfg.mount)       cfg.mount(probe, st);
-      else if (cfg.render) probe.innerHTML = cfg.render(st);
+      paint(probe, { app:built.app, ex:built.ex, scenario:s.id, step:steps - 1, example:0 });
       list = scanPrim(probe);
     } catch { list = []; }
     probe.remove();
     return list;
+  }
+
+  /* ---------- the painter ----------
+     One place draws the screen, so the live stage, the replay's probe, the
+     assertions and the per-rung measurements all get the same treatment.
+
+     With no views declared it calls `mount` once, on the element it was
+     given — the path the harness has always taken. With views declared it
+     calls `mount` once per view, each inside a frame the width of that
+     view's own device, and hands back a root per view: that is what lets a
+     step address one screen and an assertion read another.
+
+     `only` paints a single view alone. The audit uses it to walk the ladder
+     for one view at a time, so a phone is measured at a phone's widths and
+     nothing measures the stage. */
+  function widthFor(v){
+    const before = renderingView;
+    renderingView = v;
+    try { return currentWidth(); } finally { renderingView = before; }
+  }
+
+  /* The size picker that rides above each view on the bench. It is built for
+     the live stage only: a probe is what the rules measure, and chrome inside
+     one would be measured with the screen. */
+  function viewPicker(v){
+    const sel = document.createElement("select");
+    sel.className = "h-view-vp";
+    sel.setAttribute("aria-label", "Aparelho da vista " + v.label);
+    const declared = (declaredWidth(v) || {}).id;
+    const group = (label, list) => {
+      const g = document.createElement("optgroup");
+      g.label = label;
+      list.filter(d => !d.freeForm).forEach(d => {
+        const o = document.createElement("option");
+        o.value = d.id;
+        o.textContent = d.label + (d.id === declared ? " · declarado" : "");
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    };
+    group("Pontos de quebra", LADDER);
+    group("Aparelhos", DEVICES);
+    sel.value = (state.viewSizes && state.viewSizes[v.id]) || declared || "";
+    sel.addEventListener("change", ev => {
+      /* the declared device is not an override — picking it back clears one,
+         so the bench stops claiming a swap that is no longer there */
+      if (ev.target.value === declared) delete state.viewSizes[v.id];
+      else state.viewSizes[v.id] = ev.target.value;
+      savePrefs();
+      render();
+      fit();
+    });
+    return sel;
+  }
+
+  function paint(host, extras, only){
+    const draw = (el, v) => {
+      const before = renderingView;
+      renderingView = v;
+      try {
+        /* extras == null is the live stage: it hands `mount` the state object
+           itself, getters and all, exactly as before */
+        let shown;
+        if (v == null && extras == null) shown = state;
+        else {
+          shown = (extras == null) ? { ...state } : { ...state, ...extras };
+          /* `mount` renders ONE screen and has no business reading the others,
+             and the roots on the live state point at the live document — a
+             mount drawing into a probe would be handed the wrong nodes. So no
+             copy carries them; the assertions get them set deliberately,
+             after the paint that produced them. */
+          delete shown.views;
+          if (v){
+            /* Callers build their `shown` before they know which view it is
+               for, so it carries the STAGE's answers: view null, and the rung
+               and width of the bench. Re-stamp them here, or every view draws
+               as the first one and measures at somebody else's width. */
+            const w = currentWidth();
+            shown.view      = v.id;
+            shown.viewLabel = v.label;
+            shown.actor     = v.actor;
+            shown.rung      = rungOf(w.w).id;
+            shown.widthPx   = w.w;
+            shown.can       = perm => can(perm, v.actor);
+            shown.waitingFor = () => waitingForView(v.id);
+          }
+        }
+        if (cfg.mount)       cfg.mount(el, shown);
+        else if (cfg.render) el.innerHTML = cfg.render(shown);
+      } finally { renderingView = before; }
+    };
+
+    if (!multi()){ draw(host, null); return { "": host }; }
+
+    host.classList.add("h-multi");
+    const roots = {};
+    VIEWS.forEach(v => {
+      if (only && only !== v.id) return;
+      let cell = [...host.children].find(c => c.getAttribute
+                 && c.getAttribute("data-h-view") === v.id);
+      if (!cell){
+        cell = document.createElement("div");
+        cell.className = "h-view";
+        cell.setAttribute("data-h-view", v.id);
+        /* The label and its picker are chrome, and chrome inside a probe gets
+           read as the prototype's own: a 10px label is measured as text below
+           the minimum, and in strict mode its <span> is reported as raw
+           markup the prototype cannot remove, because it never wrote it. So
+           the bench gets them and a probe never does. */
+        if (host.id === "app"){
+          const tag = document.createElement("div");
+          tag.className = "h-view-label";
+          const nome = document.createElement("span");
+          nome.className = "h-view-name";
+          nome.textContent = v.label;
+          tag.appendChild(nome);
+          tag.appendChild(viewPicker(v));
+          cell.appendChild(tag);
+        }
+        const frame = document.createElement("div");
+        frame.className = "h-view-frame";
+        cell.appendChild(frame);
+        host.appendChild(cell);
+      }
+      const frame = cell.querySelector(".h-view-frame");
+      /* the picker mirrors the state, never a second source of truth: Resetar
+         and a restored preference both come through here */
+      const picker = cell.querySelector(".h-view-vp");
+      if (picker){
+        const want = (state.viewSizes && state.viewSizes[v.id]) || (declaredWidth(v) || {}).id || "";
+        if (picker.value !== want) picker.value = want;
+      }
+      const w = widthFor(v);
+      frame.style.width  = w.w + "px";
+      frame.style.height = w.h + "px";
+      roots[v.id] = frame;
+      draw(frame, v);
+    });
+    return roots;
+  }
+
+  /* What each view is showing right now, as text to compare. Coarse on
+     purpose: "did this screen change at all" is the question, and anything
+     finer would start guessing which changes count. */
+  /* Which of the three states each view was seen in, across the whole suite.
+     The single-screen rule is that a page owes loading, empty and error; with
+     several views it is owed by each of them, and this is the evidence rather
+     than a promise in a tag. */
+  let statesSeen = {};
+  function noteStates(roots){
+    if (!multi()) return;
+    Object.keys(roots).forEach(id => {
+      const el = roots[id];
+      if (!el) return;
+      STATES.forEach(e => {
+        if (el.querySelector(`[data-estado="${e}"]`)){
+          (statesSeen[id] = statesSeen[id] || new Set()).add(e);
+        }
+      });
+    });
+  }
+
+  function snapshotViews(roots){
+    const out = {};
+    Object.keys(roots).forEach(id => { out[id] = roots[id] ? roots[id].innerHTML : null; });
+    return out;
+  }
+
+  /* The element a step or an assertion means. Naming no view means the whole
+     stage — which is what a cross-view assertion wants to read. */
+  function rootOf(roots, host, viewId){
+    if (!multi()) return host;
+    return viewId ? (roots[viewId] || null) : host;
   }
 
   /* ---------- steps that really click ---------- */
@@ -537,8 +820,8 @@ const Proto = (() => {
       if (!st[kindName]) continue;
       const v = st[kindName];
       return typeof v === "string"
-        ? { kindName, sel:v, val:undefined }
-        : { kindName, sel:v.sel || v.selectorStr, val:v.val };
+        ? { kindName, sel:v, val:undefined, on:st.on || null }
+        : { kindName, sel:v.sel || v.selectorStr, val:v.val, on:st.on || v.on || null };
     }
     return null;
   }
@@ -547,21 +830,35 @@ const Proto = (() => {
     const { kindName, sel, val } = spec;
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = currentWidth().w + "px";
+    sizeProbe(probe, currentWidth().w);
     document.body.appendChild(probe);
 
-    const shown = { ...state, app, ex:exRow };
+    /* With views declared, a step that does not say WHERE it acts is not a
+       specification: two screens are on the bench and the same control can
+       be on both. */
+    if (multi() && !spec.on){
+      probe.remove();
+      return { app, error_:'o passo não diz em qual vista age — falta on:"' 
+               + VIEWS.map(v => v.id).join('" / "') + '"' };
+    }
+    if (spec.on && !viewById(spec.on)){
+      probe.remove();
+      return { app, error_:'o passo age na vista "' + spec.on + '", que não está declarada em views' };
+    }
+
+    let roots;
     try {
-      if (cfg.mount)       cfg.mount(probe, shown);
-      else if (cfg.render) probe.innerHTML = cfg.render(shown);
+      roots = paint(probe, { app, ex:exRow });
     } catch (e){
       probe.remove();
       return { app, error_:"a tela quebrou antes de " + ACTIONS[kindName].caption + " " + sel + ": " + e.message };
     }
 
-    const el = probe.querySelector(sel);
-    if (!el){ probe.remove(); return { app, error_:"não há " + sel + " nesta tela" }; }
-    if (el.disabled){ probe.remove(); return { app, error_:sel + " está desabilitado" }; }
+    const where = spec.on ? ' na vista "' + spec.on + '"' : " nesta tela";
+    const root = rootOf(roots, probe, spec.on);
+    const el = root && root.querySelector(sel);
+    if (!el){ probe.remove(); return { app, error_:"não há " + sel + where }; }
+    if (el.disabled){ probe.remove(); return { app, error_:sel + " está desabilitado" + where }; }
 
     /* filling a button or clicking a field is a script error, not a code one */
     const tag = el.tagName.toLowerCase();
@@ -582,7 +879,13 @@ const Proto = (() => {
 
     const previousSandbox = sandbox;
     sandbox = { app: clone(app) };
-    const s = { ...state, app: sandbox.app, ex: exRow };
+    const s = { ...state, app: sandbox.app, ex: exRow, view: spec.on || null };
+    if (spec.on){
+      const v = viewById(spec.on);
+      s.can = perm => can(perm, v && v.actor);
+    }
+    const previousActing = actingView;
+    actingView = spec.on || null;
     let touched = 0;
     ACTIONS[kindName].evs.forEach(ev => {
       handlers.forEach(h => {
@@ -600,12 +903,13 @@ const Proto = (() => {
     /* the handler may have fired a request: the sandbox only closes once the
        network settles, otherwise the response's set() would land on screen */
     await awaitNetwork();
+    actingView = previousActing;
     const out = sandbox.app;
     sandbox = previousSandbox;
     const caption = ((el.textContent || "") + " " + (el.getAttribute("data-act") || "")
                     + " " + (el.getAttribute("aria-label") || "")).trim();
     probe.remove();
-    if (!touched) return { app: out, caption, error_:"nenhum handler responde a " + sel + " para " + kindName };
+    if (!touched) return { app: out, caption, error_:"nenhum handler responde a " + sel + where + " para " + kindName };
     return { app: out, caption };
   }
 
@@ -688,7 +992,16 @@ const Proto = (() => {
      inside an iframe, which is where these files open. Intercepting fetch
      gives the same discipline: swapping in a real backend means deleting
      the interceptor, not rewriting the screen. */
+  /* the view whose handler is running right now: what a request fired from
+     it belongs to. Without this, `waitingFor()` is one number for the whole
+     bench and a request from the kitchen puts the customer's screen into a
+     skeleton it has no reason to show. */
+  let actingView = null;
+
   const network = { inFlight:0, log:[], tela:[], failures:{}, counter:0, seq:0, origin:null, stalled:[], seenRoutes:{}, inFlightScreen:0,
+    /* viewId -> requests in flight; `loose` is what no view owns (the Dado,
+       a screen load) and which therefore every view is waiting on */
+    byView:{}, loose:0,
     /* one success and one failure per route, kept for the API contract
        export: the log is a rolling window and loses them */
     samples:{} };
@@ -773,7 +1086,8 @@ const Proto = (() => {
          and using the flag on the way back made the counter go down without
          ever having gone up */
       const countsOnScreen = !verifying && !replaying;
-      if (countsOnScreen){ network.inFlightScreen++; warnNetwork(); }
+      const owner = actingView;
+      if (countsOnScreen){ network.inFlightScreen++; markIn(owner); warnNetwork(); }
       const ctx = { params: found.params, payload, data_: cfg.data_, query:{} };
 
       const run = () => {
@@ -822,7 +1136,7 @@ const Proto = (() => {
             network.inFlight++;
             const r = run();
             network.inFlight--;
-            if (countsOnScreen){ network.inFlightScreen = Math.max(0, network.inFlightScreen - 1); warnNetwork(); }
+            if (countsOnScreen){ network.inFlightScreen = Math.max(0, network.inFlightScreen - 1); markOut(owner); warnNetwork(); }
             res(r);
             return r;   /* the `waitFor` step needs the payload that arrived */
           } });
@@ -847,13 +1161,29 @@ const Proto = (() => {
       return new Promise(res => {
         const end = () => {
           network.inFlight--;
-          if (countsOnScreen){ network.inFlightScreen = Math.max(0, network.inFlightScreen - 1); warnNetwork(); }
+          if (countsOnScreen){ network.inFlightScreen = Math.max(0, network.inFlightScreen - 1); markOut(owner); warnNetwork(); }
           res(run());
         };
         expects ? setTimeout(end, expects) : end();
       });
     };
     window.fetch.__original = originalFetch;
+  }
+
+  function markIn(owner){
+    if (owner) network.byView[owner] = (network.byView[owner] || 0) + 1;
+    else network.loose++;
+  }
+  function markOut(owner){
+    if (owner) network.byView[owner] = Math.max(0, (network.byView[owner] || 0) - 1);
+    else network.loose = Math.max(0, network.loose - 1);
+  }
+
+  /* What THIS view is waiting on: its own requests, plus the ones nobody
+     owns — a screen load belongs to all of them. */
+  function waitingForView(id){
+    if (!multi() || !id) return network.inFlightScreen > 0;
+    return (network.byView[id] || 0) > 0 || network.loose > 0;
   }
 
   /* redraws when a request starts or ends: this is what makes the skeleton
@@ -933,7 +1263,8 @@ const Proto = (() => {
     if (!initial) return;
     try {
       localStorage.setItem(prefsKey(), JSON.stringify({
-        ctx: state.ctx, viewport: state.viewport, zoom: state.zoom, sidebar: state.sidebar
+        ctx: state.ctx, viewport: state.viewport, zoom: state.zoom, sidebar: state.sidebar,
+        viewSizes: state.viewSizes
       }));
     } catch {}
   }
@@ -1017,7 +1348,13 @@ const Proto = (() => {
   /* the width in force NOW: the example's, if it declares one; otherwise
      the screen's */
   let forcedWidth = null;
-  function currentWidth(){ return forcedWidth || vp(); }
+  /* Order matters. A ladder walk (`forcedWidth`) is the audit measuring this
+     view AT that rung and has to win; otherwise the view answers for the
+     device it stands for; only with no views declared does the stage's own
+     viewport decide, exactly as before. */
+  function currentWidth(){
+    return forcedWidth || (renderingView && viewWidth(renderingView)) || vp();
+  }
 
   function scnById(id){ return cfg.scenarios.find(s => s.id === id); }
   function scn(id){ return scnById(id) || visible()[0]; }
@@ -1108,6 +1445,14 @@ const Proto = (() => {
       out += `# escopo: ${dropped.length} cenário${dropped.length === 1 ? "" : "s"} `
            + `fora porque ${culprits.join(", ")} não se aplica a este contexto\n`;
     }
+    if (multi()){
+      out += `# vistas: ${VIEWS.map(v => {
+        const d = viewWidth(v) || {};
+        return `${v.id} = ${v.label}${v.actor ? ` (${v.actor})` : ""} @ ${d.w}px`;
+      }).join(" · ")}\n`;
+      out += `# vistas: as telas estão abertas ao mesmo tempo e leem os mesmos dados; `
+           + `um passo marcado [vista] acontece naquela tela\n`;
+    }
     out += `# contexto: ${cfg.context.map(d => {
       const v = state.ctx[d.id];
       return `${d.label.toLowerCase()}=${Array.isArray(v) ? (v.join(",") || "nenhuma") : v}`;
@@ -1161,7 +1506,11 @@ const Proto = (() => {
       (s.steps || []).forEach(st => {
         const k = stepWord(st, natPrev);
         natPrev = nature(st);
-        out += `    ${k.kw} ${k.text}\n`;
+        out += `    ${k.kw} ${st.on ? `[${st.on}] ` : ""}${k.text}\n`;
+        const wants = [].concat(st.propagates || []);
+        const holds = [].concat(st.unchanged || []);
+        if (wants.length) out += `      # e a tela de ${wants.join(", ")} muda por causa disso\n`;
+        if (holds.length) out += `      # e a tela de ${holds.join(", ")} continua como estava\n`;
       });
       if (isOutline(s)){
         out += `\n    Exemplos:\n`;
@@ -1301,7 +1650,8 @@ const Proto = (() => {
     /* the key carries the context: the same step yields different screens for
        the owner and for the waiter */
     const ctxSig = JSON.stringify(state.ctx);
-    const wid = forcedWidth ? forcedWidth.id : "tela";
+    const wid = (forcedWidth ? forcedWidth.id : "tela")
+      + (multi() ? "|" + VIEWS.map(v => (viewWidth(v) || {}).w).join(",") : "");
     const keyName = k => s.id + "|" + axis + "|" + k + "|" + ctxSig + "|" + wid;
 
     /* A scenario with `waitFor` does not enter the cache: the stalled request
@@ -1776,8 +2126,14 @@ const Proto = (() => {
 
   /* the probe has to follow the current width, otherwise the container
      query never changes and the Então always measures the same arrangement */
-  function adjustProbe(probe){
-    if (probe) probe.style.width = currentWidth().w + "px";
+  function adjustProbe(probe){ sizeProbe(probe, currentWidth().w); }
+
+  /* A probe holding several views is a row of frames, each already the width
+     of its own device — forcing a width on the row would squeeze them all. */
+  function sizeProbe(probe, w){
+    if (!probe) return;
+    if (multi()){ probe.style.width = ""; return; }
+    probe.style.width = w + "px";
   }
 
   function layoutSignature(root){
@@ -1868,19 +2224,26 @@ const Proto = (() => {
     return set;
   }
 
-  async function rungSignature(s, rung, probe){
+  /* One view, at one rung. `forcedWidth` wins over the view's own device, so
+     each view is walked across the whole ladder as the ordinary screen it is
+     — and everything below reads THAT VIEW'S frame, never the row of frames
+     around it. Measuring the row is what made the rules stop meaning
+     anything: the finger rule fired on a desktop view and stayed silent on a
+     phone, because it was reading the stage's rung instead of the view's. */
+  async function rungSignature(s, rung, probe, view){
     const before = forcedWidth;
     forcedWidth = { id:rung.id, w:rung.w, h:rung.h };
-    probe.style.width = rung.w + "px";
+    sizeProbe(probe, rung.w);
     let sig = "", physical = [], offer = new Set();
     try {
       const built = await buildState(s, (s.steps || []).length - 1, 0);
-      const shown = { ...state, app:built.app, ex:built.ex, scenario:s.id };
-      if (cfg.mount)       cfg.mount(probe, shown);
-      else if (cfg.render) probe.innerHTML = cfg.render(shown);
-      sig = layoutSignature(probe);
-      physical = layoutEngine() ? measuresPhysical(probe, rung, rung.w) : [];
-      offer = offerOf(probe);
+      const roots = paint(probe, { app:built.app, ex:built.ex, scenario:s.id },
+                          view ? view.id : null);
+      const root = view ? roots[view.id] : probe;
+      if (!root) throw new Error("vista sem raiz");
+      sig = layoutSignature(root);
+      physical = layoutEngine() ? measuresPhysical(root, rung, rung.w) : [];
+      offer = offerOf(root);
     } catch { sig = "ERRO"; }
     forcedWidth = before;
     return { sig, physical, offer };
@@ -1901,7 +2264,7 @@ const Proto = (() => {
 
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = currentWidth().w + "px";
+    sizeProbe(probe, currentWidth().w);
     document.body.appendChild(probe);
 
     const auditCtx = clone(state.ctx);
@@ -1959,9 +2322,7 @@ const Proto = (() => {
         for (let k = -1; k < steps.length; k++){
           try {
             const b = k === steps.length - 1 ? built : await buildState(s, k, ri);
-            const shown = { ...state, app:b.app, ex:b.ex, scenario:s.id };
-            if (cfg.mount)       cfg.mount(probe, shown);
-            else if (cfg.render) probe.innerHTML = cfg.render(shown);
+            paint(probe, { app:b.app, ex:b.ex, scenario:s.id });
             screens.push(probe.innerHTML);
           } catch { /* a step that breaks is already called out elsewhere */ }
         }
@@ -2036,6 +2397,12 @@ const Proto = (() => {
           (perPage[pg] = perPage[pg] || []).push(x);
         });
 
+        /* Each declared view is an ordinary screen, so the whole block below
+           runs once per view. A page with three views owes three arrangements
+           across the ladder, not one — the discipline is multiplied by the
+           views, never escaped by them. */
+        const units = multi() ? VIEWS : [null];
+
         for (const pg of Object.keys(perPage)){
           /* Looks at a few of the page's journeys, not just the first: one
              that ends in the empty state has no arrangement to compare, and
@@ -2043,15 +2410,22 @@ const Proto = (() => {
              showing different arrangements is enough for the page to have
              responded. */
           const candidates = perPage[pg].slice(0, cfg.layoutJourneys || 3);
+
+          for (const view of units){
+          /* a probe per view: frames left over from the previous view would
+             sit in this one's layout and in its measurements */
+          const probeV = view ? document.createElement("div") : probeL;
+          if (view){ probeV.className = "h-probe"; document.body.appendChild(probeV); }
+          const unit = pg + (view ? ` · ${view.label}` : "");
           let best = { distinct:1, inheritedList:[], nameStr:candidates[0] && candidates[0].name };
 
           for (const s of candidates){
             state.ctx = contextOf(s);
             const sigs = [];
-            for (const d of LADDER) sigs.push({ d, ...(await rungSignature(s, d, probeL)) });
+            for (const d of LADDER) sigs.push({ d, ...(await rungSignature(s, d, probeV, view)) });
 
             sigs.forEach(x => (x.physical || []).forEach(([keyName, detail]) => {
-              const k = `${pg}: ${keyName}`;
+              const k = `${unit}: ${keyName}`;
               const reg = physicals.get(k) || { rungs:[], details:new Set() };
               if (reg.rungs.indexOf(x.d.id) < 0) reg.rungs.push(x.d.id);
               reg.details.add(detail);
@@ -2066,7 +2440,7 @@ const Proto = (() => {
             wide.forEach(item => {
               if (String(item).indexOf("estado:") === 0) return;
               if (!narrow.has(item)){
-                physicals.set(`${pg}: ${item} some no estreito`,
+                physicals.set(`${unit}: ${item} some no estreito`,
                   `existe em ${sigs[sigs.length - 1].d.id}, some em ${sigs[0].d.id} — decisão ou falta de espaço?`);
               }
             });
@@ -2081,25 +2455,32 @@ const Proto = (() => {
             }
           }
 
+          const what = view ? `a vista "${view.label}" da página "${pg}"` : `a página "${pg}"`;
           if (noEngine){ /* with no engine there is no arrangement to judge */ }
           else if (best.distinct === 1){
-            warnings.push(`a página "${pg}" desenha o MESMO arranjo em toda a escada `
+            warnings.push(`${what} desenha o MESMO arranjo em toda a escada `
               + `(${LADDER.map(d => d.id).join(", ")}) — coube, mas não respondeu`);
           } else {
             if (best.distinct < (cfg.minimalArrangements || 2)){
-              warnings.push(`a página "${pg}" tem só ${best.distinct} arranjo(s) em ${LADDER.length} degraus`);
+              warnings.push(`${what} tem só ${best.distinct} arranjo(s) em ${LADDER.length} degraus`);
             }
             if (best.inheritedList.length){
-              infos.push(`"${pg}": ${best.distinct} arranjos (via ${best.nameStr}); `
+              infos.push(`"${unit}": ${best.distinct} arranjos (via ${best.nameStr}); `
                 + `${best.inheritedList.join(", ")} herdam o degrau anterior`);
             }
+          }
+          if (view) probeV.remove();
           }
         }
         state.ctx = clone(auditCtx);
       }
       probeL.remove();
       physicals.forEach((reg, k) => {
-        if (typeof reg === "string"){ warnings.push(reg); return; }
+        /* the key is what names the page, the view and the thing that
+           vanished; pushing only the value left "existe em xlg, some em xxs"
+           with nothing to say WHAT did, which with several views on the
+           bench does not even say which screen */
+        if (typeof reg === "string"){ warnings.push(`${k} — ${reg}`); return; }
         warnings.push(`${k} — ${[...reg.details].slice(0, 3).join(", ")} `
           + `(em ${reg.rungs.join(", ")})`);
       });
@@ -2178,9 +2559,7 @@ const Proto = (() => {
         for (let k = -1; k < stps; k++){
           try {
             const b = await buildState(s, k, 0);
-            const shown = { ...state, app:b.app, ex:b.ex, scenario:s.id };
-            if (cfg.mount)       cfg.mount(probe, shown);
-            else if (cfg.render) probe.innerHTML = cfg.render(shown);
+            paint(probe, { app:b.app, ex:b.ex, scenario:s.id });
             if (errorMarks(probe)) middle = true;
             if (k === stps - 1) end = errorMarks(probe);
           } catch { /* already called out elsewhere */ }
@@ -2437,6 +2816,60 @@ const Proto = (() => {
       }
     });
 
+    /* A step that names a view in a prototype that declares none: today the
+       harness quietly ignores it, so a leftover `on:` from a copied scenario
+       reads as if it were scoping something. */
+    if (!multi()){
+      const strays = cfg.scenarios.filter(s => (s.steps || []).some(st => st.on));
+      if (strays.length){
+        warnings.push(`${strays.map(s => `"${s.name}"`).join(", ")}: passo com on:"…" `
+          + `mas o protótipo não declara views — o on não aponta para nada`);
+      }
+    }
+
+    /* ---------- what several views owe ----------
+       A view is an ordinary screen, so it owes everything a screen owes — and
+       the audit above has already demanded that of each of them. What is left
+       is what only exists because they are on the bench together. */
+    if (multi()){
+      const acted = new Set(), choreo = new Set();
+      cfg.scenarios.forEach(s => (s.steps || []).forEach(st => {
+        if (specOf(st) && st.on) acted.add(st.on);
+        [].concat(st.propagates || [], st.unchanged || []).forEach(v => choreo.add(v));
+      }));
+
+      VIEWS.forEach(v => {
+        if (!acted.has(v.id)){
+          warnings.push(`a vista "${v.label}" não é operada por nenhum passo — `
+            + `uma tela que ninguém usa é uma captura de tela, não uma especificação`);
+        }
+        const seen = statesSeen[v.id] || new Set();
+        STATES.forEach(e => {
+          if (!seen.has(e)){
+            warnings.push(`a vista "${v.label}" nunca marcou [data-estado="${e}"] em nenhum passo — `
+              + `são três telas, e cada uma passa por carregando, vazio e erro`);
+          }
+        });
+      });
+
+      /* An Examples `largura` column forces ONE width on the whole draw, so
+         with views on the bench it puts every screen at that width at once —
+         which is almost never what the row meant. Each view already carries
+         the width of its own device. */
+      const comLargura = cfg.scenarios.filter(s => isOutline(s) && sampleWidth(s, 0));
+      if (comLargura.length){
+        warnings.push(`${comLargura.map(s => `"${s.name}"`).join(", ")}: a coluna largura `
+          + `vale para TODAS as vistas ao mesmo tempo — com várias telas, cada uma já traz `
+          + `a largura do seu aparelho`);
+      }
+
+      if (!choreo.size){
+        warnings.push(`nenhum passo declara propagates/unchanged — com várias vistas, o que uma `
+          + `ação faz nas OUTRAS telas é justamente o que precisa ser especificado `
+          + `(propagates:["cliente"], unchanged:["cozinha"])`);
+      }
+    }
+
     return {
       warnings: warnings.concat(problems.splice(0)),
       infos,
@@ -2557,7 +2990,7 @@ const Proto = (() => {
     return enqueue(async () => {
     const probe = document.createElement("div");
     probe.className = "h-probe";
-    probe.style.width = currentWidth().w + "px";
+    sizeProbe(probe, currentWidth().w);
     document.body.appendChild(probe);
 
     const by = partial ? partial.by : {};
@@ -2569,6 +3002,7 @@ const Proto = (() => {
     cancelVerification = false;
     interrupted = false;
     network.seenRoutes = {};
+    statesSeen = {};
 
     /* 20 seconds with no sign of life feels frozen: the pill becomes a
        counter and the button stays busy while the suite runs */
@@ -2619,10 +3053,19 @@ const Proto = (() => {
 
           let passed, reason = null;
           try {
-            if (cfg.mount)       cfg.mount(probe, probeState);
-            else if (cfg.render) probe.innerHTML = cfg.render(probeState);
-            passed = !!st.check(built.app, probe, probeState);
-            if (!passed) reason = stepError || "a verificação do Então devolveu falso";
+            const roots = paint(probe, probeState);
+            noteStates(roots);
+            /* every view's root, so an assertion can say "the customer saw it
+               change" and "the kitchen's board did not move" in one breath */
+            probeState.views = roots;
+            const el = rootOf(roots, probe, st.on);
+            if (!el){
+              passed = false;
+              reason = 'o Então lê a vista "' + st.on + '", que não está declarada em views';
+            } else {
+              passed = !!st.check(built.app, el, probeState);
+              if (!passed) reason = stepError || "a verificação do Então devolveu falso";
+            }
           } catch (e){
             passed = false;
             reason = stepError || ("quebrou ao desenhar: " + e.message);
@@ -2662,18 +3105,26 @@ const Proto = (() => {
 
       forcedWidth = sampleWidth(s, 0);
       adjustProbe(probe);
+      /* A state scenario may name the view it is about: with three screens on
+         the bench, "the empty state" is the empty state OF SOMEBODY. Naming
+         none keeps the old reading — it showed up somewhere. */
+      const alvoView = s.on || null;
       for (let i = -1; i < total && !matched; i++){
         try {
           const built = await buildState(s, i, 0);
-          const shown = { ...state, app:built.app, ex:built.ex, scenario:s.id };
-          if (cfg.mount)       cfg.mount(probe, shown);
-          else if (cfg.render) probe.innerHTML = cfg.render(shown);
-          if (probe.querySelector(`[data-estado="${est}"]`)){ matched = true; onde = i; }
+          const roots = paint(probe, { app:built.app, ex:built.ex, scenario:s.id });
+          noteStates(roots);
+          const el = rootOf(roots, probe, alvoView);
+          if (!el){
+            reason = `o cenário é da vista "${alvoView}", que não está declarada em views`;
+            break;
+          }
+          if (el.querySelector(`[data-estado="${est}"]`)){ matched = true; onde = i; }
         } catch (e){ reason = "quebrou ao desenhar: " + e.message; break; }
       }
       if (!matched && !reason){
-        reason = `em nenhum passo a tela marcou [data-estado="${est}"] — `
-               + `o AsyncStateContainer cobriu este caso?`;
+        reason = `em nenhum passo ${alvoView ? `a vista "${alvoView}"` : "a tela"} marcou `
+               + `[data-estado="${est}"] — o AsyncStateContainer cobriu este caso?`;
       }
 
       forcedWidth = null;
@@ -2681,6 +3132,90 @@ const Proto = (() => {
       if (!matched){
         failures.push({ scen:s.name, tags:(s.tags || []).join(" "), stp:"—",
           kw:"Estado", textStr:est, example:null, reason, link:`#${s.id}/dado` });
+      }
+    }
+
+    /* ---------- a step that does not say where it acts ----------
+       With several screens open the same control can be on more than one of
+       them, so an action naming no view has not said what happens. The replay
+       reports it too, but only where a later Então drags it into the open — a
+       scenario whose last step is that action would pass with a warning. This
+       makes it a failure on its own, which is what the rule claims to be. */
+    if (multi()) for (const s of all){
+      if (cancelVerification) break;
+      (s.steps || []).forEach((st, i) => {
+        const spec = specOf(st);
+        const k = kindOf(st);
+        const fail = reason => {
+          bad++;
+          failures.push({ scen:s.name, tags:(s.tags || []).join(" "), stp:i + 1,
+            kw:k.kw, textStr:k.text, example:null, reason, link:`#${s.id}/${i + 1}` });
+        };
+        if (st.on && !viewById(st.on)){
+          fail(`o passo aponta para a vista "${st.on}", que não está declarada em views`);
+        } else if (spec && !spec.on){
+          fail(`o passo age mas não diz em qual vista — falta on:"`
+             + VIEWS.map(v => v.id).join('" / "') + `"`);
+        }
+      });
+    }
+
+    /* ---------- propagation: what the OTHER screens did ----------
+       The reason to have several views open at once is that an action on one
+       is meant to show up on another — and, just as often, is meant NOT to.
+       `propagates` names the views that must have changed because of a step;
+       `unchanged` names the ones that must not have. Neither can be said with
+       a single screen, and neither is a matter of opinion: the harness holds
+       both renderings and compares them. */
+    if (multi()) for (const s of all){
+      if (cancelVerification) break;
+      state.ctx = contextOf(s);
+      const stps = s.steps || [];
+      for (let i = 0; i < stps.length; i++){
+        const st = stps[i];
+        const wants = [].concat(st.propagates || []);
+        const holds = [].concat(st.unchanged || []);
+        if (!wants.length && !holds.length) continue;
+
+        const k = kindOf(st);
+        const fail = reason => {
+          bad++;
+          failures.push({ scen:s.name, tags:(s.tags || []).join(" "), stp:i + 1,
+            kw:k.kw, textStr:k.text, example:null, reason, link:`#${s.id}/${i + 1}` });
+        };
+
+        /* every row of an Esquema do Cenário, not just the first: a
+           propagation that only holds for one set of Exemplos is a
+           propagation that does not hold */
+        const rows = isOutline(s) ? s.examples.tableRows.map((_, ri) => ri) : [0];
+        for (const ri of rows){
+          const linha = isOutline(s) ? ` (${s.examples.tableRows[ri].join(" | ")})` : "";
+          let before = null, after = null, broke = null;
+          forcedWidth = sampleWidth(s, ri);
+          adjustProbe(probe);
+          try {
+            const b = await buildState(s, i - 1, ri);
+            before = snapshotViews(paint(probe, { app:b.app, ex:b.ex, scenario:s.id }));
+            const a2 = await buildState(s, i, ri);
+            after  = snapshotViews(paint(probe, { app:a2.app, ex:a2.ex, scenario:s.id }));
+          } catch (e){ broke = "quebrou ao desenhar: " + e.message; }
+          forcedWidth = null;
+
+          if (broke){ wants.concat(holds).forEach(() => fail(broke + linha)); continue; }
+
+          wants.forEach(id => {
+            if (!viewById(id)) return fail(`o passo declara propagates:"${id}", que não está declarada em views`);
+            if (before[id] !== after[id]) ok++;
+            else fail(`a vista "${id}" não mudou depois deste passo${linha} — `
+                    + `a propagação está declarada mas não acontece`);
+          });
+          holds.forEach(id => {
+            if (!viewById(id)) return fail(`o passo declara unchanged:"${id}", que não está declarada em views`);
+            if (before[id] === after[id]) ok++;
+            else fail(`a vista "${id}" mudou depois deste passo${linha} — `
+                    + `o passo declara que ela fica como está`);
+          });
+        }
       }
     }
 
@@ -2835,7 +3370,8 @@ const Proto = (() => {
          The earlier steps keep the suite's result, which judged each of
          them at its own moment. */
       if (i !== state.step){ delete results[s.id][i]; return; }
-      try { results[s.id][i] = !!st.check(state.app, el, state); }
+      const root = rootOf(liveRoots, el, st.on);
+      try { results[s.id][i] = root ? !!st.check(state.app, root, state) : false; }
       catch { results[s.id][i] = false; }
     });
     updatePill();
@@ -2864,8 +3400,24 @@ const Proto = (() => {
     return (w === d.w ? "" : "~") + d.id;
   }
 
+  /* With views declared the stage is not a device — it is the row of them.
+     Each frame keeps its device's true width (which is what every rule
+     measures) and the whole row is scaled to fit, exactly the way a single
+     frame already is. */
+  const VIEW_GAP = 20, VIEW_LABEL = 22;
+  function stageSize(){
+    if (!multi()) return vp();
+    let w = 0, h = 0;
+    VIEWS.forEach((v, i) => {
+      const d = viewWidth(v) || { w:380, h:780 };
+      w += d.w + (i ? VIEW_GAP : 0);
+      h = Math.max(h, d.h);
+    });
+    return { id:"palco", label:"palco", w, h: h + VIEW_LABEL };
+  }
+
   function fit(){
-    const v = vp(), frame = $("h-frame"), box = $("h-frame-box"), stage = $("h-stage");
+    const v = stageSize(), frame = $("h-frame"), box = $("h-frame-box"), stage = $("h-stage");
     if (!frame || !box || !stage) return;
 
     frame.style.width = v.w + "px";
@@ -2882,7 +3434,10 @@ const Proto = (() => {
     box.style.width  = Math.round(v.w * scale) + "px";
     box.style.height = Math.round(v.h * scale) + "px";
 
-    $("h-dims").innerHTML = `<b>${v.w}</b> × <b>${v.h}</b> · ${bpLabel(v.w)}`;
+    frame.classList.toggle("h-multi", multi());
+    $("h-dims").innerHTML = multi()
+      ? VIEWS.map(x => { const d = viewWidth(x) || {}; return `${x.label} <b>${d.w}</b>`; }).join(" · ")
+      : `<b>${v.w}</b> × <b>${v.h}</b> · ${bpLabel(v.w)}`;
     /* the selector mirrors the state, never a second source of truth: a link,
        a scenario and a click can all change the width, and all pass through
        here */
@@ -3140,7 +3695,8 @@ const Proto = (() => {
           const dot = waitingFor
             ? `<span class="h-spin sm"></span>`
             : (r != null ? `<span class="dot ${r ? "ok" : "bad"}">●</span>` : "");
-          html += stepRow(s, i, k.kw, k.key, k.text, ex, on && state.step === i, on && state.step > i, dot);
+          html += stepRow(s, i, k.kw, k.key, k.text, ex, on && state.step === i, on && state.step > i, dot,
+                          st.on);
         });
         html += `</div>`;
 
@@ -3177,10 +3733,13 @@ const Proto = (() => {
     }
   }
 
-  function stepRow(s, i, kw, key, text, ex, isOn, isDone, dot){
+  function stepRow(s, i, kw, key, text, ex, isOn, isDone, dot, onView){
+    const v = onView ? viewById(onView) : null;
+    const tag = multi() && onView
+      ? `<span class="h-step-vista">${esc(v ? v.label : onView)}</span>` : "";
     return `<button class="h-step k-${key}${isOn ? " on" : ""}${isDone ? " done" : ""}"`
       + ` data-scn="${esc(s.id)}" data-step="${i}">`
-      + `<span class="kw">${esc(kw)}</span><span>${substHtml(text, ex)}</span>${dot || "<span></span>"}`
+      + `<span class="kw">${esc(kw)}</span><span>${tag}${substHtml(text, ex)}</span>${dot || "<span></span>"}`
       + `</button>`;
   }
 
@@ -3189,8 +3748,8 @@ const Proto = (() => {
     const app = $("app");
     if (!app) return;
     try {
-      if (cfg.mount)       cfg.mount(app, state);
-      else if (cfg.render) app.innerHTML = cfg.render(state);
+      liveRoots = paint(app, null);
+      state.views = liveRoots;
     } catch (err){
       app.innerHTML = `<pre class="h-err"><b>O protótipo quebrou ao desenhar a tela.</b>`
         + esc(String(err && err.stack || err)) + `</pre>`;
@@ -3202,6 +3761,7 @@ const Proto = (() => {
     syncHash();
   }
 
+  let liveRoots = {};
   let monitorOpen = false, monitorSel = null;
 
   function paintMonitor(){
@@ -3266,11 +3826,24 @@ const Proto = (() => {
     if (!app) return;
     ["click","input","change","keydown","submit"].forEach(type => {
       app.addEventListener(type, ev => {
-        handlers.forEach(h => {
-          if (h.type !== type) return;
-          const el = ev.target.closest ? ev.target.closest(h.selector) : null;
-          if (el && app.contains(el)) h.fn(ev, el, state);
-        });
+        /* which view was touched: the handler then reads `state.view`, its
+           permissions answer for that view's actor, and the requests it
+           fires are that view's — not the whole bench's */
+        /* the size picker sits inside #app but belongs to the bench, not to
+           the screen: a prototype's change handler must not answer it */
+        if (ev.target.closest && ev.target.closest(".h-view-label")) return;
+        const cell = ev.target.closest ? ev.target.closest("[data-h-view]") : null;
+        const v = cell ? viewById(cell.getAttribute("data-h-view")) : null;
+        const prevActing = actingView, prevRendering = renderingView;
+        actingView = v ? v.id : null;
+        renderingView = v;
+        try {
+          handlers.forEach(h => {
+            if (h.type !== type) return;
+            const el = ev.target.closest ? ev.target.closest(h.selector) : null;
+            if (el && app.contains(el)) h.fn(ev, el, state);
+          });
+        } finally { actingView = prevActing; renderingView = prevRendering; }
       });
     });
   }
@@ -3290,6 +3863,7 @@ const Proto = (() => {
     state.ctx = clone(initial.ctx);
     userCtx = clone(state.ctx);
     state.viewport = initial.viewport;
+    state.viewSizes = {};        /* back to the devices the views declare */
     state.zoom = initial.zoom;
     state.landscape = false;
     state.example = 0;
@@ -3350,6 +3924,11 @@ const Proto = (() => {
         else if (d.options.some(o => o.id === v)) state.ctx[d.id] = v;
       });
       if (prefs.viewport && VIEWPORTS.some(v => v.id === prefs.viewport)) state.viewport = prefs.viewport;
+      if (prefs.viewSizes && typeof prefs.viewSizes === "object"){
+        Object.keys(prefs.viewSizes).forEach(k => {
+          if (VIEWPORTS.some(v => v.id === prefs.viewSizes[k])) state.viewSizes[k] = prefs.viewSizes[k];
+        });
+      }
       if (prefs.zoom) state.zoom = prefs.zoom;
       if (prefs.sidebar) state.sidebar = Math.max(288, Number(prefs.sidebar) || 288);
       ensureVisibleScenario();
@@ -3358,6 +3937,30 @@ const Proto = (() => {
     if (cfg.widths && cfg.widths.length){
       LADDER = cfg.widths.map(d => ({ ...d, level:true }));
       VIEWPORTS = LADDER.concat(DEVICES);
+    }
+
+    /* the views come after the ladder: they borrow their widths from it */
+    VIEWS = normalizeViews(cfg.views);
+    if (multi()){
+      const noWidth = VIEWS.filter(v => !viewWidth(v));
+      if (noWidth.length){
+        /* a view with no width cannot be drawn, and drawing it at some
+           default would measure a device nobody declared */
+        window.PROTO_LOAD_ERROR = "vista sem largura: "
+          + noWidth.map(v => `"${v.id}"`).join(", ")
+          + ` — declare viewport (${VIEWPORTS.map(x => x.id).join(", ")}) ou w/h`;
+        VIEWS = [];
+      }
+    }
+    /* With views on the bench there is no single viewport to pick: the stage
+       is the sum of the views, and each one carries its own device — swapped
+       from the picker above that view. A stage-wide selector here would show
+       a rung that describes nothing, so it goes, rather than sitting there
+       disabled with a stale number in it. */
+    if (multi()){
+      const selVp = $("h-vp"), rot = $("h-rotate");
+      if (selVp) selVp.hidden = true;
+      if (rot) rot.hidden = true;
     }
     $("h-vp").innerHTML =
       `<optgroup label="Pontos de quebra">`

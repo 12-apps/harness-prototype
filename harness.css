@@ -500,3 +500,16 @@
   padding:3px 7px;background:var(--h-panel-2);border:1px solid var(--h-line-2);border-radius:6px;
 }
 .h-spec-dl .h-btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* Several views on the stage: the frame stops being a device and becomes the
+   row that holds them, so the phone chrome belongs to each view, not here. */
+.h-frame.h-multi{
+  background:transparent;box-shadow:none;border-radius:0;overflow:visible;
+}
+
+/* which screen a step acts on, in the scenario bar */
+.h-step-vista{
+  display:inline-block;margin-right:6px;padding:1px 5px;border-radius:4px;
+  background:#232936;color:#9aa3b5;font:600 9px/1.5 var(--h-sans);
+  letter-spacing:.06em;text-transform:uppercase;vertical-align:1px;
+}

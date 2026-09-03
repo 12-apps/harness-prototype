@@ -104,6 +104,58 @@ The wiring joins up at both ends, and both ends are checked:
 Proto.on("click", '[data-act="save"]', …)        {/* answers it */}
 ```
 
+## More than one screen at a time
+
+Some flows need two people. Someone orders, someone else prepares it, and each
+has to see what the other did — a single screen cannot specify that, because
+the whole behaviour is what happens on the *other* one.
+
+`views` declares them. How many and who they are is the product's business:
+
+```js
+Proto.init({
+  views:[
+    { id:"cliente", label:"Cliente", actor:"cliente", viewport:"se"   },
+    { id:"cozinha", label:"Cozinha", actor:"cozinha", viewport:"ipad" }
+  ],
+  ...
+})
+```
+
+**Your prototype still renders ONE screen.** It never lays out a stage and
+never knows the others exist: the harness calls `mount` once per view, each in
+a frame the width of that view's device, and `state.view` says which one it is
+asking for. `state.can(…)` then answers for that view's `actor`, and
+`state.waitingFor()` for that view's own requests.
+
+That is what keeps every rule on this page applying: **a view is an ordinary
+screen**, so each one is walked across the whole width ladder, owes its own
+arrangement, its own touch targets, its own `@carregando` / `@vazio` / `@erro`,
+and its own wiring. Three views owe three of everything. `views` multiplies the
+specification; it is not a way out of any of it.
+
+With views declared:
+
+- **a step says where it acts** — `on:"cozinha"` beside the `click`. An action
+  without it is refused: two screens are open and the same control can be on
+  both. The `.feature` carries the addressee, so the export reads as a script
+  with parts;
+- **an assertion reads one screen** — `on:"cliente"` scopes `el` to that view;
+  `state.views.cozinha` reaches another, which is how one `Então` says *the
+  customer saw it and the kitchen did not move*;
+- **the choreography is declared** — `propagates:["cliente"]` names the views a
+  step must change, `unchanged:["cozinha"]` the ones it must not. The harness
+  compares the renderings before and after. A prototype with several views and
+  no such step is warned: what one screen's action does to the others is
+  exactly the part that needed specifying.
+
+On the bench each view carries a picker above its frame, for looking at the
+same screen on another device. It never reaches the suite: verification and the
+audit always measure the device the view **declares**.
+
+Leaving `views` out changes nothing anywhere — a one-screen prototype takes the
+same path it always did.
+
 ## What the specification owes itself
 
 Beyond the components — the full list is in `docs/project-instructions.md`:
