@@ -149,6 +149,34 @@ With views declared:
   no such step is warned: what one screen's action does to the others is
   exactly the part that needed specifying.
 
+### The data is live, and nobody re-reads by hand
+
+A screen says what it **watches**, and the harness owns the copy:
+
+```js
+{ id:"cliente", viewport:"se", watches:{ comanda:"GET /api/comandas/7" } }
+```
+
+`s.data.comanda` is what the server last said; `s.dataError.comanda` is why it
+could not be read. **A write anywhere invalidates, every screen watching a
+touched query re-reads, and every view holding it redraws** — none of that is
+in your file. A route may narrow what it disturbs with `invalidates:["fila"]`;
+saying nothing invalidates everything.
+
+That is what makes `app` mean what it should: **this screen's local state** —
+the half-typed form, the open tab — never a copy of the server. And it is why
+no handler fetches on another device's behalf, which no real device can do.
+
+The four states fall out of the subscription instead of a flag:
+`undefined` is still loading, `dataError` is the error, empty is empty.
+`Proto.refresh("fila")` is pull-to-refresh — the only read you write by hand.
+
+**Writing is not the same as being told.** A route held open
+(`network:{ "GET /api/x":"pendente" }`) is a subscription, and a `waitFor` step
+is the server answering it. Pairing `unchanged:[…]` on the write with
+`propagates:[…]` on the release is how a prototype specifies that the other
+screens learn by push rather than by magic.
+
 On the bench each view carries a picker above its frame, for looking at the
 same screen on another device. It never reaches the suite: verification and the
 audit always measure the device the view **declares**.

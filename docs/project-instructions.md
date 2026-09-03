@@ -279,6 +279,72 @@ There is no stage-wide viewport selector when views are declared. The stage is
 the sum of the views and no single rung describes it, so rather than show a
 number that means nothing, the selector is not there.
 
+### The data is live
+
+`data_` was always one source of truth for the server. What was not one was the
+client: every screen kept its own copy inside `app`, and somebody had to
+remember to re-read it — which is how a kitchen's handler ends up fetching the
+customer's comanda, something no real device can do for another.
+
+So a screen declares what it watches, and the harness owns the copy:
+
+```js
+views:[
+  { id:"cliente", viewport:"se",   watches:{ comanda:"GET /api/comandas/7" } },
+  { id:"cozinha", viewport:"ipad", watches:{ fila:"GET /api/cozinha/fila"   } }
+]
+```
+
+A view sees only the names it declares — `s.data.comanda`, and
+`s.dataError.comanda` when the read failed. A screen that forgets to subscribe
+goes stale, and the gate says so rather than the person noticing later.
+
+**Every write invalidates and every watcher re-reads.** A route narrows what it
+disturbs with `invalidates:["fila"]`; saying nothing invalidates everything,
+which is the safe direction to be wrong in. The re-read goes through the same
+interceptor as everything else, so it appears in the monitor and in `api.md` as
+the request it really is.
+
+`app` goes back to meaning this screen's own state: a draft, a selection, an
+open panel. If it holds a copy of something a route returns, it is stale and
+the layer should be holding it instead.
+
+The four states come from the subscription rather than a flag:
+
+```js
+function estadoDe(valor, erro, hasContent){
+  return erro                ? "erro"
+       : valor === undefined ? "carregando"
+       : !hasContent         ? "vazio"
+       :                       "conteudo";
+}
+```
+
+`Proto.refresh("fila")` re-reads by hand — pull to refresh, a real control.
+Everything else re-reads because something was written.
+
+### Writing is not the same as being told
+
+A route held open is a subscription:
+
+```js
+network:{ "GET /api/comandas/:id":"pendente" }
+```
+
+The screen has asked and the server has not answered, which is exactly the
+loading state; a `waitFor` step is the server answering. That distinction is
+worth specifying, because it is the expensive part for whoever implements this:
+
+```js
+{ when:"a cozinha inicia", on:"cozinha", click:'[data-act="iniciar"]',
+  unchanged:["cliente"] },            // writing moves the server, not a screen
+{ when:"o servidor avisa o cliente", waitFor:"GET /api/comandas/:id",
+  propagates:["cliente"] }            // only being told moves one
+```
+
+Without that pair the `.feature` says the customer's screen changed without
+saying how the customer learned — and how they learn is the whole question.
+
 ### The step says where it acts
 
 ```js

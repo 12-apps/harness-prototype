@@ -25,10 +25,20 @@ const ORDEM = ["recebido", "preparando", "pronto", "entregue"];
 
 window.PROTO_ROUTES = [
   { httpMethod:"GET", pathStr:"/api/comandas/:id", onLoad:true,
+    /* no comanda is not a failure: the table simply has not ordered yet, and
+       the screen owes an empty state rather than an error */
     responds: ({ params, data_ }) => {
       const c = data_.comandas[params.id];
-      if (!c) throw new Error("comanda não encontrada");
-      return JSON.parse(JSON.stringify(c));
+      return c ? JSON.parse(JSON.stringify(c)) : null;
+    } },
+
+  { httpMethod:"POST", pathStr:"/api/comandas",
+    responds: ({ payload, data_ }) => {
+      const id = String((payload && payload.mesa) || 7);
+      data_.comandas[id] = { id, mesa:"Mesa " + id, status:"recebido",
+        itens:[{ id:"i1", nameStr:"Pizza margherita", qtd:1 },
+               { id:"i2", nameStr:"Suco de laranja",  qtd:2 }] };
+      return JSON.parse(JSON.stringify(data_.comandas[id]));
     } },
 
   { httpMethod:"GET", pathStr:"/api/cozinha/fila", onLoad:true,
