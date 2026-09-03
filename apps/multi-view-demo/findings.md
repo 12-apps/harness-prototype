@@ -38,10 +38,35 @@ by giving the kitchen a separate "Entregues" lane and the gate says
 through the same routes, so the shared fixture *is* the propagation — the
 handlers just re-read after a write.
 
-## What it still does by hand
+## The data is live, and no handler re-reads
 
-`app` is one state object, so the per-view error fields (`erroCliente`,
-`erroGarcom`, `erroCozinha`) are held by hand: one `error_` cannot say *the
-customer's screen is down and the kitchen's is fine*. `waitingFor()` is per view
-in the harness, but which view an error belongs to is the prototype's own
-bookkeeping.
+Each view declares what it watches:
+
+```js
+{ id:"cliente", viewport:"se", watches:{ comanda:"GET /api/comandas/7" } }
+```
+
+Then look at what the handlers do — `mudarStatus` writes and stops. It does not
+re-read the comanda, the fila or the salão, because on real devices the kitchen
+cannot fetch on the customer's behalf. The write invalidates, every screen
+watching a touched query re-reads, every view holding it redraws. `app` holds
+only `writeError`, which is genuinely this screen's own.
+
+Break it and the gate says so: give the status route `invalidates:["nada"]` and
+you get `a vista "cliente" não mudou depois deste passo`; delete a view's
+`watches` and its screen goes stale for the rest of the journey.
+
+**"As três telas esperando cada uma a sua resposta"** is the scenario worth
+reading. All three subscriptions are held open, they arrive one at a time, and
+then:
+
+```js
+{ when:"a cozinha inicia o preparo", on:"cozinha", click:'[data-act="iniciar"]',
+  unchanged:["cliente","garcom","cozinha"] },
+{ when:"o servidor avisa as três telas", waitFor:true,
+  propagates:["cliente","garcom","cozinha"] }
+```
+
+Writing moves the *server*; it moves nobody's screen — not even the one that
+wrote. Only being told does. That pair is what stops the specification from
+saying "the other screens change" while staying silent on how they find out.

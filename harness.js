@@ -278,7 +278,10 @@ const Proto = (() => {
       const id = String(v.id || v.identifier || ("vista" + (i + 1)));
       return { id, label: v.label || id, actor: v.actor || v.papel || null,
                viewport: v.viewport || v.aparelho || null,
-               w: Number(v.w) || 0, h: Number(v.h) || 0 };
+               w: Number(v.w) || 0, h: Number(v.h) || 0,
+               /* what this screen subscribes to — dropping it here was how a
+                  view ended up watching nothing while saying it did */
+               watches: v.watches || v.assina || null };
     });
   }
 
@@ -386,6 +389,12 @@ const Proto = (() => {
     /* is a request in flight right now? AsyncStateContainer uses this to show
        the loading state without the prototype hand-managing a flag */
     waitingFor(){ return network.inFlightScreen > 0; },
+    /* What the server says, for the view being drawn — only the names that
+       view declares it watches, so a screen that forgot to subscribe stays
+       stale and the gate notices instead of the person. Live: a write
+       anywhere re-reads these and redraws every view holding them. */
+    get data(){ return dataFor(renderingView).data; },
+    get dataError(){ return dataFor(renderingView).dataError; },
     /* which view is being drawn. With no views declared this is null and the
        prototype never has to ask. */
     get view(){ return renderingView ? renderingView.id : null; },
@@ -654,11 +663,14 @@ const Proto = (() => {
                and width of the bench. Re-stamp them here, or every view draws
                as the first one and measures at somebody else's width. */
             const w = currentWidth();
+            const d = dataFor(v);
             shown.view      = v.id;
             shown.viewLabel = v.label;
             shown.actor     = v.actor;
             shown.rung      = rungOf(w.w).id;
             shown.widthPx   = w.w;
+            shown.data      = d.data;
+            shown.dataError = d.dataError;
             shown.can       = perm => can(perm, v.actor);
             shown.waitingFor = () => waitingForView(v.id);
           }
@@ -1112,6 +1124,10 @@ const Proto = (() => {
           const r = found.route.responds(ctx);
           const reg = register(200, "", payload, r === undefined ? null : r);
           if (writes && before === JSON.stringify(cfg.data_)) reg.didNotPersist = true;
+          /* a write moved the server, so every watch that covers it is now a
+             stale copy — this is the whole of the synchronisation, and no
+             prototype has to remember it */
+          if (writes){ markStale(found.route); scheduleSettle(); }
           return resposta(200, r === undefined ? null : r);
         } catch (e){
           register(500, e.message, payload, { error_:e.message });
@@ -1186,6 +1202,20 @@ const Proto = (() => {
     return (network.byView[id] || 0) > 0 || network.loose > 0;
   }
 
+  /* On the bench the re-read happens on its own, a tick after the write, and
+     every view holding that query redraws with it. During a replay the calls
+     below are awaited in order instead, so the suite stays deterministic. */
+  let settleTimer = null;
+  function scheduleSettle(){
+    if (verifying || replaying) return;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(async () => {
+      if (verifying || replaying) return;
+      const moved = await settleQueries();
+      if (moved && didRender) render();
+    }, 0);
+  }
+
   /* redraws when a request starts or ends: this is what makes the skeleton
      appear while the response has not arrived */
   let networkTimer = null;
@@ -1247,6 +1277,123 @@ const Proto = (() => {
       throw e;
     }
     return data_;
+  }
+
+  /* ---------- the query layer ----------
+     `data_` is the server and has always been one source of truth. What was
+     not one was the CLIENT: every screen kept its own copy inside `app`, and
+     somebody had to remember to re-read it. That is why a kitchen's handler
+     ended up fetching the customer's comanda — one device doing another
+     device's reading, which is not something any real product can do.
+
+     So a view declares what it WATCHES, and the harness owns the copy:
+
+         views:[
+           { id:"cliente", watches:{ comanda:"GET /api/comandas/7" } },
+           { id:"cozinha", watches:{ fila:"GET /api/cozinha/fila"   } }
+         ]
+
+     Every write invalidates, every watch re-reads, every view that holds one
+     redraws — without a line of it in the prototype. `app` goes back to
+     meaning what it should have meant all along: this screen's local state,
+     the half-typed form and the open tab, not a stale photograph of the
+     server.
+
+     A route may narrow what it disturbs with `invalidates:["fila"]`; saying
+     nothing invalidates everything, which is the safe direction to be wrong
+     in. */
+  let queries = {};        /* name -> the value the server last gave */
+  let queryErrors = {};    /* name -> why it could not be read */
+  let staleAll = false;
+  const staleNames = new Set();
+
+  function watchList(){
+    const out = [], seen = new Set();
+    const add = (nameStr, spec) => {
+      if (seen.has(nameStr)) return;
+      seen.add(nameStr);
+      const m = /^\s*(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s*$/i.exec(String(spec));
+      out.push(m ? { nameStr, httpMethod:m[1].toUpperCase(), pathStr:m[2] }
+                 : { nameStr, httpMethod:"GET", pathStr:String(spec) });
+    };
+    VIEWS.forEach(v => Object.keys(v.watches || {}).forEach(n => add(n, v.watches[n])));
+    Object.keys(cfg.watches || {}).forEach(n => add(n, cfg.watches[n]));
+    return out;
+  }
+
+  function watching(){ return watchList().length > 0; }
+
+  /* Reads go through the same interceptor as everything else, so a watch
+     shows up in the monitor and in api.md as the request it really is —
+     the specification says the screen re-read, and says which route. */
+  async function runWatches(only){
+    for (const q of watchList()){
+      if (only && !only.has(q.nameStr)) continue;
+      /* A route the scenario is holding open never answers until a `waitFor`
+         releases it, so awaiting it here would hang the whole replay. Fire it
+         and leave: the value lands when the step lets the server speak, which
+         is exactly what a subscription looks like. Until then the name reads
+         undefined — the screen's loading state. */
+      if (heldOpen(q.httpMethod, q.pathStr)){
+        request(q.httpMethod, q.pathStr)
+          .then(v => { queries[q.nameStr] = v; delete queryErrors[q.nameStr]; })
+          .catch(e => { queryErrors[q.nameStr] = e.message; });
+        continue;
+      }
+      try {
+        queries[q.nameStr] = await request(q.httpMethod, q.pathStr);
+        delete queryErrors[q.nameStr];
+      } catch (e){
+        queryErrors[q.nameStr] = e.message;
+      }
+    }
+  }
+
+  function heldOpen(httpMethod, pathStr){
+    const direct = network.failures[httpMethod + " " + pathStr];
+    if (direct === "pendente") return true;
+    const found = findRoute(httpMethod, pathStr);
+    return !!found && network.failures[httpMethod + " " + found.route.pathStr] === "pendente";
+  }
+
+  /* Pull to refresh: a real control on a real screen, and the only way a
+     prototype asks for a re-read by hand. Everything else re-reads because
+     something was written. */
+  async function refresh(...names){
+    const flat = names.flat().filter(Boolean);
+    await runWatches(flat.length ? new Set(flat) : null);
+    if (!verifying && !replaying && didRender) render();
+  }
+
+  function markStale(route){
+    const inv = route && (route.invalidates || route.invalida);
+    if (Array.isArray(inv) && inv.length) inv.forEach(n => staleNames.add(n));
+    else staleAll = true;
+  }
+
+  async function settleQueries(){
+    if (!staleAll && !staleNames.size) return false;
+    const only = staleAll ? null : new Set(staleNames);
+    staleAll = false; staleNames.clear();
+    await runWatches(only);
+    return true;
+  }
+
+  function resetQueries(){
+    queries = {}; queryErrors = {};
+    staleAll = false; staleNames.clear();
+  }
+
+  /* what a given view is allowed to see: only what it says it watches, so a
+     screen that forgot to subscribe goes stale and the gate notices */
+  function dataFor(v){
+    const out = { data:{}, dataError:{} };
+    const w = v ? (v.watches || {}) : (cfg.watches || {});
+    Object.keys(w).forEach(n => {
+      out.data[n] = queries[n];
+      if (queryErrors[n] != null) out.dataError[n] = queryErrors[n];
+    });
+    return out;
   }
 
   /* Context and layout preferences survive a reload. On about:srcdoc
@@ -1675,6 +1822,9 @@ const Proto = (() => {
 
     const restore = c => {
       cfg.data_ = JSON.parse(c.data_);
+      queries = JSON.parse(c.queries);
+      queryErrors = JSON.parse(c.queryErrors);
+      staleAll = false; staleNames.clear();
       return { app: clone(c.app), errors_: c.errors_.slice(), orders: c.orders };
     };
 
@@ -1717,7 +1867,11 @@ const Proto = (() => {
       network.failures = typeof s.network === "function" ? (s.network(ex) || {}) : (s.network || {});
       network.origin = { scn:s.id, nameStr:s.name, stp:-1, kw:"Dado" };
       const beforeGiven = network.counter;
+      resetQueries();
+      /* the Dado runs first: it may seed the fixtures, and the watches have
+         to read the server as the scenario leaves it, not as the file did */
       app = typeof s.given.state === "function" ? await s.given.state(ex, api) : clone(s.given.state);
+      await runWatches();
       errors_ = [];
       baseOrders = network.counter - beforeGiven;
       start = 0;
@@ -1737,6 +1891,7 @@ const Proto = (() => {
         sandbox = { app: clone(app) };
         const r = await releaseStalled(st.waitFor === true ? null : st.waitFor);
         app = sandbox.app; sandbox = null;
+        await settleQueries();
         if (!r.n){
           errors_.push({ stp:i, error_:"não havia pedido parado para soltar em " + st.waitFor });
         } else if (typeof st.applyState === "function"){
@@ -1752,6 +1907,11 @@ const Proto = (() => {
       const spec = specOf(st);
       if (spec){
         const before = JSON.stringify(app);
+        /* the watches are part of what a step changes: a step whose whole
+           effect is that the screen re-read would otherwise look inert. The
+           rules about silent changes and `local:` still compare `app` alone —
+           they are about what the SCREEN did, not about what it re-read. */
+        const beforeAll = before + "\u0000" + JSON.stringify(queries);
         const repBefore = replaying;
         if (lastLive) replaying = false;   /* latency + loading */
         const cAntes = network.counter;
@@ -1759,8 +1919,9 @@ const Proto = (() => {
         app = r.app;
         if (r.error_) errors_.push({ stp:i, error_:r.error_ });
 
+        await settleQueries();
         if (lastLive) replaying = repBefore;
-        if (JSON.stringify(app) !== before) stateChanged.add(s.id + "|" + i);
+        if (JSON.stringify(app) + "\u0000" + JSON.stringify(queries) !== beforeAll) stateChanged.add(s.id + "|" + i);
         if (!st.local && !r.error_ && network.counter === cAntes && JSON.stringify(app) !== before){
           silentChanges.push({ scn:s.id, nameStr:s.name, stp:i, sel:spec.sel, kindName:spec.kindName });
         }
@@ -1804,7 +1965,9 @@ const Proto = (() => {
   }
 
   function instant(app, errors_, orders){
-    return { app: clone(app), data_: JSON.stringify(cfg.data_), errors_: errors_.slice(), orders };
+    return { app: clone(app), data_: JSON.stringify(cfg.data_),
+             queries: JSON.stringify(queries), queryErrors: JSON.stringify(queryErrors),
+             errors_: errors_.slice(), orders };
   }
 
   async function replay(){
@@ -2824,6 +2987,23 @@ const Proto = (() => {
       if (strays.length){
         warnings.push(`${strays.map(s => `"${s.name}"`).join(", ")}: passo com on:"…" `
           + `mas o protótipo não declara views — o on não aponta para nada`);
+      }
+    }
+
+    /* ---------- the query layer ---------- */
+    watchList().forEach(q => {
+      if (!findRoute(q.httpMethod, q.pathStr)){
+        warnings.push(`a assinatura "${q.nameStr}" observa ${q.httpMethod} ${q.pathStr}, `
+          + `que não é uma rota declarada`);
+      }
+    });
+    if (multi() && !watching()){
+      const writes = (cfg.routes || []).some(r =>
+        ["POST","PUT","PATCH","DELETE"].indexOf((r.httpMethod || "GET").toUpperCase()) > -1);
+      if (writes){
+        warnings.push(`várias vistas e nenhuma assina nada (watches) — cada tela está `
+          + `mantendo a própria cópia do servidor à mão, e alguém tem que lembrar de `
+          + `reler. Declare watches:{ nome:"GET /rota" } na vista e o harness relê sozinho`);
       }
     }
 
@@ -4411,7 +4591,7 @@ const Proto = (() => {
   }
 
   return { versionStr: VERSION,
-    init, on, set, render, goto, gherkin, apiContract, source, download, verifyAll, verify, report, api, network,
+    init, on, set, refresh, render, goto, gherkin, apiContract, source, download, verifyAll, verify, report, api, network,
     get verificationMode(){ return verificationMode; }, reset, fit, esc, state, VIEWPORTS };
 })();
 

@@ -30,7 +30,7 @@ const check = (label, cond, detail) => {
 
 /* One bench per case: a fresh window, so the config, the handlers and the
    fixtures of one case never reach the next. */
-async function bench(config){
+async function bench(config, wire){
   const dom = new JSDOM(`<!doctype html><html><body></body></html>`,
     { runScripts:"outside-only", pretendToBeVisual:true, url:"https://proto.test/" });
   const w = dom.window;
@@ -38,7 +38,8 @@ async function bench(config){
   w.Proto.init({ title:"teste", verifyOnOpen:false, resumeVerification:false, ...config });
   /* the control has to really do something, or every case below would pass
      for the wrong reason: nothing moved because nothing happened */
-  w.Proto.on("click", '[data-act="bump"]', async () => {
+  if (wire) wire(w);
+  else w.Proto.on("click", '[data-act="bump"]', async () => {
     const back = await w.Proto.api.post("/api/n", {});
     w.Proto.set({ n: back.n });
   });
@@ -173,6 +174,63 @@ const journey = extra => ({
     check("and does not blame the view next to it",
           !/p · B: ação:so-largo/.test(medido.warnings),
           "the other view was blamed for it too — the rules are reading the stage");
+  }
+
+  /* ---- the query layer: the harness owns the copy, not the prototype ----
+          A screen says what it watches; a write invalidates; every screen
+          holding that query re-reads. The point is that the handler below
+          does nothing but write — no screen fetches for another, because no
+          real device can. ---- */
+  {
+    const live = (assinaB, invalidates) => ({
+      views:[
+        { id:"a", label:"A", viewport:"xs", watches:{ n:"GET /api/n" } },
+        { id:"b", label:"B", viewport:"md", watches: assinaB ? { n:"GET /api/n" } : {} }
+      ],
+      data_:{ n:0 },
+      routes:[
+        { httpMethod:"GET",  pathStr:"/api/n", onLoad:true, responds:({ data_ }) => ({ n:data_.n }) },
+        { httpMethod:"POST", pathStr:"/api/n", invalidates,
+          responds:({ data_ }) => ({ n: ++data_.n }) }
+      ],
+      render: s => s.view === "a"
+        ? `<div data-estado="conteudo"><button data-act="bump">somar</button>`
+          + `<i>${s.data.n ? s.data.n.n : "?"}</i></div>`
+        : `<div data-estado="conteudo">${s.data.n ? s.data.n.n : "não assina"}</div>`,
+      scenarios:[{
+        id:"j", name:"jornada", page:"p", tags:["@feliz"],
+        given:{ text:"que as duas telas estão abertas", state:() => ({ page:"p" }) },
+        steps:[
+          { then:"A começa em zero", on:"a", check:(x, el) => /0/.test(el.textContent) },
+          { when:"A soma", on:"a", click:'[data-act="bump"]', propagates:["a","b"] },
+          { then:"A conta um", on:"a", check:(x, el) => /1/.test(el.textContent) }
+        ]
+      }]
+    });
+    /* writes, and nothing else — no re-reading, no Proto.set */
+    const soEscreve = w => w.Proto.on("click", '[data-act="bump"]',
+      () => w.Proto.api.post("/api/n", {}));
+
+    const sync = await bench(live(true), soEscreve);
+    check("a write re-reads every screen watching it, with no handler doing so",
+          sync.r.bad === 0, "failed: " + sync.reasons);
+
+    const naoAssina = await bench(live(false), soEscreve);
+    check("a screen that watches nothing stays where it was",
+          /a vista "b" não mudou/.test(naoAssina.reasons),
+          "the unsubscribed screen updated anyway: " + naoAssina.reasons);
+
+    const estreito = await bench(live(true, ["outra"]), soEscreve);
+    check("a route may narrow what it invalidates",
+          /a vista "b" não mudou/.test(estreito.reasons),
+          "invalidates: was ignored: " + estreito.reasons);
+
+    const rotaFalsa = await bench({ ...live(true),
+      views:[{ id:"a", label:"A", viewport:"xs", watches:{ n:"GET /api/nao-existe" } },
+             { id:"b", label:"B", viewport:"md", watches:{ n:"GET /api/n" } }] }, soEscreve);
+    check("warns about a watch on a route nobody declared",
+          /não é uma rota declarada/.test(rotaFalsa.warnings),
+          "not warned: " + rotaFalsa.warnings);
   }
 
   /* ---- and none of it fires on a prototype with one screen ---- */
