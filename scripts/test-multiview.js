@@ -157,7 +157,13 @@ const journey = extra => ({
     const seen = [];
     w.Proto.init({ title:"palco", verifyOnOpen:false, resumeVerification:false,
                    ...base(true), scenarios:[journey({})] });
-    w.Proto.on("click", '[data-act="bump"]', (e, el, st) => seen.push(st.view));
+    /* records which screen the click belonged to AND does the real work, so
+       the verification at the end of this block still has a journey to run */
+    w.Proto.on("click", '[data-act="bump"]', async (e, el, st) => {
+      seen.push(st.view);
+      const back = await w.Proto.api.post("/api/n", {});
+      w.Proto.set({ n: back.n });
+    });
     w.Proto.render();
 
     const cells = w.document.querySelectorAll("#app [data-h-view]");
@@ -180,6 +186,36 @@ const journey = extra => ({
     if (botao) botao.dispatchEvent(new w.MouseEvent("click", { bubbles:true }));
     check("a click belongs to the screen it happened on",
           seen.length === 1 && seen[0] === "a", "handler saw " + JSON.stringify(seen));
+
+    /* ---- swapping the device a view is shown on ---- */
+    const picker = w.document.querySelector('#app [data-h-view="a"] .h-view-vp');
+    check("offers a device picker above each view",
+          !!picker && picker.querySelectorAll("option").length > 1,
+          "no picker on the view");
+
+    const antes = seen.length;
+    picker.value = "ipad";
+    picker.dispatchEvent(new w.Event("change", { bubbles:true }));
+    const larguraA = w.document.querySelector('#app [data-h-view="a"] .h-view-frame').style.width;
+    check("swapping a view's device changes that view's width",
+          larguraA === "1024px", "got " + larguraA);
+    check("and leaves the other view where it was",
+          w.document.querySelector('#app [data-h-view="b"] .h-view-frame').style.width === "768px",
+          "the other view moved too");
+    w.Proto.fit();
+    check("the stage follows the swap",
+          w.document.getElementById("h-host").shadowRoot
+            .getElementById("h-frame").style.width === (1024 + 20 + 768) + "px",
+          "stage did not follow");
+    /* the picker is the bench's, not the screen's: a prototype handler must
+       not receive its change event */
+    check("the picker's own event never reaches the prototype",
+          seen.length === antes, "a prototype handler answered the picker");
+
+    /* ---- and none of that changes what is verified ---- */
+    const depois = await w.Proto.verifyAll();
+    check("swapping a device does not change what the gate measures",
+          depois.bad === 0, depois.bad + " failing after the swap");
   }
 
   console.log(failed

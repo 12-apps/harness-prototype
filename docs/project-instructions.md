@@ -219,6 +219,16 @@ states and its own wiring. Three views owe three of everything, and the audit
 says so by name — `a vista "Cozinha" da página "salao"…`. Declaring views
 multiplies what the specification owes; it is not a way out of any of it.
 
+Each view carries a picker above its frame, so you can look at the same screen
+on another device without touching the file — the customer's comanda on a
+tablet, say. That is the bench, not the specification: the suite and the audit
+always measure the device the view **declares**, or looking at something would
+quietly change what the gate approved. Resetar puts every view back on its own.
+
+There is no stage-wide viewport selector when views are declared. The stage is
+the sum of the views and no single rung describes it, so rather than show a
+number that means nothing, the selector is not there.
+
 ### The step says where it acts
 
 ```js

@@ -49,9 +49,20 @@ let H_ROOT = null;
     }
     .h-view{flex:0 0 auto;display:flex;flex-direction:column;gap:6px}
     .h-view-label{
+      display:flex;align-items:center;gap:8px;min-height:22px;
       font:600 10px/1.6 ui-sans-serif,system-ui,sans-serif;letter-spacing:.09em;
       text-transform:uppercase;color:#8b93a5;
     }
+    .h-view-name{white-space:nowrap}
+    /* the device this view is being shown on: the declared one until somebody
+       asks to see the same screen somewhere else */
+    .h-view-vp{
+      font:500 10px/1.4 ui-sans-serif,system-ui,sans-serif;letter-spacing:.04em;
+      text-transform:none;color:#c3cad8;background:#1b1f27;
+      border:1px solid #2f3643;border-radius:6px;padding:2px 4px;max-width:170px;
+    }
+    .h-view-vp:hover{border-color:#414a5b;color:#e8eaef}
+    .h-view-vp:focus-visible{outline:2px solid #5b7cfa;outline-offset:1px}
     .h-view-frame{
       background:#fff;border-radius:14px;overflow:auto;
       box-shadow:0 0 0 1px #313846,0 18px 44px rgba(0,0,0,.5);
@@ -273,12 +284,31 @@ const Proto = (() => {
 
   function viewById(id){ return VIEWS.find(v => v.id === id) || null; }
 
-  /* a view's own width — a named rung or device, or a raw size */
-  function viewWidth(v){
+  /* A view's width. What `views` declares is the device the specification is
+     about; `state.viewSizes` is the person at the bench asking to see that
+     same screen on another one — the audit still walks every view across the
+     whole ladder either way, so swapping here changes what you look at, never
+     what is verified. */
+  function declaredWidth(v){
     if (!v) return null;
     if (v.w) return { id: rungOf(v.w).id, w: v.w, h: v.h || 800 };
     const d = VIEWPORTS.find(x => x.id === v.viewport);
     return d ? { id: d.id, w: d.w, h: d.h } : null;
+  }
+
+  function viewWidth(v){
+    if (!v) return null;
+    /* The swap is the bench's, never the suite's. Verification and the audit
+       always measure the device the view DECLARES — otherwise looking at a
+       screen on another size would quietly change what the gate approved,
+       and the specification would be whatever was last picked from a
+       dropdown. */
+    const swap = !verifying && state.viewSizes && state.viewSizes[v.id];
+    if (swap){
+      const d = VIEWPORTS.find(x => x.id === swap);
+      if (d && !d.freeForm) return { id: d.id, w: d.w, h: d.h };
+    }
+    return declaredWidth(v);
   }
 
   /* which rung a width falls on: the largest rung it reaches */
@@ -349,6 +379,9 @@ const Proto = (() => {
     ctx:{},        /* dimensionId -> active id (string), or a list (flags) */
     app:{}, ex:null,
     viewport:"xs", landscape:false, zoom:"fit", sidebar:288,
+    /* viewId -> a viewport id, when the bench is showing that view on a
+       device other than the one it declares */
+    viewSizes:{},
 
     /* is a request in flight right now? AsyncStateContainer uses this to show
        the loading state without the prototype hand-managing a flag */
@@ -564,6 +597,40 @@ const Proto = (() => {
     try { return currentWidth(); } finally { renderingView = before; }
   }
 
+  /* The size picker that rides above each view on the bench. It is built for
+     the live stage only: a probe is what the rules measure, and chrome inside
+     one would be measured with the screen. */
+  function viewPicker(v){
+    const sel = document.createElement("select");
+    sel.className = "h-view-vp";
+    sel.setAttribute("aria-label", "Aparelho da vista " + v.label);
+    const declared = (declaredWidth(v) || {}).id;
+    const group = (label, list) => {
+      const g = document.createElement("optgroup");
+      g.label = label;
+      list.filter(d => !d.freeForm).forEach(d => {
+        const o = document.createElement("option");
+        o.value = d.id;
+        o.textContent = d.label + (d.id === declared ? " · declarado" : "");
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    };
+    group("Pontos de quebra", LADDER);
+    group("Aparelhos", DEVICES);
+    sel.value = (state.viewSizes && state.viewSizes[v.id]) || declared || "";
+    sel.addEventListener("change", ev => {
+      /* the declared device is not an override — picking it back clears one,
+         so the bench stops claiming a swap that is no longer there */
+      if (ev.target.value === declared) delete state.viewSizes[v.id];
+      else state.viewSizes[v.id] = ev.target.value;
+      savePrefs();
+      render();
+      fit();
+    });
+    return sel;
+  }
+
   function paint(host, extras, only){
     const draw = (el, v) => {
       const before = renderingView;
@@ -608,7 +675,11 @@ const Proto = (() => {
         cell.setAttribute("data-h-view", v.id);
         const tag = document.createElement("div");
         tag.className = "h-view-label";
-        tag.textContent = v.label;
+        const nome = document.createElement("span");
+        nome.className = "h-view-name";
+        nome.textContent = v.label;
+        tag.appendChild(nome);
+        if (host.id === "app") tag.appendChild(viewPicker(v));
         const frame = document.createElement("div");
         frame.className = "h-view-frame";
         cell.appendChild(tag);
@@ -616,6 +687,13 @@ const Proto = (() => {
         host.appendChild(cell);
       }
       const frame = cell.lastChild;
+      /* the picker mirrors the state, never a second source of truth: Resetar
+         and a restored preference both come through here */
+      const picker = cell.querySelector(".h-view-vp");
+      if (picker){
+        const want = (state.viewSizes && state.viewSizes[v.id]) || (declaredWidth(v) || {}).id || "";
+        if (picker.value !== want) picker.value = want;
+      }
       const w = widthFor(v);
       frame.style.width  = w.w + "px";
       frame.style.height = w.h + "px";
@@ -1171,7 +1249,8 @@ const Proto = (() => {
     if (!initial) return;
     try {
       localStorage.setItem(prefsKey(), JSON.stringify({
-        ctx: state.ctx, viewport: state.viewport, zoom: state.zoom, sidebar: state.sidebar
+        ctx: state.ctx, viewport: state.viewport, zoom: state.zoom, sidebar: state.sidebar,
+        viewSizes: state.viewSizes
       }));
     } catch {}
   }
@@ -3688,6 +3767,9 @@ const Proto = (() => {
         /* which view was touched: the handler then reads `state.view`, its
            permissions answer for that view's actor, and the requests it
            fires are that view's — not the whole bench's */
+        /* the size picker sits inside #app but belongs to the bench, not to
+           the screen: a prototype's change handler must not answer it */
+        if (ev.target.closest && ev.target.closest(".h-view-label")) return;
         const cell = ev.target.closest ? ev.target.closest("[data-h-view]") : null;
         const v = cell ? viewById(cell.getAttribute("data-h-view")) : null;
         const prevActing = actingView, prevRendering = renderingView;
@@ -3719,6 +3801,7 @@ const Proto = (() => {
     state.ctx = clone(initial.ctx);
     userCtx = clone(state.ctx);
     state.viewport = initial.viewport;
+    state.viewSizes = {};        /* back to the devices the views declare */
     state.zoom = initial.zoom;
     state.landscape = false;
     state.example = 0;
@@ -3779,6 +3862,11 @@ const Proto = (() => {
         else if (d.options.some(o => o.id === v)) state.ctx[d.id] = v;
       });
       if (prefs.viewport && VIEWPORTS.some(v => v.id === prefs.viewport)) state.viewport = prefs.viewport;
+      if (prefs.viewSizes && typeof prefs.viewSizes === "object"){
+        Object.keys(prefs.viewSizes).forEach(k => {
+          if (VIEWPORTS.some(v => v.id === prefs.viewSizes[k])) state.viewSizes[k] = prefs.viewSizes[k];
+        });
+      }
       if (prefs.zoom) state.zoom = prefs.zoom;
       if (prefs.sidebar) state.sidebar = Math.max(288, Number(prefs.sidebar) || 288);
       ensureVisibleScenario();
@@ -3802,12 +3890,15 @@ const Proto = (() => {
         VIEWS = [];
       }
     }
-    /* with views on the bench the stage is their sum, so the viewport picker
-       and the rotate button have nothing to act on */
+    /* With views on the bench there is no single viewport to pick: the stage
+       is the sum of the views, and each one carries its own device — swapped
+       from the picker above that view. A stage-wide selector here would show
+       a rung that describes nothing, so it goes, rather than sitting there
+       disabled with a stale number in it. */
     if (multi()){
       const selVp = $("h-vp"), rot = $("h-rotate");
-      if (selVp){ selVp.disabled = true; selVp.title = "cada vista traz a largura do seu aparelho"; }
-      if (rot){ rot.disabled = true; rot.title = "cada vista traz a largura do seu aparelho"; }
+      if (selVp) selVp.hidden = true;
+      if (rot) rot.hidden = true;
     }
     $("h-vp").innerHTML =
       `<optgroup label="Pontos de quebra">`

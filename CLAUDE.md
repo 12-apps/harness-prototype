@@ -149,6 +149,10 @@ With views declared:
   no such step is warned: what one screen's action does to the others is
   exactly the part that needed specifying.
 
+On the bench each view carries a picker above its frame, for looking at the
+same screen on another device. It never reaches the suite: verification and the
+audit always measure the device the view **declares**.
+
 Leaving `views` out changes nothing anywhere — a one-screen prototype takes the
 same path it always did.
 
