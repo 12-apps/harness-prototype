@@ -33,6 +33,10 @@
    match .h-shell, because it lives inside the shadow tree. */
 .h-shell{
   display:flex;flex-direction:column;height:100vh;position:relative;
+  /* a phone's 100vh is the page with the URL bar hidden, so the last rung
+     of the bench sits under it until you scroll; dvh is the height that is
+     actually on screen right now */
+  height:100dvh;
   background:var(--h-bg);color:var(--h-fg);
   font:13px/1.45 var(--h-sans);
   letter-spacing:normal;word-spacing:normal;text-transform:none;text-align:left;
@@ -397,6 +401,12 @@
 .h-falha{
   position:fixed;inset:0;z-index:60;background:#0b0d10;
   display:flex;align-items:center;justify-content:center;padding:28px;
+  /* fixed, so it sits outside the shell's safe-area padding: on a device
+     28px already clears most insets, and where it does not the report is
+     the last thing that may go under a notch. Resolves to 28px on a screen
+     with none. */
+  padding:max(28px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right))
+          max(28px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
 }
 .h-falha[hidden]{display:none}
 .h-falha-cx{width:min(860px,100%);display:flex;flex-direction:column;max-height:100%}
@@ -513,3 +523,207 @@
   background:#232936;color:#9aa3b5;font:600 9px/1.5 var(--h-sans);
   letter-spacing:.06em;text-transform:uppercase;vertical-align:1px;
 }
+
+/* ============================================================
+   O aparelho — a bancada em um telefone
+   ============================================================
+   The same chrome squeezed into 380px is not a phone version of
+   anything: the sidebar alone is 288 of them, and the top bar carries
+   eleven controls. So the bench changes shape instead of scaling down —
+   the scenario list becomes a drawer over the stage, the controls fold
+   into a row that opens on demand, and the journey gets a row of its
+   own, because a phone has no arrow keys to walk it with.
+
+   Everything here hangs off `[data-compacto]`, set by the harness from
+   the same media query. One switch: it also has to choose the default
+   viewport in JS, and a breakpoint written twice drifts.
+
+   The stage is the last thing to change shape. On a computer it is a
+   room with a screen standing in it; on a phone the device already is
+   the screen, so in device view the frame loses its padding, its corner
+   and its shadow and simply is the stage.
+   ============================================================ */
+
+/* on a computer these three are ordinary items of the bar, and the two
+   compact-only controls do not exist */
+.h-tools{display:contents}
+#h-menu,#h-more{display:none}
+.h-veu{display:none}
+.h-passos{display:none}
+.h-icone{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:38px;font-size:15px;line-height:1;
+}
+/* these two disclose a panel rather than toggle a setting, so they carry
+   aria-expanded — and the pressed look has to follow the attribute they
+   actually have */
+.h-icone[aria-expanded="true"]{
+  background:var(--h-accent);border-color:var(--h-accent);color:#fff;
+}
+
+/* The notch and the home bar are not drawing surface. Unconditional, not
+   compact-only: proto.html asks for viewport-fit=cover at every width, so
+   a tablet in landscape — wide enough for the computer's chrome, still a
+   device with rounded corners — would otherwise put the top bar under
+   them. On a screen with no insets every one of these resolves to 0, which
+   is what the box already had. */
+.h-shell{
+  padding:env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* a finger is not a mouse pointer: the bench asks 44px of every prototype
+   below sm (MIN_TOUCH_TARGET in harness.js), and owes its own chrome the
+   same number — not a nearby one */
+.h-shell[data-compacto] .h-btn,
+.h-shell[data-compacto] .h-sel,
+.h-shell[data-compacto] .h-linkin,
+.h-shell[data-compacto] .h-busca,
+.h-shell[data-compacto] .h-mini,
+.h-shell[data-compacto] .h-mon-trig,
+.h-shell[data-compacto] .h-seg button{min-height:44px;touch-action:manipulation}
+/* 16px is not a taste: a phone zooms the page into any field whose text is
+   smaller, and does not zoom back out. A search box that swallows the
+   layout on the first tap is worse than a search box with big text. */
+.h-shell[data-compacto] .h-linkin,
+.h-shell[data-compacto] .h-busca,
+.h-shell[data-compacto] .h-sel,
+.h-shell[data-compacto] textarea{font-size:16px}
+.h-shell[data-compacto] .h-icone{min-width:44px;min-height:44px;font-size:17px}
+
+.h-shell[data-compacto] .h-top{
+  flex-wrap:wrap;height:auto;min-height:56px;padding:6px 8px;gap:6px;
+  /* opened, the folded row is a menu, not the screen: it never takes more
+     than half the phone with it */
+  max-height:60dvh;overflow:auto;
+}
+.h-shell[data-compacto] #h-menu,
+.h-shell[data-compacto] #h-more{display:inline-flex}
+/* The title takes the leftover and nothing more — basis 0, so the four
+   things on the first row are 44 + 54 + 44 and whatever is left, and the
+   row can never overflow into a second one. It has to be basis and not
+   just shrink: flex wraps a line before it shrinks it, so an item whose
+   natural width is 167px pushes the ⋯ onto its own row and only then
+   discovers there was room. The suite's pill grows while it runs
+   ("verificando 41/68") and this is what absorbs it. */
+.h-shell[data-compacto] .h-brand{flex:1 1 0;min-width:0;overflow:hidden;font-size:12px}
+.h-shell[data-compacto] .h-brand em{
+  flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.h-shell[data-compacto] .h-pills{margin-left:auto;flex:0 0 auto;min-width:0}
+/* the size pill is the first thing to go: it says what the frame already
+   shows, and the row it is on has room for four things. Opened, it comes
+   back and the title goes instead — clipped to "Pr" it was neither a name
+   nor a decoration */
+.h-shell[data-compacto] .h-top:not([data-aberto]) #h-dims{display:none}
+.h-shell[data-compacto] .h-top[data-aberto] .h-brand{display:none}
+
+/* the folded row: a second line that appears when asked for */
+.h-shell[data-compacto] .h-tools{
+  display:flex;flex:1 0 100%;order:5;gap:6px;flex-wrap:wrap;align-items:center;
+}
+.h-shell[data-compacto] .h-right{flex:1 0 100%;order:6;margin-left:0;flex-wrap:wrap}
+.h-shell[data-compacto] .h-top:not([data-aberto]) .h-tools,
+.h-shell[data-compacto] .h-top:not([data-aberto]) .h-right{display:none}
+.h-shell[data-compacto] .h-linkin{flex:1 1 100%;max-width:none}
+.h-shell[data-compacto] .h-sel{flex:1 1 40%;min-width:0}
+
+/* the list, as a drawer over the stage. The containing block is declared
+   here and nowhere else: `position` on .h-body outside this block would
+   change how the computer's bench rasterises, and the computer's bench is
+   not what this section is for. */
+.h-shell[data-compacto] .h-body{position:relative}
+.h-shell[data-compacto] .h-side{
+  position:absolute;top:0;bottom:0;left:0;z-index:45;
+  width:min(86vw,340px);flex:0 0 auto;
+  box-shadow:24px 0 60px rgba(0,0,0,.55);
+}
+.h-shell[data-compacto] .h-resize{display:none}
+.h-shell[data-compacto] .h-veu{
+  display:block;position:absolute;inset:0;z-index:40;
+  background:rgba(6,8,11,.6);
+}
+.h-shell[data-compacto] .h-veu[hidden]{display:none}
+/* a scenario card is a tap target before it is a row of text */
+.h-shell[data-compacto] .h-scn-hd{min-height:46px}
+.h-shell[data-compacto] .h-step{min-height:44px;padding-top:9px;padding-bottom:9px}
+.h-shell[data-compacto] .h-chip,
+.h-shell[data-compacto] .h-multi-trig,
+.h-shell[data-compacto] .h-multi-opt,
+.h-shell[data-compacto] .h-grupo,
+.h-shell[data-compacto] .h-ex-row,
+.h-shell[data-compacto] .h-dimsel{min-height:44px}
+
+/* the stage */
+.h-shell[data-compacto] .h-stage{padding:10px}
+.h-shell[data-compacto] .h-stage[data-aparelho]{padding:0;background:var(--h-bg)}
+.h-shell[data-compacto] .h-stage[data-aparelho] .h-frame{
+  border-radius:0;box-shadow:none;
+}
+.h-shell[data-compacto] .h-mon{left:10px;bottom:10px;max-width:calc(100% - 20px)}
+
+/* which screen, when there are several: a row of devices does not fit on a
+   phone, so the bench shows one at a time and this switches. A row like the
+   journey's, for the same reason — it takes its height off the stage rather
+   than floating over the screen it is naming. */
+.h-vistas{display:none}
+.h-shell[data-compacto] .h-vistas{
+  display:flex;align-items:center;gap:6px;flex:0 0 auto;
+  padding:6px 8px;overflow-x:auto;
+  background:var(--h-panel);border-top:1px solid var(--h-line);
+}
+.h-shell[data-compacto] .h-vistas[hidden],
+.h-vistas[hidden]{display:none}
+.h-vista-bt{
+  flex:0 0 auto;min-height:44px;padding:6px 12px;border-radius:8px;
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  font:inherit;font-size:12px;white-space:nowrap;cursor:pointer;
+  touch-action:manipulation;
+}
+.h-vista-bt[aria-pressed="true"]{
+  background:var(--h-accent);border-color:var(--h-accent);color:#fff;font-weight:600;
+}
+
+/* the journey, as a row of its own: it takes its height off the stage
+   instead of floating over the prototype's own fixed footer */
+.h-shell[data-compacto] .h-passos{
+  display:flex;align-items:center;gap:8px;flex:0 0 auto;
+  padding:6px 8px;background:var(--h-panel);border-top:1px solid var(--h-line);
+}
+/* the compact rule outranks a bare [hidden], and paintSteps hides this row
+   whenever there is no scenario to walk — the starter template has none,
+   so without this the bench ships two live-looking chevrons with nothing
+   between them, which is the very defect the gate rejects in a prototype */
+.h-shell[data-compacto] .h-passos[hidden],
+.h-passos[hidden]{display:none}
+.h-passo-nm{
+  flex:1;min-width:0;min-height:44px;display:flex;flex-direction:column;
+  justify-content:center;gap:1px;
+  background:transparent;border:0;padding:4px 6px;border-radius:8px;
+  color:var(--h-fg-dim);font:inherit;text-align:left;cursor:pointer;
+  touch-action:manipulation;
+}
+.h-passo-nm b{
+  font-size:12px;font-weight:600;color:var(--h-fg);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.h-passo-nm span{font-size:10.5px;color:var(--h-fg-mute)}
+.h-passos .h-btn[disabled]{opacity:.35;cursor:not-allowed}
+
+/* the panels stop being two columns side by side */
+.h-shell[data-compacto] .h-spec{padding:10px}
+.h-shell[data-compacto] .h-spec-hd{flex-wrap:wrap;gap:6px}
+.h-shell[data-compacto] .h-spec-hd p{display:none}
+.h-shell[data-compacto] .h-spec-hd .h-right{margin-left:0;flex:1 0 100%}
+.h-shell[data-compacto] .h-dados-cols{flex-direction:column;gap:10px}
+.h-shell[data-compacto] .h-dados-col{min-height:34vh}
+.h-shell[data-compacto] .h-spec textarea{padding:10px}
+/* fixed, so the shell's own safe-area padding does not reach it — and it
+   is the one screen that has to stay readable in landscape, where the
+   notch eats a side rather than the top */
+.h-shell[data-compacto] .h-falha{
+  padding:calc(14px + env(safe-area-inset-top))
+          calc(14px + env(safe-area-inset-right))
+          calc(14px + env(safe-area-inset-bottom))
+          calc(14px + env(safe-area-inset-left));
+}
+.h-shell[data-compacto] .h-falha-cx textarea{min-height:34vh}

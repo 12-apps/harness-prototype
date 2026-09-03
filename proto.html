@@ -2,7 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover: on a phone the bench draws to the edges of the
+     screen, and the harness keeps its chrome out of the notch and the home
+     bar with env(safe-area-inset-*). Without cover the browser letterboxes
+     the page and the prototype never sees the real device width. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Proto</title>
 
 <!-- ============================================================

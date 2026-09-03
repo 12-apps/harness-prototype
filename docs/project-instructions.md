@@ -54,7 +54,7 @@ defines can reach your screen.
 The filled-in reference is [`apps/product-editor/`](../apps/product-editor/) — read
 it when you want the shape of real scenarios, routes and states.
 
-The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume) and a blocking failure screen.
+The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume), a blocking failure screen — and, on a phone, a bench that opens as the phone.
 
 ## The prototype is the specification
 
@@ -183,6 +183,56 @@ On top of that, verification measures, rung by rung:
 
 Prefer `@container` over `@media`: the frame is the container.
 
+## Opening it on a phone
+
+A prototype of a phone screen is reviewed on a phone sooner or later, and
+the bench that reviews it is not the same bench a computer needs. Open
+`proto.html?app=<name>` — or the exported single-file `.html`, which is the
+one that usually travels — on a handheld and the chrome changes shape:
+
+- the viewport opens at **Este aparelho**: the frame *is* the screen, 1:1,
+  edge to edge under the notch. What you touch is the real thing at the real
+  width, and the `@container` rules answer to it. A 380px frame drawn inside
+  a 390px screen is a picture of a phone shown on a phone;
+- the scenario bar becomes a drawer over the stage, and closes when you pick
+  something from it — the screen is what you came for;
+- the rest of the controls fold into a row that opens on **⋯**;
+- the journey gets a row of its own at the bottom — `‹ nome do cenário ·
+  passo 2 de 5 ›` — because a phone has no arrow keys, and stepping is the
+  bench's main interaction.
+
+Two switches, and they answer different questions. The **shape** of the
+chrome is the viewport alone — `max-width: 860px`, or short and coarse,
+which is what a phone on its side is and no computer is (current handsets
+are 874–956px wide in landscape, past any threshold a laptop window is also
+past). So a narrow window on a computer gets the phone bench, which is how
+you look at it without a phone. The **device view** asks for a coarse
+pointer as well: a narrow window keeps the rung the file declares, because
+a window is not a device. Neither switch reads the user agent.
+
+Who chose the width decides what may change it, and there are three
+answers. **Nobody** — the bench swaps it for the device when the shape
+becomes a phone's, and back to the declared rung when it stops being one,
+so rotating never strands you at a picture of a phone inside the phone.
+**The scenario** — an `Esquema do Cenário` with a `largura` column takes the
+frame to that width while you are on it, and gives it back when you leave.
+**The person** — a rung picked from the selector, or one carried in a link,
+is never taken back by either. Width is also the one saved preference a
+handheld does not inherit.
+
+A link is somebody saying *look at this one*, and it wins over all of that
+— when it carries a width. A link made on a phone in device view carries
+none, because the device view is that bench's default and the hash only
+records departures from it: the recipient gets the scenario and the step,
+at whatever width their own bench opens. Send `?viewport=xxs` (the selector
+puts it in the link) when the width is the point.
+
+Nothing about the specification changes, and the gate is not exposed to any
+of it: `verify.js` drives the page at a fixed 1400×1000 with an ordinary
+pointer, so it is never in phone form, and the in-page **Verificar** runs
+the suite in an iframe at least 1000px wide. What the gate reports never
+depends on what you happen to be holding.
+
 ## Several screens at once
 
 A flow that needs two people needs two screens open together: someone orders,
@@ -277,6 +327,23 @@ will read as changed every time and cannot be declared `unchanged`. And
 **a request fired after an `await` inside a handler loses its view**, so it
 counts as nobody's and every view shows its loading state; fire what a screen
 asks for at the top of the handler if that matters to you.
+
+### On a phone, one screen at a time
+
+A row of devices is the one arrangement a phone cannot hold: three of them at
+their true widths is about 1800px asked to be 390, and every screen arrives at
+a fifth of its size. So on a handheld the stage holds **one view**, at its own
+device's width, and a row of names under it switches between them.
+
+The step is what leads. `on:` already says which screen an action happens on,
+so walking the journey with `›` takes the stage to that screen as it goes — the
+export reads as a script with parts, and on a phone the bench plays it that
+way. Tapping a name overrides that until the next step names one.
+
+This is display and nothing else. Every view is still rendered, so `state.views`,
+`propagates` and `unchanged` see exactly what they always saw; the suite still
+measures each view at the device it declares, and a probe always draws all of
+them. What changes on a phone is which one you are looking at.
 
 Leaving `views` out changes nothing: a one-screen prototype takes exactly the
 path it always did.
