@@ -24,10 +24,16 @@ let H_ROOT = null;
 (function shell(){
   const DOC_CSS = `
     *,*::before,*::after{box-sizing:border-box}
+    /* a phone inflates text in narrow columns on its own, which would
+       redraw the very arrangement the width ladder exists to measure */
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     html,body{height:100%;margin:0}
-    body{background:#0b0d10;overflow:hidden}
+    /* the prototype scrolls inside the frame, so the page behind it must
+       not rubber-band or pull to refresh under the finger */
+    body{background:#0b0d10;overflow:hidden;overscroll-behavior:none}
     #app{
       width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
       container-type:inline-size;container-name:frame;
     }
     /* the off-screen probe verification measures: light DOM, like the mount,
@@ -56,25 +62,33 @@ let H_ROOT = null;
 
   /* a shadow root is a DocumentFragment: no insertAdjacentHTML on it */
   H_ROOT.innerHTML = `
-<div class="h-shell">
-  <header class="h-top">
+<div class="h-shell" id="h-shell">
+  <header class="h-top" id="h-top">
+    <button class="h-btn h-icone" id="h-menu" aria-pressed="true"
+            aria-label="Cenários" title="Cenários">☰</button>
+
     <span class="h-brand"><span class="h-dot"></span>Proto <em id="h-title">protótipo</em></span>
 
-    <select class="h-sel" id="h-vp" aria-label="Viewport"></select>
-    <select class="h-sel" id="h-zoomsel" aria-label="Escala">
-      <option value="fit" id="h-zoomfit">Ajustar</option>
-      <option value="100">100% · rolar</option>
-      <option value="75">75%</option>
-      <option value="50">50%</option>
-    </select>
+    <div class="h-tools" id="h-tools">
+      <select class="h-sel" id="h-vp" aria-label="Viewport"></select>
+      <select class="h-sel" id="h-zoomsel" aria-label="Escala">
+        <option value="fit" id="h-zoomfit">Ajustar</option>
+        <option value="100">100% · rolar</option>
+        <option value="75">75%</option>
+        <option value="50">50%</option>
+      </select>
 
-    <input class="h-linkin" id="h-linkin" spellcheck="false" autocomplete="off"
-           aria-label="Link do estado — cole um para ir até ele" placeholder="#cenario/passo">
+      <input class="h-linkin" id="h-linkin" spellcheck="false" autocomplete="off"
+             aria-label="Link do estado — cole um para ir até ele" placeholder="#cenario/passo">
+    </div>
 
     <div class="h-pills">
       <span class="h-pill" id="h-dims">—</span>
       <span class="h-pill" id="h-checks">—</span>
     </div>
+
+    <button class="h-btn h-icone" id="h-more" aria-expanded="false"
+            aria-label="Mais controles" title="Mais controles">⋯</button>
 
     <div class="h-right">
       <button class="h-btn" id="h-verify">Verificar</button>
@@ -102,6 +116,8 @@ let H_ROOT = null;
     <aside class="h-side" id="h-side"></aside>
     <div class="h-resize" id="h-resize" role="separator" aria-orientation="vertical"
          tabindex="0" title="Arraste para largura · duplo clique volta ao padrão"></div>
+
+    <div class="h-veu" id="h-veu" hidden></div>
 
     <main class="h-stage" id="h-stage">
       <div class="h-frame-box" id="h-frame-box">
@@ -160,6 +176,17 @@ let H_ROOT = null;
       </section>
     </main>
   </div>
+
+  <!-- A phone has no arrow keys, and the drawer that lists the steps covers
+       the screen it would be stepping through. Walking the journey is the
+       bench's main interaction, so on a phone it gets a row of its own —
+       a row, not an overlay: it takes its height off the stage instead of
+       sitting on top of the prototype's own fixed footer. -->
+  <nav class="h-passos" id="h-passos" hidden>
+    <button class="h-btn h-icone" id="h-passo-ant" aria-label="Passo anterior">‹</button>
+    <button class="h-passo-nm" id="h-passo-nm" aria-label="Cenários"></button>
+    <button class="h-btn h-icone" id="h-passo-prox" aria-label="Próximo passo">›</button>
+  </nav>
 </div>
 `;
 
@@ -188,7 +215,7 @@ let H_ROOT = null;
 const Proto = (() => {
   /* build stamp: lets you tell from the screen whether the open file is
      the newest one — hover over the Proto name */
-  const VERSION = "v3.7 · 2026-08-17 · primeira pintura imediata";
+  const VERSION = "v3.8 · 2026-09-03 · no telefone, o aparelho é a tela";
   /* ---------- breakpoint ladder ----------
      Naming the widths changes what you ask of the prototype: "works on
      mobile" is vague; "on xxs the primary action moves to the fixed
@@ -204,6 +231,12 @@ const Proto = (() => {
   ];
 
   const DEVICES = [
+    /* Not a market width: the one you are holding. On a phone the bench
+       opens here, because a 380px frame drawn inside a 390px screen is a
+       picture of a phone shown on a phone. `freeForm` makes it the stage;
+       `real` is what tells the chrome the stage has nothing left to be a
+       room around. */
+    { id:"aparelho", label:"Este aparelho",   w:0, h:0, freeForm:true, real:true },
     { id:"se",    label:"iPhone SE",          w:375,  h:667  },
     { id:"pro",   label:"iPhone 16 Pro Max",  w:440,  h:956  },
     { id:"mini",  label:"iPad Mini",          w:744,  h:1133 },
@@ -2844,6 +2877,15 @@ const Proto = (() => {
   /* ---------- medidas ---------- */
   const STAGE_PAD = 48;
 
+  /* The room around the frame. On a computer the stage is a room with a
+     screen standing in it; on a phone the device already is the screen, so
+     there is no room to leave — and a rung chosen by hand still gets a
+     margin, or you cannot tell the frame from the bench. */
+  function padFor(v){
+    if (!compactMode) return STAGE_PAD;
+    return v && v.real ? 0 : 20;
+  }
+
   function vp(){
     const v = VIEWPORTS.find(x => x.id === state.viewport) || VIEWPORTS[1];
     if (v.freeForm){
@@ -2851,9 +2893,14 @@ const Proto = (() => {
          viewport, which is the point of this option. Rotating does not
          apply. */
       const stage = $("h-stage");
+      const pad = padFor(v);
+      /* the floor keeps a mistaken measurement from collapsing the frame;
+         a real device is allowed to be short, because it is — a phone in
+         landscape has barely 300px left under the bar */
+      const floor = v.real ? 200 : 320;
       return { ...v,
-        w: Math.max(320, Math.round(((stage && stage.clientWidth)  || 1280) - STAGE_PAD)),
-        h: Math.max(320, Math.round(((stage && stage.clientHeight) ||  900) - STAGE_PAD)) };
+        w: Math.max(floor, Math.round(((stage && stage.clientWidth)  || 1280) - pad)),
+        h: Math.max(floor, Math.round(((stage && stage.clientHeight) ||  900) - pad)) };
     }
     return state.landscape ? { ...v, w:v.h, h:v.w } : v;
   }
@@ -2868,14 +2915,21 @@ const Proto = (() => {
     const v = vp(), frame = $("h-frame"), box = $("h-frame-box"), stage = $("h-stage");
     if (!frame || !box || !stage) return;
 
+    /* device view: no padding, no rounded corner, no shadow — the frame is
+       the screen, and a bezel drawn around it would only steal pixels from
+       the prototype. Announced on the stage so the CSS can follow. */
+    if (compactMode && v.real) stage.setAttribute("data-aparelho", "1");
+    else stage.removeAttribute("data-aparelho");
+
     frame.style.width = v.w + "px";
     frame.style.height = v.h + "px";
 
+    const pad = padFor(v);
     let scale;
     if (v.freeForm){
       scale = 1;                       /* the frame is already the size of the stage */
     } else if (state.zoom === "fit"){
-      scale = Math.min(1, (stage.clientWidth - STAGE_PAD) / v.w, (stage.clientHeight - STAGE_PAD) / v.h);
+      scale = Math.min(1, (stage.clientWidth - pad) / v.w, (stage.clientHeight - pad) / v.h);
     } else scale = Number(state.zoom) / 100;
 
     frame.style.transform = `scale(${scale})`;
@@ -2893,6 +2947,96 @@ const Proto = (() => {
       ? `Ajustar · ${Math.round(scale * 100)}%` : "Ajustar";
 
     if (initial) syncHash();
+  }
+
+  /* ---------- a bancada em um telefone ----------
+     The same chrome squeezed into 380px is not a phone version of
+     anything: the sidebar alone is 288 of them, and the top bar carries
+     eleven controls. So below a threshold the bench changes shape — the
+     scenario list becomes a drawer over the stage, the controls fold into
+     a row that opens on demand, and the journey gets a row of its own.
+
+     One switch, read from the viewport and mirrored onto the shell as an
+     attribute, because the same answer also has to pick the default
+     viewport in JS — two breakpoints, in the CSS and here, would drift. */
+  const COMPACT_MQ = "(max-width: 860px)";
+  let compactMode = false;   /* the chrome is in phone form */
+  let drawerOpen  = false;   /* compact: the scenario drawer over the stage */
+  let sideOpen    = true;    /* wide: the sidebar column */
+  let toolsOpen   = false;   /* compact: the folded row of controls */
+
+  function narrowNow(){
+    try { return matchMedia(COMPACT_MQ).matches; } catch { return false; }
+  }
+
+  /* A phone opening the file is not a computer looking at a phone. Coarse
+     pointer AND narrow, both: a touchscreen laptop is not a handheld, and
+     a narrow window on a computer is a window, not a device.
+
+     Never in the verification child: it runs in an iframe that is at
+     least 1000px wide, and a suite whose result depended on what the
+     person is holding would not be a suite. */
+  function handheld(){
+    if (window.__PROTO_CHILD) return false;
+    try { return matchMedia("(pointer: coarse)").matches && narrowNow(); }
+    catch { return false; }
+  }
+
+  function applyChrome(){
+    const shell = $("h-shell"), side = $("h-side"), grip = $("h-resize"),
+          veil = $("h-veu"), top = $("h-top");
+    if (!shell || !side) return;
+    if (compactMode) shell.setAttribute("data-compacto", "1");
+    else shell.removeAttribute("data-compacto");
+
+    const open = compactMode ? drawerOpen : sideOpen;
+    side.hidden = !open;
+    if (grip) grip.hidden = compactMode || !open;
+    if (veil) veil.hidden = !(compactMode && drawerOpen);
+    if (top){
+      if (compactMode && toolsOpen) top.setAttribute("data-aberto", "1");
+      else top.removeAttribute("data-aberto");
+    }
+    [$("h-flags"), $("h-menu")].forEach(b => b && b.setAttribute("aria-pressed", String(open)));
+    const more = $("h-more");
+    if (more) more.setAttribute("aria-expanded", String(compactMode && toolsOpen));
+    paintSteps();
+  }
+
+  /* the width changed (a rotation, a resized window): the shape may have to
+     change with it */
+  function syncCompact(){
+    const want = narrowNow();
+    if (want !== compactMode){
+      compactMode = want;
+      /* arriving on a phone, the screen is what you came for — not the list */
+      if (compactMode) drawerOpen = false;
+      else toolsOpen = false;
+    }
+    applyChrome();
+    fit();
+  }
+
+  /* the step row: where you are in the journey, and the two directions out
+     of it. Repainted from the sidebar build, so every path that repaints
+     the list repaints this too. */
+  function paintSteps(){
+    const bar = $("h-passos");
+    if (!bar) return;
+    const s = scnById(state.scenario);
+    bar.hidden = !compactMode || !s;
+    if (bar.hidden) return;
+
+    const total = (s.steps || []).length;
+    const at = state.step;
+    const prev = $("h-passo-ant"), next = $("h-passo-prox"), nameEl = $("h-passo-nm");
+    if (prev) prev.disabled = at < 0;
+    if (next) next.disabled = at >= total - 1;
+    if (nameEl){
+      nameEl.innerHTML = `<b>${esc(s.name || s.id)}</b><span>`
+        + (at < 0 ? (total ? "dado inicial" : "sem passos") : `passo ${at + 1} de ${total}`)
+        + `</span>`;
+    }
   }
 
   /* ---------- barra lateral ---------- */
@@ -3175,6 +3319,9 @@ const Proto = (() => {
       const i = $("h-busca");
       if (i){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
     }
+    /* the step row says the same thing as the list, to whoever cannot see
+       the list: every repaint of one is a repaint of the other */
+    paintSteps();
   }
 
   function stepRow(s, i, kw, key, text, ex, isOn, isDone, dot){
@@ -3294,6 +3441,10 @@ const Proto = (() => {
     state.landscape = false;
     state.example = 0;
     applySidebar(MIN_SIDEBAR);
+    /* the chrome goes back to how the file opens too: list showing on a
+       computer, screen showing on a phone */
+    sideOpen = true; drawerOpen = false; toolsOpen = false;
+    applyChrome();
     results = {}; suite = null; memo = new Map(); partial = null;
     $("h-vp").value = state.viewport;
     $("h-zoomsel").value = state.zoom;
@@ -3315,9 +3466,13 @@ const Proto = (() => {
     }
 
     $("h-title").textContent = cfg.title || "protótipo";
-    const mark = document.querySelector(".h-brand");
+    /* the chrome is in the shadow root: the document cannot see it */
+    const mark = H_ROOT && H_ROOT.querySelector(".h-brand");
     if (mark) mark.title = "harness " + VERSION;
     document.title = "Proto · " + (cfg.title || "protótipo");
+
+    /* the shape of the bench is decided before anything is measured */
+    compactMode = narrowNow();
 
     cfg.context.forEach(d => {
       state.ctx[d.id] = d.kind === "flags"
@@ -3327,6 +3482,14 @@ const Proto = (() => {
 
     if (cfg.viewport) state.viewport = cfg.viewport;
     if (cfg.zoom)     state.zoom     = String(cfg.zoom);
+
+    /* Opened on a phone, the bench opens AS the phone. The declared
+       viewport is an authoring default — it says which rung to draw on a
+       computer, and there is no reason to draw a 380px picture of a phone
+       on a 390px phone. It goes in before `initial` is captured, so Reset
+       comes back here and not to a frame inside the screen. */
+    const onDevice = handheld();
+    if (onDevice) state.viewport = "aparelho";
 
     const first = cfg.scenarios[0];
     state.scenario = cfg.initial || (first && first.id) || null;
@@ -3349,7 +3512,13 @@ const Proto = (() => {
         if (d.kind === "flags") state.ctx[d.id] = Array.isArray(v) ? v.filter(x => d.options.some(o => o.id === x)) : [];
         else if (d.options.some(o => o.id === v)) state.ctx[d.id] = v;
       });
-      if (prefs.viewport && VIEWPORTS.some(v => v.id === prefs.viewport)) state.viewport = prefs.viewport;
+      /* The width is the one preference a phone does not inherit. A rung
+         gets saved by simply walking an Esquema do Cenário with a `largura`
+         column, and restoring it on a handheld would open the bench at a
+         picture of a phone inside the phone — the very thing the device
+         view exists to stop. The person can still pick any rung from the
+         selector, and a shared link still wins over both. */
+      if (prefs.viewport && !onDevice && VIEWPORTS.some(v => v.id === prefs.viewport)) state.viewport = prefs.viewport;
       if (prefs.zoom) state.zoom = prefs.zoom;
       if (prefs.sidebar) state.sidebar = Math.max(288, Number(prefs.sidebar) || 288);
       ensureVisibleScenario();
@@ -3436,13 +3605,45 @@ const Proto = (() => {
       if (f) goto(f.id, f.step);
     });
 
-    $("h-flags").addEventListener("click", e => {
-      const side = $("h-side");
-      side.hidden = !side.hidden;
-      $("h-resize").hidden = side.hidden;
-      e.currentTarget.setAttribute("aria-pressed", String(!side.hidden));
+    /* One control, two shapes: a column you can hide on a computer, a
+       drawer over the stage on a phone — where the stage is all the room
+       there is. The ☰ in the compact bar and the Cenários button in the
+       folded row are the same switch. */
+    function toggleScenarios(){
+      if (compactMode) drawerOpen = !drawerOpen;
+      else sideOpen = !sideOpen;
+      applyChrome();
+      requestAnimationFrame(fit);
+    }
+    /* picking something in the drawer is asking to see it: the drawer
+       covers the very screen the choice was about */
+    function chose(){
+      if (!compactMode || !drawerOpen) return;
+      drawerOpen = false;
+      applyChrome();
+      requestAnimationFrame(fit);
+    }
+    $("h-flags").addEventListener("click", toggleScenarios);
+    $("h-menu").addEventListener("click", toggleScenarios);
+    $("h-veu").addEventListener("click", chose);
+
+    /* the folded controls: the bar keeps what tells you where you are, and
+       opens the rest when asked */
+    $("h-more").addEventListener("click", () => {
+      toolsOpen = !toolsOpen;
+      applyChrome();
       requestAnimationFrame(fit);
     });
+
+    $("h-passo-ant").addEventListener("click", () => {
+      const s = scnById(state.scenario);
+      if (s && state.step > -1) goto(s.id, state.step - 1, state.example);
+    });
+    $("h-passo-prox").addEventListener("click", () => {
+      const s = scnById(state.scenario);
+      if (s && state.step < (s.steps || []).length - 1) goto(s.id, state.step + 1, state.example);
+    });
+    $("h-passo-nm").addEventListener("click", toggleScenarios);
 
     /* link field: selects everything on focus (to copy), Enter to go */
     const inp = $("h-linkin");
@@ -3625,6 +3826,7 @@ const Proto = (() => {
         const s = scnById(fix.dataset.fix);
         applyFix(s);
         showHidden = false;
+        chose();
         goto(s.id, -1, 0);
         return;
       }
@@ -3640,15 +3842,15 @@ const Proto = (() => {
       if (chip){ setDimension(chip.dataset.dim, chip.dataset.opt, true); return; }
 
       const row = e.target.closest("[data-ex]");
-      if (row){ goto(row.dataset.scn, state.step, Number(row.dataset.ex)); return; }
+      if (row){ chose(); goto(row.dataset.scn, state.step, Number(row.dataset.ex)); return; }
 
       const step = e.target.closest("[data-step]");
-      if (step){ goto(step.dataset.scn, Number(step.dataset.step)); return; }
+      if (step){ chose(); goto(step.dataset.scn, Number(step.dataset.step)); return; }
 
       const hd = e.target.closest("[data-scn]");
       if (!hd) return;
       if (hd.dataset.scn === state.expanded){ state.expanded = null; render(); }
-      else goto(hd.dataset.scn, -1, 0);
+      else { chose(); goto(hd.dataset.scn, -1, 0); }
     });
 
     document.addEventListener("click", e => {
@@ -3750,7 +3952,31 @@ const Proto = (() => {
 
     setBarra(state.sidebar);
 
-    window.addEventListener("resize", () => { setBarra(state.sidebar); });
+    /* the width can change under the bench — a resized window, a phone
+       turned on its side, a keyboard pushing the viewport up — and the
+       shape of the chrome follows it, not just the frame inside it */
+    const onResize = () => { syncCompact(); setBarra(state.sidebar); };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", onResize);
+
+    /* The chrome also changes height without the window moving at all: the
+       status pill grows while the suite runs, the step row appears with the
+       first scenario, a phone slides its URL bar away. In device view the
+       frame IS the stage, so it follows that box rather than the window —
+       otherwise the frame keeps a height the stage no longer has and the
+       bottom of the prototype ends up under the bench. */
+    if (window.ResizeObserver){
+      let lastBox = "";
+      new ResizeObserver(() => {
+        const st = $("h-stage");
+        if (!st) return;
+        const now = st.clientWidth + "x" + st.clientHeight;
+        if (now === lastBox) return;      /* the frame inside it moved, not the box */
+        lastBox = now;
+        if (vp().freeForm) fit();
+      }).observe($("h-stage"));
+    }
     window.addEventListener("hashchange", () => {
       if (muteHash) return;
       if (applyHash()){ render(); fit(); }
@@ -3766,6 +3992,7 @@ const Proto = (() => {
        blank one. The earlier regression (a blank screen until the suite
        finished) was only possible because the first paint depended on an
        async path. */
+    applyChrome();
     buildSidebar();
     fit();
     const cameFromLink = applyHash();   /* reads BEFORE any write */

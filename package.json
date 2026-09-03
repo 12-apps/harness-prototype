@@ -1,6 +1,6 @@
 {
   "name": "proto-harness",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "Prototyping bench: the prototype is the specification, and the gate enforces it.",
   "bin": {
     "proto-verify": "./verify.js"

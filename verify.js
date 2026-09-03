@@ -224,11 +224,15 @@ function bundle(appDir, appName){
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${appName}</title>
 <!-- Self-contained prototype: bench, catalog and app in one file.
      Open it in a browser — nothing to install, nothing else to keep
-     alongside it. The editable form is the apps/${appName}/ folder. -->
+     alongside it. The editable form is the apps/${appName}/ folder.
+
+     This is also the file that gets opened on a phone, so it carries the
+     same viewport-fit=cover as proto.html: the harness draws to the edges
+     and keeps its own chrome out of the notch. -->
 <style data-harness-css>
 ${read(here("harness.css"))}
 </style>

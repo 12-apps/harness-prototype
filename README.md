@@ -95,6 +95,12 @@ so an agent can produce them without a browser.
 
 A width ladder (`xxs … xlg`), a scenario bar with search and grouping, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, `.feature` export, isolated verification in an iframe with automatic resume, and a blocking failure screen with a pasteable report.
 
+## On a phone, it opens as the phone
+
+The same file, opened on a handheld, is a different bench: the frame stops being a frame and becomes the screen — 1:1, edge to edge, so what you touch is the real width and the `@container` rules answer to it. The scenario bar becomes a drawer that closes when you pick from it, the controls fold into a row behind **⋯**, and the journey gets a row of its own at the bottom (`‹ cenário · passo 2 de 5 ›`), because a phone has no arrow keys.
+
+This travels with the handoff bundle: the `.html` is one file, so the phone that opens it gets the bench too. The switch is a coarse pointer and a narrow screen, never the user agent — and the computer's bench is unchanged, to the pixel. Details in [`docs/project-instructions.md`](docs/project-instructions.md#opening-it-on-a-phone).
+
 ## What it demands
 
 The gate rejects what a visual review does not catch:

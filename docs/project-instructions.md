@@ -54,7 +54,7 @@ defines can reach your screen.
 The filled-in reference is [`apps/product-editor/`](../apps/product-editor/) — read
 it when you want the shape of real scenarios, routes and states.
 
-The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume) and a blocking failure screen.
+The harness gives you: the width ladder, a resizable scenario bar with search, permalinks in the hash, saved preferences, a network monitor on the stage, a Data panel, Gherkin export, isolated verification in an iframe (with automatic resume), a blocking failure screen — and, on a phone, a bench that opens as the phone.
 
 ## The prototype is the specification
 
@@ -182,6 +182,38 @@ On top of that, verification measures, rung by rung:
 - **content that exists when wide and vanishes when narrow** — a decision, or a lack of room?
 
 Prefer `@container` over `@media`: the frame is the container.
+
+## Opening it on a phone
+
+A prototype of a phone screen is reviewed on a phone sooner or later, and
+the bench that reviews it is not the same bench a computer needs. Open
+`proto.html?app=<name>` — or the exported single-file `.html`, which is the
+one that usually travels — on a handheld and the chrome changes shape:
+
+- the viewport opens at **Este aparelho**: the frame *is* the screen, 1:1,
+  edge to edge under the notch. What you touch is the real thing at the real
+  width, and the `@container` rules answer to it. A 380px frame drawn inside
+  a 390px screen is a picture of a phone shown on a phone;
+- the scenario bar becomes a drawer over the stage, and closes when you pick
+  something from it — the screen is what you came for;
+- the rest of the controls fold into a row that opens on **⋯**;
+- the journey gets a row of its own at the bottom — `‹ nome do cenário ·
+  passo 2 de 5 ›` — because a phone has no arrow keys, and stepping is the
+  bench's main interaction.
+
+The switch is the viewport, never the user agent: a **coarse pointer and a
+narrow screen**, both. A narrow window on a computer gets the same chrome —
+which is how you look at it without a phone — but keeps the declared rung,
+because a window is not a device. Width is the one saved preference a
+handheld does not inherit: walking an `Esquema do Cenário` with a `largura`
+column saves a rung, and restoring that on a phone would open the bench at
+the picture again. A link still wins over both, because a link is somebody
+saying *look at this one*.
+
+Nothing about the specification changes. Picking a rung by hand still works
+there, an Examples row with a `largura` still takes the frame to that width,
+and verification still runs in an iframe at least 1000px wide — what the
+gate reports never depends on what you happen to be holding.
 
 ## Components — raw HTML is not allowed
 
