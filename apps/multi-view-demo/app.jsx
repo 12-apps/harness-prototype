@@ -90,7 +90,7 @@ function VistaCliente({ s }){
         <Badge className="situacao" data-situacao={c.status}>{PALAVRA.cliente[c.status]}</Badge>
         {c.itens.map(i => (
           <Box className="linha" key={i.id}>
-            <Text>{i.qtd}× {i.nameStr}</Text>
+            <Text className="item">{i.qtd}× {i.nameStr}</Text>
           </Box>
         ))}
       </Box>
@@ -127,7 +127,7 @@ function VistaGarcom({ s }){
         {lista.map(p => (
           <Card className="linha" key={p.id}>
             <CardContent>
-              <Text>{p.mesa}</Text>
+              <Text className="mesa">{p.mesa}</Text>
               <Badge className="situacao" data-situacao={p.status}>{PALAVRA.garcom[p.status]}</Badge>
               {p.status === "pronto" && (
                 <Button className="btn" data-act="entregar" data-id={p.id}>Entreguei na mesa</Button>
@@ -157,8 +157,8 @@ function Raia({ titulo, chave, estados, fila, acao, rotulo }){
       {cards.map(c => (
         <Card className="ficha" key={c.id}>
           <CardContent>
-            <Text>{c.mesa}</Text>
-            <Text>{c.itens} item(s)</Text>
+            <Text className="mesa">{c.mesa}</Text>
+            <Text className="qtd">{c.itens} item(s)</Text>
             {acao && <Button className="btn" data-act={acao} data-id={c.id}>{rotulo}</Button>}
           </CardContent>
         </Card>
