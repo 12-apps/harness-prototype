@@ -1,0 +1,50 @@
+/* Each view is an ordinary screen inside its own frame, and the frame is the
+   container — so these are the same @container rules any single-screen
+   prototype would write. Nothing here knows the other views exist, and
+   nothing here lays out a stage: the harness does that. */
+
+.vista {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.estado { display: grid; gap: 10px; min-width: 0; }
+.linha, .ficha { min-width: 0; }
+.situacao { justify-self: start; }
+.btn { min-height: 44px; }
+
+/* the comanda and the salão: one column on a small phone, two once there is
+   room for them side by side */
+@container frame (min-width: 480px) {
+  .vista.telefone .estado[data-estado="conteudo"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .vista.telefone .situacao { grid-column: 1 / -1; }
+}
+
+/* the pass: the lanes are the arrangement, and how many fit is the width's
+   decision — stacked on a phone, side by side on the screen at the pass */
+.quadro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.raia { display: grid; gap: 8px; align-content: start; min-width: 0; }
+
+@container frame (min-width: 480px) {
+  .quadro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container frame (min-width: 1024px) {
+  .quadro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* a refusal from the server belongs across the whole board, not in one lane */
+.aviso { grid-column: 1 / -1; }
+
+/* Each view is walked across the WHOLE ladder, so a phone screen still has to
+   behave when it is given 1440px: prose gets a measure, like anywhere else. */
+.vista p { max-width: 65ch; }

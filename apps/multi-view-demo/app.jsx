@@ -1,9 +1,15 @@
-/* SPIKE — three actors on one stage, sharing one data layer.
+/* Several views, one data layer — the reference for `views` in Proto.init.
 
-   This is not a finished prototype. It exists to measure what a multi-device
-   screen collides with in the harness as it stands today: three views side by
-   side, each meant to be a different device, all reading the same fixtures
-   through the same routes. What the gate says about it is the finding. */
+   Three people watch the same order: the customer on a phone, the waiter on a
+   phone, the kitchen on a screen at the pass. Nothing here composes a stage
+   and nothing here knows the other screens exist. This file renders ONE
+   screen; `views` declares who is watching, and the harness calls `mount`
+   once per view, each in a frame the width of that view's device.
+
+   That is what keeps every rule written for one screen applying to each of
+   them: a view is an ordinary screen. Each one is walked across the whole
+   width ladder, owes its own arrangement, its own touch targets and its own
+   loading / empty / error states. */
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Box } from "@12-apps/ui/mui/Box";
@@ -91,7 +97,7 @@ function VistaCliente({ s }){
     );
 
   return (
-    <Box className="vista telefone" data-view="cliente">
+    <Box className="vista telefone">
       <Heading level="h2">Comanda · {(c && c.mesa) || "—"}</Heading>
       {body}
     </Box>
@@ -133,7 +139,7 @@ function VistaGarcom({ s }){
     );
 
   return (
-    <Box className="vista telefone" data-view="garcom">
+    <Box className="vista telefone">
       <Heading level="h2">Salão</Heading>
       <Button className="btn" data-act="recarregar-salao">Atualizar</Button>
       {body}
@@ -142,8 +148,9 @@ function VistaGarcom({ s }){
 }
 
 /* ---------- the kitchen's screen ---------- */
-function Raia({ titulo, chave, fila, acao, rotulo }){
-  const cards = fila.filter(c => c.status === chave);
+function Raia({ titulo, chave, estados, fila, acao, rotulo }){
+  const quais = estados || [chave];
+  const cards = fila.filter(c => quais.indexOf(c.status) > -1);
   return (
     <Box className="raia" data-raia={chave}>
       <Heading level="h3">{titulo}</Heading>
@@ -182,13 +189,15 @@ function VistaCozinha({ s }){
         {s.app.writeError && <Alert className="aviso" data-erro="escrita">{s.app.writeError}</Alert>}
         <Raia titulo="Recebidos"  chave="recebido"   fila={fila} acao="iniciar"  rotulo="Iniciar" />
         <Raia titulo="Preparando" chave="preparando" fila={fila} acao="concluir" rotulo="Concluir" />
-        <Raia titulo="Prontos"    chave="pronto"     fila={fila} />
-        <Raia titulo="Prontos"    chave="entregue"   fila={fila} />
+        {/* the pass is done once the plate has left it: whether the waiter has
+            already put it on the table is the waiter's business, not this
+            screen's — which is exactly what unchanged:["cozinha"] specifies */}
+        <Raia titulo="Prontos"    chave="pronto"     fila={fila} estados={["pronto","entregue"]} />
       </Box>
     );
 
   return (
-    <Box className="vista mesa" data-view="cozinha">
+    <Box className="vista mesa">
       <Heading level="h2">Cozinha</Heading>
       <Button className="btn" data-act="recarregar-fila">Atualizar</Button>
       {body}
@@ -196,17 +205,8 @@ function VistaCozinha({ s }){
   );
 }
 
-/* The three devices on one stage. The harness draws ONE screen, so this is
-   the only place they can go: side by side inside the single frame. */
-function Palco({ s }){
-  return (
-    <Box className="palco">
-      <VistaCliente s={s} />
-      <VistaGarcom  s={s} />
-      <VistaCozinha s={s} />
-    </Box>
-  );
-}
+/* One screen per call. `s.view` says which one the harness is asking for. */
+const TELAS = { cliente:VistaCliente, garcom:VistaGarcom, cozinha:VistaCozinha };
 
 Proto.init({
   title: "salão · comanda em três telas",
@@ -223,7 +223,26 @@ Proto.init({
     impl: { component:"SalaoComanda", route:"/salao", moduleName:"salao/comanda" }
   },
 
-  context: [],
+  /* Who is watching, and on what. Any number, any actors — the harness only
+     needs a width for each. `actor` names an option of an exclusive context
+     dimension, so `s.can(...)` inside a view answers for that view's person
+     rather than for whoever is at the bench. */
+  views: [
+    { id:"cliente", label:"Cliente", actor:"cliente", viewport:"se"   },
+    { id:"garcom",  label:"Garçom",  actor:"garcom",  viewport:"se"   },
+    { id:"cozinha", label:"Cozinha", actor:"cozinha", viewport:"ipad" }
+  ],
+
+  context: [
+    {
+      id:"papel", label:"Papel", kind:"opcao", value:"cliente",
+      options:[
+        { id:"cliente", label:"Cliente", allows:["comanda.ver"] },
+        { id:"garcom",  label:"Garçom",  allows:["comanda.ver","mesa.entregar"] },
+        { id:"cozinha", label:"Cozinha", allows:["comanda.ver","fila.operar"] }
+      ]
+    }
+  ],
 
   scenarios: [
     {
@@ -240,21 +259,26 @@ Proto.init({
         })
       },
       steps:[
-        { then:"o cliente vê que o pedido foi recebido",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-situacao="recebido"]') },
-        { when:"a cozinha inicia o preparo", click:'[data-view="cozinha"] [data-act="iniciar"]' },
-        { then:"o cliente passa a ver Preparando",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-situacao="preparando"]') },
-        { then:"o garçom também vê Preparando",
-          check:(a, el) => !!el.querySelector('[data-view="garcom"] [data-situacao="preparando"]') },
-        { when:"a cozinha conclui", click:'[data-view="cozinha"] [data-act="concluir"]' },
-        { then:"o garçom é chamado para pegar na cozinha",
-          check:(a, el) => !!el.querySelector('[data-view="garcom"] [data-act="entregar"]') },
-        { when:"o garçom entrega na mesa", click:'[data-view="garcom"] [data-act="entregar"]' },
-        { then:"o cliente vê que chegou na mesa",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-situacao="entregue"]') },
-        { then:"a cozinha continua com a ficha na raia de prontos",
-          check:(a, el) => !!el.querySelector('[data-view="cozinha"] [data-raia="entregue"] .ficha') }
+        { then:"o cliente vê que o pedido foi recebido", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-situacao="recebido"]') },
+        { when:"a cozinha inicia o preparo", on:"cozinha", click:'[data-act="iniciar"]',
+          propagates:["cliente","garcom"] },
+        { then:"o cliente passa a ver Preparando", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-situacao="preparando"]') },
+        { then:"o garçom também vê Preparando", on:"garcom",
+          check:(a, el) => !!el.querySelector('[data-situacao="preparando"]') },
+        { when:"a cozinha conclui", on:"cozinha", click:'[data-act="concluir"]',
+          propagates:["cliente","garcom"] },
+        { then:"o garçom é chamado para pegar na cozinha", on:"garcom",
+          check:(a, el) => !!el.querySelector('[data-act="entregar"]') },
+        /* the one the whole feature exists for: the customer's screen has to
+           move and the kitchen's has to stay exactly where it was */
+        { when:"o garçom entrega na mesa", on:"garcom", click:'[data-act="entregar"]',
+          propagates:["cliente","garcom"], unchanged:["cozinha"] },
+        { then:"o cliente vê que chegou na mesa", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-situacao="entregue"]') },
+        { then:"a cozinha continua com a ficha na raia de prontos", on:"cozinha",
+          check:(a, el) => !!el.querySelector('[data-raia="pronto"] .ficha') }
       ]
     },
 
@@ -277,11 +301,11 @@ Proto.init({
           check:(a, el) => !!el.querySelector('[data-estado="carregando"]') },
         { when:"a fila chega", waitFor:"GET /api/cozinha/fila",
           applyState:(a, payload) => ({ ...a, fila:payload, loading:false }) },
-        { then:"a cozinha desenha o quadro",
-          check:(a, el) => !!el.querySelector('[data-view="cozinha"] [data-raia="recebido"]') },
-        { when:"o garçom atualiza o salão", click:'[data-view="garcom"] [data-act="recarregar-salao"]' },
-        { then:"o garçom vê a mesa esperando",
-          check:(a, el) => !!el.querySelector('[data-view="garcom"] [data-situacao="recebido"]') }
+        { then:"a cozinha desenha o quadro", on:"cozinha",
+          check:(a, el) => !!el.querySelector('[data-raia="recebido"]') },
+        { when:"o garçom atualiza o salão", on:"garcom", click:'[data-act="recarregar-salao"]' },
+        { then:"o garçom vê a mesa esperando", on:"garcom",
+          check:(a, el) => !!el.querySelector('[data-situacao="recebido"]') }
       ]
     },
 
@@ -304,15 +328,15 @@ Proto.init({
         }
       },
       steps:[
-        { then:"a cozinha explica a falha em vez de ficar em branco",
-          check:(a, el) => !!el.querySelector('[data-view="cozinha"] [data-estado="erro"]') },
-        { when:"a cozinha tenta de novo", click:'[data-view="cozinha"] [data-act="recarregar-fila"]' },
-        { then:"o quadro volta e a explicação some",
+        { then:"a cozinha explica a falha em vez de ficar em branco", on:"cozinha",
+          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
+        { when:"a cozinha tenta de novo", on:"cozinha", click:'[data-act="recarregar-fila"]' },
+        { then:"o quadro volta e a explicação some", on:"cozinha",
           check:(a, el) => !el.querySelector('[data-estado="erro"]')
-                        && !!el.querySelector('[data-view="cozinha"] [data-raia="recebido"] .ficha') },
-        { when:"a cozinha inicia o preparo", click:'[data-view="cozinha"] [data-act="iniciar"]' },
-        { then:"o cliente vê Preparando depois da recuperação",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-situacao="preparando"]') }
+                        && !!el.querySelector('[data-raia="recebido"] .ficha') },
+        { when:"a cozinha inicia o preparo", on:"cozinha", click:'[data-act="iniciar"]' },
+        { then:"o cliente vê Preparando depois da recuperação", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-situacao="preparando"]') }
       ]
     },
 
@@ -326,13 +350,14 @@ Proto.init({
       },
       steps:[
         { then:"as três telas convidam a começar",
-          check:(a, el) => el.querySelectorAll('[data-estado="vazio"]').length === 3 },
-        { when:"o garçom atualiza o salão", click:'[data-view="garcom"] [data-act="recarregar-salao"]' },
-        { then:"o pedido que existia aparece para o garçom",
-          check:(a, el) => !!el.querySelector('[data-view="garcom"] .linha') },
-        { when:"a cozinha atualiza a fila", click:'[data-view="cozinha"] [data-act="recarregar-fila"]' },
-        { then:"a cozinha passa a ver a ficha",
-          check:(a, el) => !!el.querySelector('[data-view="cozinha"] .ficha') }
+          check:(a, el, s) => ["cliente","garcom","cozinha"]
+            .every(v => !!s.views[v].querySelector('[data-estado="vazio"]')) },
+        { when:"o garçom atualiza o salão", on:"garcom", click:'[data-act="recarregar-salao"]' },
+        { then:"o pedido que existia aparece para o garçom", on:"garcom",
+          check:(a, el) => !!el.querySelector('.linha') },
+        { when:"a cozinha atualiza a fila", on:"cozinha", click:'[data-act="recarregar-fila"]' },
+        { then:"a cozinha passa a ver a ficha", on:"cozinha",
+          check:(a, el) => !!el.querySelector('.ficha') }
       ]
     },
 
@@ -352,14 +377,17 @@ Proto.init({
         })
       },
       steps:[
-        { when:"a cozinha tenta iniciar o preparo", click:'[data-view="cozinha"] [data-act="iniciar"]' },
-        { then:"a recusa aparece sem tirar o quadro da tela",
-          check:(a, el) => !!el.querySelector('[data-view="cozinha"] [data-erro="escrita"]')
-                        && !!el.querySelector('[data-view="cozinha"] [data-raia="recebido"] .ficha') },
-        { when:"a cozinha recarrega a fila", click:'[data-view="cozinha"] [data-act="recarregar-fila"]' },
-        { then:"o cliente continua vendo o pedido apenas recebido",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-situacao="recebido"]')
-                        && !!el.querySelector('[data-view="cozinha"] [data-erro="escrita"]') }
+        { when:"a cozinha tenta iniciar o preparo", on:"cozinha", click:'[data-act="iniciar"]' },
+        { then:"a recusa aparece sem tirar o quadro da tela", on:"cozinha",
+          check:(a, el) => !!el.querySelector('[data-erro="escrita"]')
+                        && !!el.querySelector('[data-raia="recebido"] .ficha') },
+        { when:"a cozinha recarrega a fila", on:"cozinha", click:'[data-act="recarregar-fila"]' },
+        /* Two views in one breath. `s.views` holds every view's root, which is
+           how "and the kitchen still shows the refusal" gets asserted — the
+           thing that makes several screens worth having on the bench. */
+        { then:"o cliente continua vendo o pedido apenas recebido", on:"cliente",
+          check:(a, el, s) => !!el.querySelector('[data-situacao="recebido"]')
+                           && !!s.views.cozinha.querySelector('[data-erro="escrita"]') }
       ]
     },
 
@@ -378,21 +406,22 @@ Proto.init({
         }
       },
       steps:[
-        { then:"o cliente vê a explicação em vez de uma tela vazia",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-estado="erro"]') },
-        { when:"o cliente tenta de novo", click:'[data-view="cliente"] [data-act="recarregar-comanda"]' },
-        { then:"a comanda continua fora do ar",
-          check:(a, el) => !!el.querySelector('[data-view="cliente"] [data-estado="erro"]') },
-        { when:"o garçom tenta atualizar o salão", click:'[data-view="garcom"] [data-act="recarregar-salao"]' },
-        { then:"o salão também segue fora do ar, e a cozinha não",
-          check:(a, el) => !!el.querySelector('[data-view="garcom"] [data-estado="erro"]')
-                        && !!el.querySelector('[data-view="cozinha"] [data-raia="recebido"]') }
+        { then:"o cliente vê a explicação em vez de uma tela vazia", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
+        { when:"o cliente tenta de novo", on:"cliente", click:'[data-act="recarregar-comanda"]' },
+        { then:"a comanda continua fora do ar", on:"cliente",
+          check:(a, el) => !!el.querySelector('[data-estado="erro"]') },
+        { when:"o garçom tenta atualizar o salão", on:"garcom", click:'[data-act="recarregar-salao"]' },
+        { then:"o salão também segue fora do ar, e a cozinha não", on:"garcom",
+          check:(a, el, s) => !!el.querySelector('[data-estado="erro"]')
+                           && !!s.views.cozinha.querySelector('[data-raia="recebido"]') }
       ]
     }
   ],
 
   mount: (el, state) => {
-    const draw = () => flushSync(() => rootFor(el).render(<Palco s={state} />));
+    const Tela = TELAS[state.view] || VistaCliente;
+    const draw = () => flushSync(() => rootFor(el).render(<Tela s={state} />));
     try { draw(); }
     catch { roots.delete(el); draw(); }
   }

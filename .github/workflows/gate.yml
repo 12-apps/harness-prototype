@@ -67,6 +67,12 @@ jobs:
       - name: the component rule still bites
         run: node scripts/test-enforcement.js
 
+      # `views` multiplies the discipline instead of escaping it, so the rules
+      # that come with it need the same treatment: prototypes that are wrong
+      # on purpose, and a red build if the gate lets any of them through.
+      - name: the several-views rules still bite
+        run: node scripts/test-multiview.js
+
       # The React path is not covered by the loop below, because the only React
       # app is a starter and starters are skipped. Run it explicitly so the
       # linter, the esbuild step and the flushSync mount are exercised here.
