@@ -73,6 +73,15 @@ jobs:
       - name: the several-views rules still bite
         run: node scripts/test-multiview.js
 
+      # The phone bench is a shape, not a rule the linter can read or a
+      # number the suite reports, so the only way to know it still holds is
+      # to open it at that size. It needs the Chromium located above and
+      # exits 3 without one rather than passing on checks that never ran.
+      - name: the phone bench still bites
+        env:
+          PROTO_CHROME: ${{ steps.chrome.outputs.path }}
+        run: node scripts/test-phone.js
+
       # The React path is not covered by the loop below, because the only React
       # app is a starter and starters are skipped. Run it explicitly so the
       # linter, the esbuild step and the flushSync mount are exercised here.

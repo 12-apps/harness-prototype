@@ -101,6 +101,8 @@ The same file, opened on a handheld, is a different bench: the frame stops being
 
 This travels with the handoff bundle: the `.html` is one file, so the phone that opens it gets the bench too.
 
+What holds it is [`scripts/test-phone.js`](scripts/test-phone.js), which opens the bench at 390px in a real browser and checks the shape both ways — what is true on a phone has to be false on a computer. It exists because the first version of this chrome shipped nine defects that reading the diff had already missed, every one of them found by driving a browser and none by reading.
+
 Two switches, not one, and they are not the same question. The **shape** of the chrome follows the viewport alone — narrow, or short and coarse (a phone on its side) — so a narrow window on a computer gets the phone bench too, which is how you look at it without a phone. The **device view** additionally needs a coarse pointer: a narrow window keeps the rung the file asks for, because a window is not a device. Neither reads the user agent. Above that threshold the computer's bench is unchanged, to the pixel. Details in [`docs/project-instructions.md`](docs/project-instructions.md#opening-it-on-a-phone).
 
 ## What it demands
@@ -156,6 +158,7 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 | `apps/multi-view-demo/` | the worked reference for `views`: three people watching one order, on three devices |
 | `docs/multi-device-views.md` | why `views` is shaped the way it is, and what was measured to get there |
 | `scripts/test-multiview.js` | fails the build when a several-views rule stops biting |
+| `scripts/test-phone.js` | opens the bench at phone size in a real browser and fails the build when its shape stops holding |
 
 ## Component catalog
 

@@ -233,6 +233,23 @@ pointer, so it is never in phone form, and the in-page **Verificar** runs
 the suite in an iframe at least 1000px wide. What the gate reports never
 depends on what you happen to be holding.
 
+### What holds it
+
+[`scripts/test-phone.js`](../scripts/test-phone.js) opens the bench at phone
+size in a real browser and checks each of these, **both ways**: what is true on
+a phone has to be false on a computer, so a chrome that went compact everywhere
+would pass half the file and fail the other half. It needs a Chromium and exits
+`3` without one rather than reporting checks that never ran — everything it
+asks about is what got drawn, so there is no engine to fall back to.
+
+It exists because the first version of this chrome shipped with nine defects
+that a careful reading of the diff had already missed. An Examples row stranded
+the device view for the rest of the session; the starter template drew a step
+row with nothing to step through; the screen that names a missing file arrived
+591px wider than the phone it was being read on. Every one was found by opening
+a browser at 390px, and none by reading — so the opening is the test. Each case
+was confirmed by putting its defect back and watching the build go red.
+
 ## Several screens at once
 
 A flow that needs two people needs two screens open together: someone orders,
