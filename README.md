@@ -145,6 +145,7 @@ Having a Chromium is not enough on its own: without puppeteer the gate falls bac
 | `apps/<name>/` | a prototype: `styles.css`, `data.js`, `app.jsx` |
 | `verify.js` | the command-line gate |
 | `docs/` | harness instructions and the shipping rule |
+| `docs/using-the-harness.md` | adopting the bench on a project: how to start, what to hand over, the traps |
 | `catalog/ui-catalog.*` | the 210 components of `@12-apps/ui`, generated from the installed package |
 | `catalog/ui-interactions.*` | what the screen owes each one: `exige` / `pode` / `nunca` |
 | `catalog/ui-composition.js` | the six compounds whose parts carry their box structure |
