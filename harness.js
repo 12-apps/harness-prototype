@@ -21,6 +21,17 @@
    a host element and no chrome inside it. */
 let H_ROOT = null;
 
+/* When the bench is in phone form. Declared out here because the shell has
+   to answer it before anything else runs — a prototype that fails to load
+   never reaches init(), and its "which file is missing" screen is exactly
+   the one that gets read on the device the folder was sent to.
+
+   Two conditions, not one width: a phone in landscape is 874, 932 or 956
+   CSS px on current models, well past any threshold a laptop window is
+   also not past. Short and coarse is what a phone on its side is, and no
+   computer is. */
+const COMPACT_MQ = "(max-width: 860px), (pointer: coarse) and (max-height: 520px)";
+
 (function shell(){
   const DOC_CSS = `
     *,*::before,*::after{box-sizing:border-box}
@@ -64,7 +75,10 @@ let H_ROOT = null;
   H_ROOT.innerHTML = `
 <div class="h-shell" id="h-shell">
   <header class="h-top" id="h-top">
-    <button class="h-btn h-icone" id="h-menu" aria-pressed="true"
+    <!-- expanded, not pressed: it discloses the drawer, it does not toggle
+         a setting. The Cenários button in the folded row keeps aria-pressed,
+         because on a computer it hides a column that is already there. -->
+    <button class="h-btn h-icone" id="h-menu" aria-expanded="false" aria-controls="h-side"
             aria-label="Cenários" title="Cenários">☰</button>
 
     <span class="h-brand"><span class="h-dot"></span>Proto <em id="h-title">protótipo</em></span>
@@ -113,9 +127,12 @@ let H_ROOT = null;
   </section>
 
   <div class="h-body">
-    <aside class="h-side" id="h-side"></aside>
+    <!-- both start hidden and are revealed by applyChrome() in init: until
+         the scenarios exist the sidebar is an empty panel, and on a phone
+         an empty panel is the whole screen -->
+    <aside class="h-side" id="h-side" hidden></aside>
     <div class="h-resize" id="h-resize" role="separator" aria-orientation="vertical"
-         tabindex="0" title="Arraste para largura · duplo clique volta ao padrão"></div>
+         tabindex="0" hidden title="Arraste para largura · duplo clique volta ao padrão"></div>
 
     <div class="h-veu" id="h-veu" hidden></div>
 
@@ -182,13 +199,26 @@ let H_ROOT = null;
        bench's main interaction, so on a phone it gets a row of its own —
        a row, not an overlay: it takes its height off the stage instead of
        sitting on top of the prototype's own fixed footer. -->
-  <nav class="h-passos" id="h-passos" hidden>
+  <nav class="h-passos" id="h-passos" aria-label="Passos do cenário" hidden>
     <button class="h-btn h-icone" id="h-passo-ant" aria-label="Passo anterior">‹</button>
-    <button class="h-passo-nm" id="h-passo-nm" aria-label="Cenários"></button>
+    <!-- no aria-label: it would replace the only readout of which scenario
+         and which step this is, which is the whole content of the button -->
+    <button class="h-passo-nm" id="h-passo-nm" aria-expanded="false"
+            aria-controls="h-side"></button>
     <button class="h-btn h-icone" id="h-passo-prox" aria-label="Próximo passo">›</button>
   </nav>
 </div>
 `;
+
+  /* The shape has to be right before init(): a prototype that fails to load
+     never gets there, and that screen — the one that names the missing file
+     — is read on the phone the folder was sent to. It also stops the bundle
+     from flashing a desktop bench while 2MB of it parses. */
+  try {
+    if (matchMedia(COMPACT_MQ).matches){
+      H_ROOT.querySelector(".h-shell").setAttribute("data-compacto", "1");
+    }
+  } catch {}
 
   /* the chrome stylesheet goes in with it, ahead of the markup; the
      document keeps none of it, which is what makes the isolation mutual */
@@ -309,6 +339,26 @@ const Proto = (() => {
   let showHidden = false;   /* sidebar showing only what is out of scope */
   let openDim = null;    /* the open multiselect panel — lives outside the
                             sidebar rebuild, or it would close on every render */
+
+  /* ---------- the shape of the bench ----------
+     Up here with the rest of the state, not beside the functions that use
+     it: `fit()` and `padFor()` read compactMode and are defined earlier in
+     the file, and a `let` read before its declaration runs is a crash, not
+     a default. */
+  let compactMode = false;   /* the chrome is in phone form */
+  let lastStageBox = "";     /* the stage box the last fit() drew for */
+  let drawerOpen  = false;   /* compact: the scenario drawer over the stage */
+  let sideOpen    = true;    /* wide: the sidebar column */
+  let toolsOpen   = false;   /* compact: the folded row of controls */
+
+  /* Who chose the width on screen. Three answers, and they behave
+     differently when the bench changes shape: nobody chose it (the bench
+     may swap it for the device, or back), the scenario chose it (an
+     Examples row borrows the frame and has to give it back), or the person
+     chose it (nothing may take it from them). */
+  const DEVICE_VP = "aparelho";
+  let widthSource = "default";        /* "default" | "row" | "hand" */
+  let declaredViewport = null;        /* the rung the file asks for on a computer */
 
   const state = {
     scenario:null, step:-1, example:0,
@@ -1529,6 +1579,17 @@ const Proto = (() => {
     if (targetWidth && !manualChoice && state.viewport !== targetWidth.id
         && LADDER.some(d => d.id === targetWidth.id)){
       state.viewport = targetWidth.id;
+      widthSource = "row";
+    } else if (!targetWidth && widthSource === "row"){
+      /* The row that took the frame is behind us, so it gives it back. That
+         width was never a choice — it came with the scenario — and on a
+         phone leaving it behind matters: without this, one tap on an
+         Esquema do Cenário strands the bench at a 320px picture of a phone,
+         inside the phone, for the rest of the session, and in every link it
+         shares from then on. */
+      state.viewport = compactMode && handheld() ? DEVICE_VP
+                     : (declaredViewport || state.viewport);
+      widthSource = "default";
     }
     manualChoice = false;
 
@@ -1615,7 +1676,12 @@ const Proto = (() => {
       suite = null;
     });
 
-    if (q.viewport && VIEWPORTS.some(v => v.id === q.viewport)) state.viewport = q.viewport;
+    /* a width in the link is somebody saying "look at this one at this
+       size": it counts as chosen, so nothing here takes it back */
+    if (q.viewport && VIEWPORTS.some(v => v.id === q.viewport)){
+      state.viewport = q.viewport;
+      widthSource = "hand";
+    }
     /* the hash is attacker-supplied: only a known number becomes the zoom */
     if (q.zoom != null){
       const z = parseFloat(q.zoom);
@@ -2946,6 +3012,10 @@ const Proto = (() => {
     if (fitOpt) fitOpt.textContent = state.zoom === "fit"
       ? `Ajustar · ${Math.round(scale * 100)}%` : "Ajustar";
 
+    /* the box this drawing was for: what tells the stage observer that a
+       change has already been accounted for */
+    lastStageBox = stage.clientWidth + "x" + stage.clientHeight;
+
     if (initial) syncHash();
   }
 
@@ -2959,12 +3029,6 @@ const Proto = (() => {
      One switch, read from the viewport and mirrored onto the shell as an
      attribute, because the same answer also has to pick the default
      viewport in JS — two breakpoints, in the CSS and here, would drift. */
-  const COMPACT_MQ = "(max-width: 860px)";
-  let compactMode = false;   /* the chrome is in phone form */
-  let drawerOpen  = false;   /* compact: the scenario drawer over the stage */
-  let sideOpen    = true;    /* wide: the sidebar column */
-  let toolsOpen   = false;   /* compact: the folded row of controls */
-
   function narrowNow(){
     try { return matchMedia(COMPACT_MQ).matches; } catch { return false; }
   }
@@ -2997,24 +3061,48 @@ const Proto = (() => {
       if (compactMode && toolsOpen) top.setAttribute("data-aberto", "1");
       else top.removeAttribute("data-aberto");
     }
-    [$("h-flags"), $("h-menu")].forEach(b => b && b.setAttribute("aria-pressed", String(open)));
+    const flags = $("h-flags");
+    if (flags) flags.setAttribute("aria-pressed", String(open));
+    [$("h-menu"), $("h-passo-nm")].forEach(b => b && b.setAttribute("aria-expanded", String(open)));
     const more = $("h-more");
     if (more) more.setAttribute("aria-expanded", String(compactMode && toolsOpen));
     paintSteps();
   }
 
   /* the width changed (a rotation, a resized window): the shape may have to
-     change with it */
-  function syncCompact(){
+     change with it. Only when it actually changes — this runs on every
+     resize event, and applyChrome rewrites the step row. `refit` is false
+     when the caller is about to fit anyway. */
+  function syncCompact(refit){
     const want = narrowNow();
     if (want !== compactMode){
       compactMode = want;
       /* arriving on a phone, the screen is what you came for — not the list */
       if (compactMode) drawerOpen = false;
       else toolsOpen = false;
+      /* The shape changed, so the width the shape implies changes with it —
+         but only while nobody has said otherwise. A phone turned on its
+         side is still the phone (and a tablet turned upright becomes one),
+         so the device view is not something a rotation may quietly drop;
+         going back to a computer-shaped window returns the rung the file
+         asks for. A width somebody chose survives both. */
+      if (widthSource === "default"){
+        if (compactMode && handheld()) state.viewport = DEVICE_VP;
+        else if (!compactMode && declaredViewport) state.viewport = declaredViewport;
+      }
+      applyChrome();
     }
-    applyChrome();
-    fit();
+    if (refit !== false) fit();
+  }
+
+  /* the scenario before or after this one, in the order the bar reads. The
+     arrows have always crossed that boundary — "walking a journey should
+     not hit a wall" — and the row is the only way to walk it on a phone,
+     so it crosses the same one. */
+  function neighbourScenario(dir){
+    const listEl = readingOrder(visible());
+    const i = listEl.findIndex(x => x.id === state.scenario);
+    return i < 0 ? null : (listEl[i + dir] || null);
   }
 
   /* the step row: where you are in the journey, and the two directions out
@@ -3030,11 +3118,15 @@ const Proto = (() => {
     const total = (s.steps || []).length;
     const at = state.step;
     const prev = $("h-passo-ant"), next = $("h-passo-prox"), nameEl = $("h-passo-nm");
-    if (prev) prev.disabled = at < 0;
-    if (next) next.disabled = at >= total - 1;
+    if (prev) prev.disabled = at < 0 && !neighbourScenario(-1);
+    if (next) next.disabled = at >= total - 1 && !neighbourScenario(1);
     if (nameEl){
+      /* the replay of a first visit takes up to a second, and until it
+         lands the row would be announcing a step the screen is not on */
+      const pending = awaiting && awaiting.id === s.id && awaiting.stp === at;
       nameEl.innerHTML = `<b>${esc(s.name || s.id)}</b><span>`
         + (at < 0 ? (total ? "dado inicial" : "sem passos") : `passo ${at + 1} de ${total}`)
+        + (pending ? " ·  desenhando…" : "")
         + `</span>`;
     }
   }
@@ -3444,6 +3536,7 @@ const Proto = (() => {
     /* the chrome goes back to how the file opens too: list showing on a
        computer, screen showing on a phone */
     sideOpen = true; drawerOpen = false; toolsOpen = false;
+    widthSource = "default";
     applyChrome();
     results = {}; suite = null; memo = new Map(); partial = null;
     $("h-vp").value = state.viewport;
@@ -3487,9 +3580,12 @@ const Proto = (() => {
        viewport is an authoring default — it says which rung to draw on a
        computer, and there is no reason to draw a 380px picture of a phone
        on a 390px phone. It goes in before `initial` is captured, so Reset
-       comes back here and not to a frame inside the screen. */
+       comes back here and not to a frame inside the screen — and the rung
+       the file asked for is kept, because a rotation back to a
+       computer-shaped window has to have somewhere to return to. */
+    declaredViewport = state.viewport;
     const onDevice = handheld();
-    if (onDevice) state.viewport = "aparelho";
+    if (onDevice) state.viewport = DEVICE_VP;
 
     const first = cfg.scenarios[0];
     state.scenario = cfg.initial || (first && first.id) || null;
@@ -3539,6 +3635,8 @@ const Proto = (() => {
 
     $("h-vp").addEventListener("change", e => {
       state.viewport = e.target.value;
+      /* chosen by hand: neither a scenario nor a rotation may take it back */
+      widthSource = "hand";
       /* In an Outline with a `largura` column, switching rung means switching
          row: the person asked to see that size, so it shows the case for
          that size instead of forcing the width back. */
@@ -3637,11 +3735,17 @@ const Proto = (() => {
 
     $("h-passo-ant").addEventListener("click", () => {
       const s = scnById(state.scenario);
-      if (s && state.step > -1) goto(s.id, state.step - 1, state.example);
+      if (!s) return;
+      if (state.step > -1) return void goto(s.id, state.step - 1, state.example);
+      const prev = neighbourScenario(-1);
+      if (prev) goto(prev.id, (prev.steps || []).length - 1, 0);
     });
     $("h-passo-prox").addEventListener("click", () => {
       const s = scnById(state.scenario);
-      if (s && state.step < (s.steps || []).length - 1) goto(s.id, state.step + 1, state.example);
+      if (!s) return;
+      if (state.step < (s.steps || []).length - 1) return void goto(s.id, state.step + 1, state.example);
+      const next = neighbourScenario(1);
+      if (next) goto(next.id, -1, 0);
     });
     $("h-passo-nm").addEventListener("click", toggleScenarios);
 
@@ -3727,7 +3831,9 @@ const Proto = (() => {
       paintMonitor();
     });
 
-    $("h-dados-btn").addEventListener("click", () => showDados($("h-dados").hidden));
+    /* the panels live on the stage, under the drawer's veil: opening one
+       with the drawer open paints it where nobody can see it */
+    $("h-dados-btn").addEventListener("click", () => { chose(); showDados($("h-dados").hidden); });
     $("h-dados-limpar").addEventListener("click", () => {
       network.log.length = 0; dataSel = null; paintData();
     });
@@ -3740,7 +3846,7 @@ const Proto = (() => {
       paintData();
     });
 
-    $("h-spec-btn").addEventListener("click", () => showSpec($("h-spec").hidden));
+    $("h-spec-btn").addEventListener("click", () => { chose(); showSpec($("h-spec").hidden); });
     /* A page cannot read the sidecars it was loaded from — fetch does not
        reach a file:// sibling — so the single-file bundle is the command
        line's job. Bundled, the document already is the whole prototype. */
@@ -3923,6 +4029,10 @@ const Proto = (() => {
       if (e.key !== "Escape") return;
       if (!$("h-spec").hidden) showSpec(false);
       else if (openDim){ openDim = null; render(); }
+      /* the drawer covers the screen and has no visible way out but the ☰
+         it came from — on a narrow window, which is where a keyboard is,
+         Escape is the one people try */
+      else if (compactMode && drawerOpen) chose();
     });
 
     /* sidebar width: the minimum is the current width — shrinking past that
@@ -3955,7 +4065,10 @@ const Proto = (() => {
     /* the width can change under the bench — a resized window, a phone
        turned on its side, a keyboard pushing the viewport up — and the
        shape of the chrome follows it, not just the frame inside it */
-    const onResize = () => { syncCompact(); setBarra(state.sidebar); };
+    /* setBarra fits; syncCompact would fit again, and applyChrome rewrites
+       the step row — a resize is a stream of events, so it does the shape
+       work only when the shape actually changed */
+    const onResize = () => { syncCompact(false); setBarra(state.sidebar); };
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onResize);
     if (window.visualViewport) window.visualViewport.addEventListener("resize", onResize);
@@ -3967,14 +4080,16 @@ const Proto = (() => {
        otherwise the frame keeps a height the stage no longer has and the
        bottom of the prototype ends up under the bench. */
     if (window.ResizeObserver){
-      let lastBox = "";
       new ResizeObserver(() => {
         const st = $("h-stage");
         if (!st) return;
         const now = st.clientWidth + "x" + st.clientHeight;
-        if (now === lastBox) return;      /* the frame inside it moved, not the box */
-        lastBox = now;
+        /* fit() records the box it drew for, so a change something else
+           already handled — dragging the sidebar grip fits on every
+           pointermove — does not get fitted a second time here */
+        if (now === lastStageBox) return;
         if (vp().freeForm) fit();
+        else lastStageBox = now;
       }).observe($("h-stage"));
     }
     window.addEventListener("hashchange", () => {

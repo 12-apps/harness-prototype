@@ -401,6 +401,12 @@
 .h-falha{
   position:fixed;inset:0;z-index:60;background:#0b0d10;
   display:flex;align-items:center;justify-content:center;padding:28px;
+  /* fixed, so it sits outside the shell's safe-area padding: on a device
+     28px already clears most insets, and where it does not the report is
+     the last thing that may go under a notch. Resolves to 28px on a screen
+     with none. */
+  padding:max(28px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right))
+          max(28px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
 }
 .h-falha[hidden]{display:none}
 .h-falha-cx{width:min(860px,100%);display:flex;flex-direction:column;max-height:100%}
@@ -535,17 +541,33 @@
   display:inline-flex;align-items:center;justify-content:center;
   min-width:38px;font-size:15px;line-height:1;
 }
+/* these two disclose a panel rather than toggle a setting, so they carry
+   aria-expanded — and the pressed look has to follow the attribute they
+   actually have */
+.h-icone[aria-expanded="true"]{
+  background:var(--h-accent);border-color:var(--h-accent);color:#fff;
+}
 
-.h-shell[data-compacto]{
-  /* the notch and the home bar are not drawing surface */
+/* The notch and the home bar are not drawing surface. Unconditional, not
+   compact-only: proto.html asks for viewport-fit=cover at every width, so
+   a tablet in landscape — wide enough for the computer's chrome, still a
+   device with rounded corners — would otherwise put the top bar under
+   them. On a screen with no insets every one of these resolves to 0, which
+   is what the box already had. */
+.h-shell{
   padding:env(safe-area-inset-top) env(safe-area-inset-right)
           env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-/* a finger is not a mouse pointer: the bench asks 44px of every
-   prototype below sm, and owes its own chrome the same */
+/* a finger is not a mouse pointer: the bench asks 44px of every prototype
+   below sm (MIN_TOUCH_TARGET in harness.js), and owes its own chrome the
+   same number — not a nearby one */
 .h-shell[data-compacto] .h-btn,
 .h-shell[data-compacto] .h-sel,
-.h-shell[data-compacto] .h-linkin{min-height:40px;touch-action:manipulation}
+.h-shell[data-compacto] .h-linkin,
+.h-shell[data-compacto] .h-busca,
+.h-shell[data-compacto] .h-mini,
+.h-shell[data-compacto] .h-mon-trig,
+.h-shell[data-compacto] .h-seg button{min-height:44px;touch-action:manipulation}
 /* 16px is not a taste: a phone zooms the page into any field whose text is
    smaller, and does not zoom back out. A search box that swallows the
    layout on the first tap is worse than a search box with big text. */
@@ -610,10 +632,13 @@
 .h-shell[data-compacto] .h-veu[hidden]{display:none}
 /* a scenario card is a tap target before it is a row of text */
 .h-shell[data-compacto] .h-scn-hd{min-height:46px}
-.h-shell[data-compacto] .h-step{padding-top:9px;padding-bottom:9px}
+.h-shell[data-compacto] .h-step{min-height:44px;padding-top:9px;padding-bottom:9px}
 .h-shell[data-compacto] .h-chip,
 .h-shell[data-compacto] .h-multi-trig,
-.h-shell[data-compacto] .h-dimsel{min-height:36px}
+.h-shell[data-compacto] .h-multi-opt,
+.h-shell[data-compacto] .h-grupo,
+.h-shell[data-compacto] .h-ex-row,
+.h-shell[data-compacto] .h-dimsel{min-height:44px}
 
 /* the stage */
 .h-shell[data-compacto] .h-stage{padding:10px}
@@ -629,6 +654,11 @@
   display:flex;align-items:center;gap:8px;flex:0 0 auto;
   padding:6px 8px;background:var(--h-panel);border-top:1px solid var(--h-line);
 }
+/* the compact rule outranks a bare [hidden], and paintSteps hides this row
+   whenever there is no scenario to walk — the starter template has none,
+   so without this the bench ships two live-looking chevrons with nothing
+   between them, which is the very defect the gate rejects in a prototype */
+.h-shell[data-compacto] .h-passos[hidden],
 .h-passos[hidden]{display:none}
 .h-passo-nm{
   flex:1;min-width:0;min-height:44px;display:flex;flex-direction:column;
@@ -652,9 +682,13 @@
 .h-shell[data-compacto] .h-dados-cols{flex-direction:column;gap:10px}
 .h-shell[data-compacto] .h-dados-col{min-height:34vh}
 .h-shell[data-compacto] .h-spec textarea{padding:10px}
-/* fixed, so the shell's own safe-area padding does not reach it */
+/* fixed, so the shell's own safe-area padding does not reach it — and it
+   is the one screen that has to stay readable in landscape, where the
+   notch eats a side rather than the top */
 .h-shell[data-compacto] .h-falha{
-  padding:calc(14px + env(safe-area-inset-top)) 14px
-          calc(14px + env(safe-area-inset-bottom));
+  padding:calc(14px + env(safe-area-inset-top))
+          calc(14px + env(safe-area-inset-right))
+          calc(14px + env(safe-area-inset-bottom))
+          calc(14px + env(safe-area-inset-left));
 }
 .h-shell[data-compacto] .h-falha-cx textarea{min-height:34vh}

@@ -201,19 +201,37 @@ one that usually travels — on a handheld and the chrome changes shape:
   passo 2 de 5 ›` — because a phone has no arrow keys, and stepping is the
   bench's main interaction.
 
-The switch is the viewport, never the user agent: a **coarse pointer and a
-narrow screen**, both. A narrow window on a computer gets the same chrome —
-which is how you look at it without a phone — but keeps the declared rung,
-because a window is not a device. Width is the one saved preference a
-handheld does not inherit: walking an `Esquema do Cenário` with a `largura`
-column saves a rung, and restoring that on a phone would open the bench at
-the picture again. A link still wins over both, because a link is somebody
-saying *look at this one*.
+Two switches, and they answer different questions. The **shape** of the
+chrome is the viewport alone — `max-width: 860px`, or short and coarse,
+which is what a phone on its side is and no computer is (current handsets
+are 874–956px wide in landscape, past any threshold a laptop window is also
+past). So a narrow window on a computer gets the phone bench, which is how
+you look at it without a phone. The **device view** asks for a coarse
+pointer as well: a narrow window keeps the rung the file declares, because
+a window is not a device. Neither switch reads the user agent.
 
-Nothing about the specification changes. Picking a rung by hand still works
-there, an Examples row with a `largura` still takes the frame to that width,
-and verification still runs in an iframe at least 1000px wide — what the
-gate reports never depends on what you happen to be holding.
+Who chose the width decides what may change it, and there are three
+answers. **Nobody** — the bench swaps it for the device when the shape
+becomes a phone's, and back to the declared rung when it stops being one,
+so rotating never strands you at a picture of a phone inside the phone.
+**The scenario** — an `Esquema do Cenário` with a `largura` column takes the
+frame to that width while you are on it, and gives it back when you leave.
+**The person** — a rung picked from the selector, or one carried in a link,
+is never taken back by either. Width is also the one saved preference a
+handheld does not inherit.
+
+A link is somebody saying *look at this one*, and it wins over all of that
+— when it carries a width. A link made on a phone in device view carries
+none, because the device view is that bench's default and the hash only
+records departures from it: the recipient gets the scenario and the step,
+at whatever width their own bench opens. Send `?viewport=xxs` (the selector
+puts it in the link) when the width is the point.
+
+Nothing about the specification changes, and the gate is not exposed to any
+of it: `verify.js` drives the page at a fixed 1400×1000 with an ordinary
+pointer, so it is never in phone form, and the in-page **Verificar** runs
+the suite in an iframe at least 1000px wide. What the gate reports never
+depends on what you happen to be holding.
 
 ## Components — raw HTML is not allowed
 
