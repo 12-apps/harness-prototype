@@ -511,6 +511,19 @@
 }
 .h-spec-dl .h-btn[disabled]{opacity:.45;cursor:not-allowed}
 
+/* Several views on the stage: the frame stops being a device and becomes the
+   row that holds them, so the phone chrome belongs to each view, not here. */
+.h-frame.h-multi{
+  background:transparent;box-shadow:none;border-radius:0;overflow:visible;
+}
+
+/* which screen a step acts on, in the scenario bar */
+.h-step-vista{
+  display:inline-block;margin-right:6px;padding:1px 5px;border-radius:4px;
+  background:#232936;color:#9aa3b5;font:600 9px/1.5 var(--h-sans);
+  letter-spacing:.06em;text-transform:uppercase;vertical-align:1px;
+}
+
 /* ============================================================
    O aparelho — a bancada em um telefone
    ============================================================
@@ -647,6 +660,28 @@
   border-radius:0;box-shadow:none;
 }
 .h-shell[data-compacto] .h-mon{left:10px;bottom:10px;max-width:calc(100% - 20px)}
+
+/* which screen, when there are several: a row of devices does not fit on a
+   phone, so the bench shows one at a time and this switches. A row like the
+   journey's, for the same reason — it takes its height off the stage rather
+   than floating over the screen it is naming. */
+.h-vistas{display:none}
+.h-shell[data-compacto] .h-vistas{
+  display:flex;align-items:center;gap:6px;flex:0 0 auto;
+  padding:6px 8px;overflow-x:auto;
+  background:var(--h-panel);border-top:1px solid var(--h-line);
+}
+.h-shell[data-compacto] .h-vistas[hidden],
+.h-vistas[hidden]{display:none}
+.h-vista-bt{
+  flex:0 0 auto;min-height:44px;padding:6px 12px;border-radius:8px;
+  background:var(--h-panel-2);border:1px solid var(--h-line-2);color:var(--h-fg-dim);
+  font:inherit;font-size:12px;white-space:nowrap;cursor:pointer;
+  touch-action:manipulation;
+}
+.h-vista-bt[aria-pressed="true"]{
+  background:var(--h-accent);border-color:var(--h-accent);color:#fff;font-weight:600;
+}
 
 /* the journey, as a row of its own: it takes its height off the stage
    instead of floating over the prototype's own fixed footer */

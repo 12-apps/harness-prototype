@@ -233,6 +233,121 @@ pointer, so it is never in phone form, and the in-page **Verificar** runs
 the suite in an iframe at least 1000px wide. What the gate reports never
 depends on what you happen to be holding.
 
+## Several screens at once
+
+A flow that needs two people needs two screens open together: someone orders,
+someone else prepares it, and each has to see what the other did. That
+behaviour lives *between* the screens, so one screen cannot hold it.
+
+`views` declares who is watching, and on what. How many, and who they are, is
+the product's business — the harness only insists on a width for each:
+
+```js
+views:[
+  { id:"cliente", label:"Cliente", actor:"cliente", viewport:"se"   },
+  { id:"garcom",  label:"Garçom",  actor:"garcom",  viewport:"se"   },
+  { id:"cozinha", label:"Cozinha", actor:"cozinha", viewport:"ipad" }
+]
+```
+
+`viewport` is a rung or a device from the ladder above, or a raw `w`/`h`.
+`actor` names an option of an exclusive context dimension, so `state.can(…)`
+inside a view answers for that view's person rather than for whoever is at the
+bench — one dimension, several answers, because several people are on screen.
+
+**The prototype still renders one screen.** It does not lay out a stage and it
+does not know the other views exist. The harness calls `mount` once per view,
+each in a frame the width of that view's device; `state.view` says which one it
+is asking for, `state.rung` and `state.widthPx` answer for that view's frame,
+and `state.waitingFor()` for that view's own requests — one screen's pending
+request no longer puts the others into a skeleton they have no reason to show.
+
+This is the whole design, and the reason everything else on this page keeps
+working: **a view is an ordinary screen.** Each one is walked across the entire
+ladder, owes its own arrangement, its own physical measurements, its own three
+states and its own wiring. Three views owe three of everything, and the audit
+says so by name — `a vista "Cozinha" da página "salao"…`. Declaring views
+multiplies what the specification owes; it is not a way out of any of it.
+
+Each view carries a picker above its frame, so you can look at the same screen
+on another device without touching the file — the customer's comanda on a
+tablet, say. That is the bench, not the specification: the suite and the audit
+always measure the device the view **declares**, or looking at something would
+quietly change what the gate approved. Resetar puts every view back on its own.
+
+There is no stage-wide viewport selector when views are declared. The stage is
+the sum of the views and no single rung describes it, so rather than show a
+number that means nothing, the selector is not there.
+
+### The step says where it acts
+
+```js
+{ when:"a cozinha inicia o preparo", on:"cozinha", click:'[data-act="iniciar"]' }
+```
+
+With views declared an action without `on` is refused: two screens are open and
+the same control can be on both, so a step that does not name one has not said
+what happens. The `.feature` carries the addressee — `Quando [cozinha] …` — so
+the export reads as a script with parts rather than a monologue.
+
+An `Então` may name one too. `on:"cliente"` scopes its `el` to that view;
+`state.views` holds every view's root, so a single assertion can say *the
+customer saw it change* and *the kitchen's board did not move*:
+
+```js
+{ then:"o cliente vê que chegou, e a cozinha segue igual", on:"cliente",
+  check:(a, el, s) => !!el.querySelector('[data-situacao="entregue"]')
+                   && !!s.views.cozinha.querySelector('[data-raia="pronto"] .ficha') }
+```
+
+### The choreography is declared, not hoped for
+
+What one screen's action does to the others is the reason to have them open
+together, so it is stated on the step and checked:
+
+```js
+{ when:"o garçom entrega na mesa", on:"garcom", click:'[data-act="entregar"]',
+  propagates:["cliente"], unchanged:["cozinha"] }
+```
+
+`propagates` names the views that must have changed because of this step;
+`unchanged` names the ones that must not have. The harness holds both
+renderings and compares them, so neither is a matter of opinion. The second is
+the harder half and the one nothing else can express: *the kitchen is done with
+this plate, and whether it is already on the table is not its business.*
+
+A prototype with several views and no such step is called out — it has drawn
+the screens without specifying the thing that made them worth drawing together.
+
+Two limits worth knowing before you lean on it. **The comparison is the whole
+view's markup**, so it answers "did this screen change at all" and nothing
+finer: there is no way to say *this part* must hold still, and a screen
+carrying anything incidental — a clock, a counter, a freshly generated id —
+will read as changed every time and cannot be declared `unchanged`. And
+**a request fired after an `await` inside a handler loses its view**, so it
+counts as nobody's and every view shows its loading state; fire what a screen
+asks for at the top of the handler if that matters to you.
+
+### On a phone, one screen at a time
+
+A row of devices is the one arrangement a phone cannot hold: three of them at
+their true widths is about 1800px asked to be 390, and every screen arrives at
+a fifth of its size. So on a handheld the stage holds **one view**, at its own
+device's width, and a row of names under it switches between them.
+
+The step is what leads. `on:` already says which screen an action happens on,
+so walking the journey with `›` takes the stage to that screen as it goes — the
+export reads as a script with parts, and on a phone the bench plays it that
+way. Tapping a name overrides that until the next step names one.
+
+This is display and nothing else. Every view is still rendered, so `state.views`,
+`propagates` and `unchanged` see exactly what they always saw; the suite still
+measures each view at the device it declares, and a probe always draws all of
+them. What changes on a phone is which one you are looking at.
+
+Leaving `views` out changes nothing: a one-screen prototype takes exactly the
+path it always did.
+
 ## Components — raw HTML is not allowed
 
 A prototype is React, and **every element comes from `@12-apps/ui`**. Not "prefer

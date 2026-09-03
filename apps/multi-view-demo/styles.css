@@ -1,0 +1,81 @@
+/* Each view is an ordinary screen inside its own frame, and the frame is the
+   container — so these are the same @container rules any single-screen
+   prototype would write. Nothing here knows the other views exist, and
+   nothing here lays out a stage: the harness does that. */
+
+.vista {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.estado { display: grid; gap: 10px; min-width: 0; }
+.linha, .ficha { min-width: 0; }
+/* the same record, in each person's words — so it has to read as a state,
+   not as a stray line of text */
+.situacao {
+  justify-self: start;
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: #1c2431;
+  font-weight: 600;
+  font-size: 13px;
+}
+.situacao[data-situacao="preparando"] { background: #fde9c8; color: #6b4405; }
+.situacao[data-situacao="pronto"]     { background: #cfeed8; color: #14532d; }
+.situacao[data-situacao="entregue"]   { background: #dde3ec; color: #3b4658; }
+
+/* a card is a stack, not a run of words: "Mesa 7" and "2 item(s)" are two
+   facts and ran together as one when they were left inline */
+.mesa { display: block; font-weight: 600; }
+.qtd, .item { display: block; }
+.mesa + .situacao { margin-top: 6px; }
+.btn { min-height: 44px; }
+
+/* the comanda and the salão: one column on a small phone, two once there is
+   room for them side by side */
+@container frame (min-width: 480px) {
+  .vista.telefone .estado[data-estado="conteudo"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .vista.telefone .situacao { grid-column: 1 / -1; }
+}
+
+/* the pass: the lanes are the arrangement, and how many fit is the width's
+   decision — stacked on a phone, side by side on the screen at the pass */
+.quadro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.raia {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f4f6f9;
+}
+/* an empty lane is still a lane — the pass reads the board by its shape */
+.raia h3 { margin: 0; font-size: 15px; }
+
+@container frame (min-width: 480px) {
+  .quadro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container frame (min-width: 1024px) {
+  /* three lanes, three columns: a fourth left the board with a hole in it */
+  .quadro { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* a refusal from the server belongs across the whole board, not in one lane */
+.aviso { grid-column: 1 / -1; }
+
+/* Each view is walked across the WHOLE ladder, so a phone screen still has to
+   behave when it is given 1440px: prose gets a measure, like anywhere else. */
+.vista p { max-width: 65ch; }
