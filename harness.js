@@ -642,6 +642,12 @@ const Proto = (() => {
         if (v == null && extras == null) shown = state;
         else {
           shown = (extras == null) ? { ...state } : { ...state, ...extras };
+          /* `mount` renders ONE screen and has no business reading the others,
+             and the roots on the live state point at the live document — a
+             mount drawing into a probe would be handed the wrong nodes. So no
+             copy carries them; the assertions get them set deliberately,
+             after the paint that produced them. */
+          delete shown.views;
           if (v){
             /* Callers build their `shown` before they know which view it is
                for, so it carries the STAGE's answers: view null, and the rung
@@ -668,25 +674,33 @@ const Proto = (() => {
     const roots = {};
     VIEWS.forEach(v => {
       if (only && only !== v.id) return;
-      let cell = host.querySelector('[data-h-view="' + v.id + '"]');
-      if (!cell || cell.parentNode !== host){
+      let cell = [...host.children].find(c => c.getAttribute
+                 && c.getAttribute("data-h-view") === v.id);
+      if (!cell){
         cell = document.createElement("div");
         cell.className = "h-view";
         cell.setAttribute("data-h-view", v.id);
-        const tag = document.createElement("div");
-        tag.className = "h-view-label";
-        const nome = document.createElement("span");
-        nome.className = "h-view-name";
-        nome.textContent = v.label;
-        tag.appendChild(nome);
-        if (host.id === "app") tag.appendChild(viewPicker(v));
+        /* The label and its picker are chrome, and chrome inside a probe gets
+           read as the prototype's own: a 10px label is measured as text below
+           the minimum, and in strict mode its <span> is reported as raw
+           markup the prototype cannot remove, because it never wrote it. So
+           the bench gets them and a probe never does. */
+        if (host.id === "app"){
+          const tag = document.createElement("div");
+          tag.className = "h-view-label";
+          const nome = document.createElement("span");
+          nome.className = "h-view-name";
+          nome.textContent = v.label;
+          tag.appendChild(nome);
+          tag.appendChild(viewPicker(v));
+          cell.appendChild(tag);
+        }
         const frame = document.createElement("div");
         frame.className = "h-view-frame";
-        cell.appendChild(tag);
         cell.appendChild(frame);
         host.appendChild(cell);
       }
-      const frame = cell.lastChild;
+      const frame = cell.querySelector(".h-view-frame");
       /* the picker mirrors the state, never a second source of truth: Resetar
          and a restored preference both come through here */
       const picker = cell.querySelector(".h-view-vp");
@@ -1636,7 +1650,8 @@ const Proto = (() => {
     /* the key carries the context: the same step yields different screens for
        the owner and for the waiter */
     const ctxSig = JSON.stringify(state.ctx);
-    const wid = forcedWidth ? forcedWidth.id : "tela";
+    const wid = (forcedWidth ? forcedWidth.id : "tela")
+      + (multi() ? "|" + VIEWS.map(v => (viewWidth(v) || {}).w).join(",") : "");
     const keyName = k => s.id + "|" + axis + "|" + k + "|" + ctxSig + "|" + wid;
 
     /* A scenario with `waitFor` does not enter the cache: the stalled request
@@ -2461,7 +2476,11 @@ const Proto = (() => {
       }
       probeL.remove();
       physicals.forEach((reg, k) => {
-        if (typeof reg === "string"){ warnings.push(reg); return; }
+        /* the key is what names the page, the view and the thing that
+           vanished; pushing only the value left "existe em xlg, some em xxs"
+           with nothing to say WHAT did, which with several views on the
+           bench does not even say which screen */
+        if (typeof reg === "string"){ warnings.push(`${k} — ${reg}`); return; }
         warnings.push(`${k} — ${[...reg.details].slice(0, 3).join(", ")} `
           + `(em ${reg.rungs.join(", ")})`);
       });
@@ -2797,6 +2816,17 @@ const Proto = (() => {
       }
     });
 
+    /* A step that names a view in a prototype that declares none: today the
+       harness quietly ignores it, so a leftover `on:` from a copied scenario
+       reads as if it were scoping something. */
+    if (!multi()){
+      const strays = cfg.scenarios.filter(s => (s.steps || []).some(st => st.on));
+      if (strays.length){
+        warnings.push(`${strays.map(s => `"${s.name}"`).join(", ")}: passo com on:"…" `
+          + `mas o protótipo não declara views — o on não aponta para nada`);
+      }
+    }
+
     /* ---------- what several views owe ----------
        A view is an ordinary screen, so it owes everything a screen owes — and
        the audit above has already demanded that of each of them. What is left
@@ -3105,6 +3135,31 @@ const Proto = (() => {
       }
     }
 
+    /* ---------- a step that does not say where it acts ----------
+       With several screens open the same control can be on more than one of
+       them, so an action naming no view has not said what happens. The replay
+       reports it too, but only where a later Então drags it into the open — a
+       scenario whose last step is that action would pass with a warning. This
+       makes it a failure on its own, which is what the rule claims to be. */
+    if (multi()) for (const s of all){
+      if (cancelVerification) break;
+      (s.steps || []).forEach((st, i) => {
+        const spec = specOf(st);
+        const k = kindOf(st);
+        const fail = reason => {
+          bad++;
+          failures.push({ scen:s.name, tags:(s.tags || []).join(" "), stp:i + 1,
+            kw:k.kw, textStr:k.text, example:null, reason, link:`#${s.id}/${i + 1}` });
+        };
+        if (st.on && !viewById(st.on)){
+          fail(`o passo aponta para a vista "${st.on}", que não está declarada em views`);
+        } else if (spec && !spec.on){
+          fail(`o passo age mas não diz em qual vista — falta on:"`
+             + VIEWS.map(v => v.id).join('" / "') + `"`);
+        }
+      });
+    }
+
     /* ---------- propagation: what the OTHER screens did ----------
        The reason to have several views open at once is that an action on one
        is meant to show up on another — and, just as often, is meant NOT to.
@@ -3129,31 +3184,38 @@ const Proto = (() => {
             kw:k.kw, textStr:k.text, example:null, reason, link:`#${s.id}/${i + 1}` });
         };
 
-        let before = null, after = null, broke = null;
-        forcedWidth = sampleWidth(s, 0);
-        adjustProbe(probe);
-        try {
-          const b = await buildState(s, i - 1, 0);
-          before = snapshotViews(paint(probe, { app:b.app, ex:b.ex, scenario:s.id }));
-          const a2 = await buildState(s, i, 0);
-          after  = snapshotViews(paint(probe, { app:a2.app, ex:a2.ex, scenario:s.id }));
-        } catch (e){ broke = "quebrou ao desenhar: " + e.message; }
-        forcedWidth = null;
+        /* every row of an Esquema do Cenário, not just the first: a
+           propagation that only holds for one set of Exemplos is a
+           propagation that does not hold */
+        const rows = isOutline(s) ? s.examples.tableRows.map((_, ri) => ri) : [0];
+        for (const ri of rows){
+          const linha = isOutline(s) ? ` (${s.examples.tableRows[ri].join(" | ")})` : "";
+          let before = null, after = null, broke = null;
+          forcedWidth = sampleWidth(s, ri);
+          adjustProbe(probe);
+          try {
+            const b = await buildState(s, i - 1, ri);
+            before = snapshotViews(paint(probe, { app:b.app, ex:b.ex, scenario:s.id }));
+            const a2 = await buildState(s, i, ri);
+            after  = snapshotViews(paint(probe, { app:a2.app, ex:a2.ex, scenario:s.id }));
+          } catch (e){ broke = "quebrou ao desenhar: " + e.message; }
+          forcedWidth = null;
 
-        if (broke){ wants.concat(holds).forEach(() => fail(broke)); continue; }
+          if (broke){ wants.concat(holds).forEach(() => fail(broke + linha)); continue; }
 
-        wants.forEach(id => {
-          if (!viewById(id)) return fail(`o passo declara propagates:"${id}", que não está declarada em views`);
-          if (before[id] !== after[id]) ok++;
-          else fail(`a vista "${id}" não mudou depois deste passo — `
-                  + `a propagação está declarada mas não acontece`);
-        });
-        holds.forEach(id => {
-          if (!viewById(id)) return fail(`o passo declara unchanged:"${id}", que não está declarada em views`);
-          if (before[id] === after[id]) ok++;
-          else fail(`a vista "${id}" mudou depois deste passo — `
-                  + `o passo declara que ela fica como está`);
-        });
+          wants.forEach(id => {
+            if (!viewById(id)) return fail(`o passo declara propagates:"${id}", que não está declarada em views`);
+            if (before[id] !== after[id]) ok++;
+            else fail(`a vista "${id}" não mudou depois deste passo${linha} — `
+                    + `a propagação está declarada mas não acontece`);
+          });
+          holds.forEach(id => {
+            if (!viewById(id)) return fail(`o passo declara unchanged:"${id}", que não está declarada em views`);
+            if (before[id] === after[id]) ok++;
+            else fail(`a vista "${id}" mudou depois deste passo${linha} — `
+                    + `o passo declara que ela fica como está`);
+          });
+        }
       }
     }
 

@@ -116,8 +116,28 @@ const journey = extra => ({
     ]
   }] });
   check("rejects an action that does not say which screen it acts on",
-        /não diz em qual vista age/.test(semOnde.reasons + semOnde.warnings),
-        "not reported: " + semOnde.reasons + semOnde.warnings);
+        semOnde.r.bad > 0 && /não diz em qual vista/.test(semOnde.reasons),
+        "only warned, did not fail: " + semOnde.reasons + semOnde.warnings);
+
+  /* the same, with nothing after it to drag it into the open — a scenario
+     whose last step is that action used to pass with a warning */
+  const semOndeNoFim = await bench({ ...base(true), scenarios:[{
+    id:"j", name:"jornada", page:"p", tags:["@feliz"],
+    given:{ text:"que as duas telas estão abertas", state:() => ({ page:"p", n:0 }) },
+    steps:[
+      { then:"começa vazia", on:"a", check:(a, el) => !!el.querySelector('[data-estado="vazio"]') },
+      { when:"alguém soma", click:'[data-act="bump"]' }
+    ]
+  }] });
+  check("rejects it even with no assertion after it",
+        semOndeNoFim.r.bad > 0, "passed with only a warning");
+
+  /* ---- the bench's chrome must never be inside a probe: the rules read a
+          probe, and a 10px label is measured as the prototype's own text ---- */
+  const chrome = await bench({ ...base(true), strictMode:true,
+    primitives:{ "button":"Button" }, scenarios:[journey({})] });
+  check("keeps the bench's own chrome out of what the rules measure",
+        !/h-view/.test(chrome.warnings), "chrome leaked: " + chrome.warnings);
 
   /* ---- a screen nobody touches, and a screen that never reaches a state ---- */
   const ocioso = await bench({ ...base(true), scenarios:[journey({})] });
@@ -127,6 +147,33 @@ const journey = extra => ({
   check("warns per view about a state that view never reaches",
         /a vista "B" nunca marcou \[data-estado="erro"\]/.test(ocioso.warnings),
         "not warned: " + ocioso.warnings);
+
+  /* ---- the measurements belong to the view, not to the row of frames ----
+          This is the one that decided the whole design: when the rules read
+          the stage instead of the view, they keep printing and stop meaning
+          anything. Here view A drops an affordance when it is narrow and view
+          B never has one; if anything measured the two together, B would be
+          accused of A's disappearance. ---- */
+  {
+    const larguraSensivel = {
+      views: VIEWS,
+      data_: { n:0 },
+      routes: [{ httpMethod:"POST", pathStr:"/api/n", responds: ({ data_ }) => ({ n: ++data_.n }) }],
+      render: s => s.view === "a"
+        ? `<div data-estado="${s.app.n ? "conteudo" : "vazio"}">`
+          + `<button data-act="bump">somar</button>`
+          + (s.widthPx >= 1024 ? `<button data-act="so-largo">extra</button>` : ``)
+          + `</div>`
+        : `<div data-estado="conteudo">parado</div>`
+    };
+    const medido = await bench({ ...larguraSensivel, scenarios:[journey({})] });
+    check("blames the view that actually drops content when narrow",
+          /p · A: ação:so-largo some no estreito/.test(medido.warnings),
+          "not reported: " + medido.warnings);
+    check("and does not blame the view next to it",
+          !/p · B: ação:so-largo/.test(medido.warnings),
+          "the other view was blamed for it too — the rules are reading the stage");
+  }
 
   /* ---- and none of it fires on a prototype with one screen ---- */
   const umaTela = await bench({

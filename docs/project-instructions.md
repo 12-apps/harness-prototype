@@ -269,6 +269,15 @@ this plate, and whether it is already on the table is not its business.*
 A prototype with several views and no such step is called out — it has drawn
 the screens without specifying the thing that made them worth drawing together.
 
+Two limits worth knowing before you lean on it. **The comparison is the whole
+view's markup**, so it answers "did this screen change at all" and nothing
+finer: there is no way to say *this part* must hold still, and a screen
+carrying anything incidental — a clock, a counter, a freshly generated id —
+will read as changed every time and cannot be declared `unchanged`. And
+**a request fired after an `await` inside a handler loses its view**, so it
+counts as nobody's and every view shows its loading state; fire what a screen
+asks for at the top of the handler if that matters to you.
+
 Leaving `views` out changes nothing: a one-screen prototype takes exactly the
 path it always did.
 
